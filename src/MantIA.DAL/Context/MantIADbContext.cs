@@ -18,17 +18,16 @@ public class MantIADbContext : DbContext
     public DbSet<Empresa> Empresas => Set<Empresa>();
     public DbSet<CatalogoMaquina> CatalogosMaquina => Set<CatalogoMaquina>();
     public DbSet<Maquina> Maquinas => Set<Maquina>();
+    public DbSet<Usuario> Usuarios => Set<Usuario>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // Filtro multi-tenant SOLO sobre datos operativos privados.
-        // Fail-closed: si _tenant.EmpresaId es null, ninguna fila matchea.
         modelBuilder.Entity<Maquina>()
             .HasQueryFilter(m => m.EmpresaId == _tenant.EmpresaId);
-
-        // CatalogoMaquina queda SIN filtro: es el catálogo compartido global.
+        modelBuilder.Entity<Usuario>()
+            .HasQueryFilter(u => u.EmpresaId == _tenant.EmpresaId);
     }
 
     public override int SaveChanges()

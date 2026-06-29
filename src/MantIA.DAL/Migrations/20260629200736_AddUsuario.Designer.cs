@@ -3,6 +3,7 @@ using System;
 using MantIA.DAL.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MantIA.DAL.Migrations
 {
     [DbContext(typeof(MantIADbContext))]
-    partial class MantIADbContextModelSnapshot : ModelSnapshot
+    [Migration("20260629200736_AddUsuario")]
+    partial class AddUsuario
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -180,7 +183,7 @@ namespace MantIA.DAL.Migrations
                     b.Property<string>("Auth0UserId")
                         .IsRequired()
                         .HasColumnType("text")
-                        .HasColumnName("auth0_user_id");
+                        .HasColumnName("auth0user_id");
 
                     b.Property<string>("Email")
                         .IsRequired()
