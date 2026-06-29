@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MantIA.API/MantIA.API.csproj" />
+    <Project Path="src/MantIA.BE/MantIA.BE.csproj" />
+    <Project Path="src/MantIA.BLL/MantIA.BLL.csproj" />
+    <Project Path="src/MantIA.DAL/MantIA.DAL.csproj" />
+    <Project Path="src/MantIA.WEB/MantIA.WEB.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MantIA.IntegrationTests/MantIA.IntegrationTests.csproj" />
+    <Project Path="tests/MantIA.UnitTests/MantIA.UnitTests.csproj" />
+  </Folder>
+</Solution>
