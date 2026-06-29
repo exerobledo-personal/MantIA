@@ -1,6 +1,15 @@
-var builder = WebApplication.CreateBuilder(args);
+using Microsoft.EntityFrameworkCore;
+using Npgsql.EntityFrameworkCore.PostgreSQL;
+using MantIA.DAL.Tenancy;
 
-// Add services to the container.
+
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddDbContext<MantIA.DAL.Context.MantIADbContext>(options =>
+    options
+        .UseNpgsql(builder.Configuration.GetConnectionString("MantIADb"))
+        .UseSnakeCaseNamingConvention());
+
+builder.Services.AddScoped<ICurrentTenant, CurrentTenant>();
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
