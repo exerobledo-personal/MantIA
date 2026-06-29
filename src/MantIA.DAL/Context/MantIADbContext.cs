@@ -15,10 +15,14 @@ public class MantIADbContext : DbContext
         _tenant = tenant;
     }
 
+    #region DBSets
     public DbSet<Empresa> Empresas => Set<Empresa>();
     public DbSet<CatalogoMaquina> CatalogosMaquina => Set<CatalogoMaquina>();
     public DbSet<Maquina> Maquinas => Set<Maquina>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();
+    public DbSet<NivelPermiso> NivelesPermiso => Set<NivelPermiso>();
+    public DbSet<PermisoPorRolYNivel> PermisosPorRolYNivel => Set<PermisoPorRolYNivel>();
+    #endregion
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -28,6 +32,10 @@ public class MantIADbContext : DbContext
             .HasQueryFilter(m => m.EmpresaId == _tenant.EmpresaId);
         modelBuilder.Entity<Usuario>()
             .HasQueryFilter(u => u.EmpresaId == _tenant.EmpresaId);
+        modelBuilder.Entity<NivelPermiso>()
+            .HasQueryFilter(n => n.EmpresaId == _tenant.EmpresaId);
+        modelBuilder.Entity<PermisoPorRolYNivel>()
+            .HasQueryFilter(p => p.EmpresaId == _tenant.EmpresaId);
     }
 
     public override int SaveChanges()

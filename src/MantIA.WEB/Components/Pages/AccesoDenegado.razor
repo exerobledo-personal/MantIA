@@ -1,0 +1,10 @@
+﻿@page "/acceso-denegado"
+
+<h3>Acceso denegado</h3>
+<p>@(Mensaje ?? "Tu cuenta no esta autorizada para acceder a esta plataforma.")</p>
+<p>Si crees que es un error, contacta al administrador de tu empresa.</p>
+<a href="/logout">Cerrar sesion</a>
+
+@code {
+    [SupplyParameterFromQuery] public string? Mensaje { get; set; }
+}

@@ -10,6 +10,9 @@ builder.Services.AddDbContext<MantIA.DAL.Context.MantIADbContext>(options =>
         .UseSnakeCaseNamingConvention());
 
 builder.Services.AddScoped<ICurrentTenant, CurrentTenant>();
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<MantIA.BLL.Authorization.IPermisoService, MantIA.BLL.Authorization.PermisoService>();
+builder.Services.AddScoped<MantIA.BLL.Authorization.IUsuarioActual, MantIA.BLL.Authorization.UsuarioActual>();
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi

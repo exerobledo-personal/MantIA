@@ -3,6 +3,7 @@ using System;
 using MantIA.DAL.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MantIA.DAL.Migrations
 {
     [DbContext(typeof(MantIADbContext))]
-    partial class MantIADbContextModelSnapshot : ModelSnapshot
+    [Migration("20260629213405_AddPermisos")]
+    partial class AddPermisos
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -269,10 +272,6 @@ namespace MantIA.DAL.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fecha_baja");
 
-                    b.Property<Guid?>("NivelPermisoId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("nivel_permiso_id");
-
                     b.Property<string>("Nombre")
                         .IsRequired()
                         .HasColumnType("text")
@@ -285,9 +284,6 @@ namespace MantIA.DAL.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_usuarios");
-
-                    b.HasIndex("NivelPermisoId")
-                        .HasDatabaseName("ix_usuarios_nivel_permiso_id");
 
                     b.ToTable("usuarios", (string)null);
                 });
@@ -310,16 +306,6 @@ namespace MantIA.DAL.Migrations
                         .WithMany()
                         .HasForeignKey("NivelPermisoId")
                         .HasConstraintName("fk_permisos_por_rol_y_nivel_niveles_permiso_nivel_permiso_id");
-
-                    b.Navigation("NivelPermiso");
-                });
-
-            modelBuilder.Entity("MantIA.BE.Entities.Usuario", b =>
-                {
-                    b.HasOne("MantIA.BE.Entities.NivelPermiso", "NivelPermiso")
-                        .WithMany()
-                        .HasForeignKey("NivelPermisoId")
-                        .HasConstraintName("fk_usuarios_niveles_permiso_nivel_permiso_id");
 
                     b.Navigation("NivelPermiso");
                 });

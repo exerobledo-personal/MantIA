@@ -68,3 +68,21 @@ public class TenantResolver
             !string.Equals(dominioEmail, empresa.Dominio, StringComparison.OrdinalIgnoreCase))
         {
             return new ResultadoAcceso
+            {
+                Estado = EstadoAcceso.DominioNoCorporativo,
+                Mensaje = $"El correo {email} no pertenece al dominio corporativo de {empresa.RazonSocial} ({empresa.Dominio})."
+            };
+        }
+
+        // Acceso OK: recien aca se setea el tenant real.
+        _tenant.EmpresaId = empresa.Id;
+        return new ResultadoAcceso { Estado = EstadoAcceso.Autorizado, EmpresaId = empresa.Id };
+    }
+
+    private static string? ExtraerDominio(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return null;
+        var idx = email.LastIndexOf('@');
+        return idx >= 0 && idx < email.Length - 1 ? email[(idx + 1)..] : null;
+    }
+}

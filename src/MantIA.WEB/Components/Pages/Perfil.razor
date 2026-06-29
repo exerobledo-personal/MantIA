@@ -2,7 +2,6 @@
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
 @using MantIA.WEB.Services
-@using MantIA.DAL.Tenancy
 @inject AuthenticationStateProvider AuthProvider
 @inject TenantResolver Resolver
 
@@ -18,7 +17,12 @@ else if (claims.Count == 0)
 }
 else
 {
-    <p><strong>Empresa (tenant) resuelta:</strong> @(empresaId?.ToString() ?? "NINGUNA (fail-closed)")</p>
+    <p><strong>Estado de acceso:</strong> @resultado?.Estado</p>
+    @if (!string.IsNullOrEmpty(resultado?.Mensaje))
+    {
+        <p style="color:red"><strong>@resultado!.Mensaje</strong></p>
+    }
+    <p><strong>Empresa (tenant) resuelta:</strong> @(resultado?.EmpresaId?.ToString() ?? "NINGUNA")</p>
     <hr />
     <ul>
         @foreach (var c in claims)
@@ -31,23 +35,13 @@ else
 
 @code {
     private List<Claim>? claims;
-    private Guid? empresaId;
+    private ResultadoAcceso? resultado;
 
     protected override async Task OnInitializedAsync()
     {
         var state = await AuthProvider.GetAuthenticationStateAsync();
         claims = state.User.Claims.ToList();
-
         if (claims.Count > 0)
-        {
-            await Resolver.ResolverAsync(state.User);
-            // leemos el tenant ya resuelto desde el mismo scope
-            empresaId = (await AuthProvider.GetAuthenticationStateAsync()).User.Identity?.IsAuthenticated == true
-                ? GetTenant()
-                : null;
-        }
+            resultado = await Resolver.ResolverAsync(state.User);
     }
-
-    [Inject] private ICurrentTenant Tenant { get; set; } = default!;
-    private Guid? GetTenant() => Tenant.EmpresaId;
 }

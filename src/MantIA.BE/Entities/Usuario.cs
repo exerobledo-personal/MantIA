@@ -12,6 +12,9 @@ public class Usuario : TenantEntity
     public string Nombre { get; set; } = string.Empty;
     public string Apellido { get; set; } = string.Empty;
     public string Rol { get; set; } = "Empleado";
+    public Guid? NivelPermisoId { get; set; }
+    public NivelPermiso? NivelPermiso { get; set; }
+
     public string Estado { get; set; } = "activo";
     public DateTime FechaAlta { get; set; } = DateTime.UtcNow;
     public DateTime? FechaBaja { get; set; }
