@@ -1,0 +1,300 @@
+@page "/plataforma/empresas"
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Empresas cliente · MantIA</PageTitle>
+
+<PageHeader Titulo="Empresas cliente"
+            Bajada="Alta, edición y baja de las organizaciones que operan sobre MantIA. Cada empresa es un tenant aislado: sus máquinas, repuestos, órdenes de trabajo y usuarios no se cruzan con los de ninguna otra."
+            Icono="@Icons.Material.Filled.Domain"
+            Migas="@Migas">
+    <Acciones>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Sell" Href="/plataforma/planes">
+            Planes de suscripción
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add" Href="/plataforma/empresas/nueva">
+            Nueva empresa
+        </MudButton>
+    </Acciones>
+</PageHeader>
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Empresas activas"
+                    Valor="@DatosDemo.Empresas.Count(e => e.Estado == EstadoGenerico.Activo).ToString()"
+                    Unidad="@($"/ {DatosDemo.Empresas.Count}")"
+                    Detalle="Tenants con contrato vigente y acceso habilitado"
+                    Icono="@Icons.Material.Filled.CheckCircle" Acento="Color.Success" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="En plan piloto"
+                    Valor="@DatosDemo.Empresas.Count(e => e.Plan == PlanPiloto).ToString()"
+                    Detalle="Pruebas sin costo de 60 días pendientes de conversión"
+                    Icono="@Icons.Material.Filled.Timelapse" Acento="Color.Info" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Cerca del límite del plan" Valor="@CercaDelLimite.Count.ToString()"
+                    Detalle="Con el 80 % o más de las máquinas habilitadas en uso"
+                    Icono="@Icons.Material.Filled.TrendingUp"
+                    Acento="@(CercaDelLimite.Count > 0 ? Color.Warning : Color.Success)" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Empresas inactivas"
+                    Valor="@DatosDemo.Empresas.Count(e => e.Estado == EstadoGenerico.Inactivo).ToString()"
+                    Detalle="Sin acceso al servicio, con datos conservados por retención contractual"
+                    Icono="@Icons.Material.Filled.PowerSettingsNew" Acento="Color.Default" />
+    </MudItem>
+</MudGrid>
+
+@if (CercaDelLimite.Count > 0)
+{
+    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4"
+              Icon="@Icons.Material.Filled.TrendingUp">
+        @CercaDelLimite.Count @(CercaDelLimite.Count == 1 ? "empresa está" : "empresas están") al 80 % o más
+        del cupo de máquinas de su plan: @NombresCercaDelLimite. Son candidatas naturales a una ampliación de plan.
+    </MudAlert>
+}
+
+<FilterBar>
+    <MudTextField @bind-Value="_busqueda" Immediate="true"
+                  Placeholder="Buscar por razón social o dominio corporativo"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                  Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"
+                  Class="mantia-filtros__buscador" />
+
+    <MudSelect T="string" @bind-Value="_plan" Label="Plan" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@TodosLosPlanes">@TodosLosPlanes</MudSelectItem>
+        @foreach (var plan in DatosDemo.Planes)
+        {
+            <MudSelectItem T="string" Value="@plan.Nombre">@plan.Nombre</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="string" @bind-Value="_rubro" Label="Rubro" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@TodosLosRubros">@TodosLosRubros</MudSelectItem>
+        @foreach (var rubro in Rubros)
+        {
+            <MudSelectItem T="string" Value="@rubro">@rubro</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="string" @bind-Value="_estado" Label="Estado" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@TodosLosEstados">@TodosLosEstados</MudSelectItem>
+        @foreach (var estado in Enum.GetValues<EstadoGenerico>())
+        {
+            <MudSelectItem T="string" Value="@estado.ToString()">@estado.ToString()</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSpacer />
+
+    <MudText Typo="Typo.body2" Class="mud-text-secondary">
+        @Filtradas.Count de @DatosDemo.Empresas.Count empresas
+    </MudText>
+</FilterBar>
+
+@if (Filtradas.Count == 0)
+{
+    <SectionCard>
+        <EmptyState Titulo="No hay empresas que coincidan con el filtro"
+                    Descripcion="Probá con otro texto de búsqueda o ampliá el alcance a todos los planes, rubros y estados."
+                    Icono="@Icons.Material.Filled.SearchOff">
+            <Accion>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LimpiarFiltros">
+                    Limpiar filtros
+                </MudButton>
+            </Accion>
+        </EmptyState>
+    </SectionCard>
+}
+else
+{
+    <SectionCard Titulo="Listado de empresas cliente"
+                 Bajada="Cada fila abre la ficha del tenant con su suscripción, sus contadores de uso y su actividad"
+                 SinPadding="true">
+        <MudTable Items="@Filtradas" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                  Breakpoint="Breakpoint.Sm" Striped="false"
+                  OnRowClick="@((TableRowClickEventArgs<EmpresaVm> e) => Abrir(e.Item))"
+                  RowStyle="cursor:pointer">
+            <HeaderContent>
+                <MudTh>Razón social</MudTh>
+                <MudTh>Rubro</MudTh>
+                <MudTh>Plan</MudTh>
+                <MudTh>Uso de máquinas</MudTh>
+                <MudTh Style="text-align:right">Usuarios activos</MudTh>
+                <MudTh Style="text-align:right">Órdenes del mes</MudTh>
+                <MudTh>Alta</MudTh>
+                <MudTh>Estado</MudTh>
+                <MudTh Style="text-align:right">Acciones</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Razón social">
+                    <div class="mantia-celda-principal">
+                        <strong>@context.RazonSocial</strong>
+                        <span>@context.Dominio · @context.TenantId</span>
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="Rubro">@context.Rubro</MudTd>
+                <MudTd DataLabel="Plan">
+                    <StatusChip Texto="@context.Plan" ChipColor="Color.Info" Variante="Variant.Outlined" />
+                </MudTd>
+                <MudTd DataLabel="Uso de máquinas" Style="min-width:170px">
+                    <div class="d-flex justify-space-between" style="font-size:.78rem">
+                        <span><b>@context.MaquinasRegistradas</b> de @context.MaxMaquinasHabilitadas</span>
+                        <span>@Uso(context) %</span>
+                    </div>
+                    <MudProgressLinear Value="@((double)Uso(context))" Color="@ColorUso(Uso(context))"
+                                       Rounded="true" Size="Size.Small" Class="mt-1" />
+                </MudTd>
+                <MudTd DataLabel="Usuarios activos" Style="text-align:right">@context.UsuariosActivos</MudTd>
+                <MudTd DataLabel="Órdenes del mes" Style="text-align:right">@context.OrdenesUltimoMes</MudTd>
+                <MudTd DataLabel="Alta">@Ui.Fecha(context.FechaAlta)</MudTd>
+                <MudTd DataLabel="Estado">
+                    <StatusChip Texto="@context.Estado.ToString()" ChipColor="@Ui.ColorDe(context.Estado)" />
+                </MudTd>
+                <MudTd DataLabel="Acciones" Style="text-align:right">
+                    <div class="d-flex justify-end" style="gap:.25rem"
+                         @onclick="Ignorar" @onclick:stopPropagation="true">
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small"
+                                       Color="Color.Primary" aria-label="Ver ficha de la empresa"
+                                       Href="@($"/plataforma/empresas/{context.Id}")" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       Color="Color.Default" aria-label="Editar datos de la empresa"
+                                       Href="@($"/plataforma/empresas/{context.Id}/editar")" />
+                        @if (context.Estado == EstadoGenerico.Activo)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Block" Size="Size.Small"
+                                           Color="Color.Error" aria-label="Desactivar empresa"
+                                           OnClick="@(() => Desactivar(context))" />
+                        }
+                        else
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small"
+                                           Color="Color.Success" aria-label="Reactivar empresa"
+                                           OnClick="@(() => Reactivar(context))" />
+                        }
+                    </div>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager RowsPerPageString="Filas por página"
+                                   InfoFormat="{first_item}-{last_item} de {all_items}"
+                                   AllItemsText="Todas" />
+            </PagerContent>
+        </MudTable>
+    </SectionCard>
+}
+
+@code {
+    private const string TodosLosPlanes = "Todos los planes";
+    private const string TodosLosRubros = "Todos los rubros";
+    private const string TodosLosEstados = "Todos los estados";
+    private const string PlanPiloto = "Piloto";
+
+    private string _busqueda = "";
+    private string _plan = TodosLosPlanes;
+    private string _rubro = TodosLosRubros;
+    private string _estado = TodosLosEstados;
+
+    private static readonly List<BreadcrumbItem> Migas =
+    [
+        new BreadcrumbItem("Plataforma MantIA", "/plataforma"),
+        new BreadcrumbItem("Empresas cliente", "/plataforma/empresas")
+    ];
+
+    private static List<string> Rubros => DatosDemo.Empresas
+        .Select(e => e.Rubro)
+        .Distinct()
+        .OrderBy(r => r)
+        .ToList();
+
+    private static List<EmpresaVm> CercaDelLimite => DatosDemo.Empresas
+        .Where(e => e.Estado == EstadoGenerico.Activo && Uso(e) >= 80)
+        .OrderByDescending(Uso)
+        .ToList();
+
+    private static string NombresCercaDelLimite =>
+        string.Join(", ", CercaDelLimite.Select(e => $"{e.RazonSocial} ({Uso(e)} %)"));
+
+    private List<EmpresaVm> Filtradas => DatosDemo.Empresas
+        .Where(e => _plan == TodosLosPlanes || e.Plan == _plan)
+        .Where(e => _rubro == TodosLosRubros || e.Rubro == _rubro)
+        .Where(e => _estado == TodosLosEstados || e.Estado.ToString() == _estado)
+        .Where(Coincide)
+        .OrderByDescending(e => e.Estado == EstadoGenerico.Activo)
+        .ThenBy(e => e.RazonSocial)
+        .ToList();
+
+    private bool Coincide(EmpresaVm empresa)
+    {
+        if (string.IsNullOrWhiteSpace(_busqueda)) return true;
+
+        var texto = _busqueda.Trim();
+        return empresa.RazonSocial.Contains(texto, StringComparison.OrdinalIgnoreCase)
+               || empresa.Dominio.Contains(texto, StringComparison.OrdinalIgnoreCase)
+               || empresa.TenantId.Contains(texto, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int Uso(EmpresaVm empresa) => empresa.MaxMaquinasHabilitadas <= 0
+        ? 0
+        : (int)Math.Round(empresa.MaquinasRegistradas * 100d / empresa.MaxMaquinasHabilitadas);
+
+    private static Color ColorUso(int uso) => uso switch
+    {
+        >= 90 => Color.Error,
+        >= 80 => Color.Warning,
+        _ => Color.Primary
+    };
+
+    private void LimpiarFiltros()
+    {
+        _busqueda = "";
+        _plan = TodosLosPlanes;
+        _rubro = TodosLosRubros;
+        _estado = TodosLosEstados;
+    }
+
+    private void Abrir(EmpresaVm? empresa)
+    {
+        if (empresa is not null) Nav.NavigateTo($"/plataforma/empresas/{empresa.Id}");
+    }
+
+    private async Task Desactivar(EmpresaVm empresa)
+    {
+        var parametros = new DialogParameters
+        {
+            { "Mensaje", $"¿Confirmás la desactivación de {empresa.RazonSocial}?" },
+            { "Detalle", $"Se desactivan los {empresa.UsuariosActivos} usuarios del tenant {empresa.TenantId} en el proveedor de identidad, por lo que nadie de la empresa va a poder iniciar sesión. Los datos operativos (máquinas, repuestos, órdenes de trabajo y bitácoras) se conservan durante el período de retención contractual y se restituyen si la empresa se reactiva." },
+            { "TextoConfirmar", "Desactivar empresa" },
+            { "ColorAccion", Color.Error },
+            { "Icono", Icons.Material.Filled.Block }
+        };
+
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialogo = await DialogService.ShowAsync<ConfirmDialog>("Desactivar empresa", parametros, opciones);
+        var resultado = await dialogo.Result;
+
+        if (resultado is null || resultado.Canceled) return;
+
+        empresa.Estado = EstadoGenerico.Inactivo;
+        empresa.OrdenesUltimoMes = 0;
+
+        Snackbar.Add($"{empresa.RazonSocial} quedó desactivada. Se revocó el acceso de sus usuarios en el proveedor de identidad.", Severity.Success);
+    }
+
+    private void Reactivar(EmpresaVm empresa)
+    {
+        empresa.Estado = EstadoGenerico.Activo;
+        Snackbar.Add($"{empresa.RazonSocial} volvió a estar activa. Sus usuarios recuperan el acceso con las credenciales vigentes.", Severity.Success);
+    }
+
+    private void Ignorar()
+    {
+    }
+}

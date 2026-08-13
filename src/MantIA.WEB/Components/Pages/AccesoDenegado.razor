@@ -1,10 +1,53 @@
-﻿@page "/acceso-denegado"
+@page "/acceso-denegado"
+@layout LoginLayout
 
-<h3>Acceso denegado</h3>
-<p>@(Mensaje ?? "Tu cuenta no esta autorizada para acceder a esta plataforma.")</p>
-<p>Si crees que es un error, contacta al administrador de tu empresa.</p>
-<a href="/logout">Cerrar sesion</a>
+<PageTitle>Acceso denegado · MantIA</PageTitle>
+
+<div class="mantia-acceso__panel" style="min-height:100vh">
+    <div style="width:100%;max-width:560px;text-align:center">
+        <div class="d-flex align-center justify-center mb-6" style="gap:.75rem">
+            <MudIcon Icon="@Icons.Material.Filled.Insights" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">MantIA</MudText>
+        </div>
+
+        <MudIcon Icon="@Icons.Material.Filled.Lock" Color="Color.Error" Style="font-size:5.5rem" />
+
+        <MudText Typo="Typo.h4" Class="mt-4">Acceso denegado</MudText>
+
+        <MudText Typo="Typo.body1" Class="mt-3">@MensajeVisible</MudText>
+
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mt-4">
+            El ingreso a MantIA está restringido al dominio corporativo que cada empresa cliente registra al
+            contratar el servicio. Si tu correo no pertenece a ese dominio, o si todavía no fuiste dado de alta
+            como usuario de la empresa, el acceso queda bloqueado hasta que el administrador complete el alta.
+        </MudText>
+
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-6">
+            Administración de @DatosDemo.EmpresaActual.RazonSocial: @Administrador
+        </MudAlert>
+
+        <div class="d-flex flex-wrap justify-center mt-6" style="gap:.75rem">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                       StartIcon="@Icons.Material.Filled.Login" Href="/">
+                Volver al inicio de sesión
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Large"
+                       StartIcon="@Icons.Material.Filled.MailOutline" Href="@EnlaceCorreo">
+                Escribir al administrador
+            </MudButton>
+        </div>
+    </div>
+</div>
 
 @code {
     [SupplyParameterFromQuery] public string? Mensaje { get; set; }
+
+    private string MensajeVisible => string.IsNullOrWhiteSpace(Mensaje)
+        ? "Tu cuenta no está habilitada para operar en esta plataforma."
+        : Mensaje;
+
+    private static string Administrador => DatosDemo.EmpresaActual.AdminInicial;
+
+    private static string EnlaceCorreo =>
+        $"mailto:{Administrador}?subject=Solicitud%20de%20acceso%20a%20MantIA";
 }

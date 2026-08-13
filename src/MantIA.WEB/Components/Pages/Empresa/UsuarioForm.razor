@@ -1,0 +1,332 @@
+@page "/empresa/usuarios/nuevo"
+@page "/empresa/usuarios/{Id:guid}/editar"
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>@(EsAlta ? "Nuevo usuario" : "Editar usuario") · MantIA</PageTitle>
+
+<PageHeader Titulo="@(EsAlta ? "Registrar un usuario" : $"Editar {_nombre} {_apellido}")"
+            Bajada="@(EsAlta
+                        ? "El alta habilita el acceso de una persona a la plataforma. El rol define qué recursos ve y el nivel hasta dónde puede operar sobre cada uno."
+                        : "Los cambios de rol, nivel o plantas asignadas se aplican en la próxima sesión del usuario.")"
+            Icono="@Icons.Material.Filled.PersonAdd"
+            Migas="@Migas" />
+
+@if (!EsAlta && _usuario is null)
+{
+    <SectionCard>
+        <EmptyState Titulo="No encontramos el usuario"
+                    Descripcion="La persona que intentás editar no existe en la cuenta de la empresa."
+                    Icono="@Icons.Material.Filled.SearchOff">
+            <Accion>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/empresa/usuarios">
+                    Volver al listado
+                </MudButton>
+            </Accion>
+        </EmptyState>
+    </SectionCard>
+}
+else
+{
+    <MudForm @ref="_formulario">
+        <MudGrid Spacing="3">
+            <MudItem xs="12" lg="7">
+                <SectionCard Titulo="Datos de la persona"
+                             Bajada="Con estos datos el usuario aparece en las órdenes de trabajo y en la bitácora">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_nombre" Label="Nombre"
+                                          Variant="Variant.Outlined" Placeholder="Sofía"
+                                          Required="true" RequiredError="Indicá el nombre de la persona" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_apellido" Label="Apellido"
+                                          Variant="Variant.Outlined" Placeholder="Ledesma"
+                                          Required="true" RequiredError="Indicá el apellido de la persona" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_email" Label="Correo corporativo"
+                                          Variant="Variant.Outlined" Immediate="true"
+                                          Placeholder="@PlaceholderCorreo"
+                                          Error="@CorreoConError" ErrorText="@ErrorCorreo"
+                                          HelperText="@($"Solo se admiten correos del dominio corporativo {DatosDemo.EmpresaActual.Dominio}")"
+                                          Required="true" RequiredError="El correo corporativo es la identidad del usuario en la plataforma" />
+                        </MudItem>
+                    </MudGrid>
+                </SectionCard>
+
+                <SectionCard Titulo="Rol, nivel y alcance" Class="mt-4"
+                             Bajada="El rol define qué recursos ve el usuario, el nivel hasta dónde puede operar y las plantas sobre qué equipos trabaja">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="_rol" Label="Rol"
+                                       Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter"
+                                       HelperText="Determina el conjunto de recursos habilitados">
+                                @foreach (var rol in RolesDisponibles)
+                                {
+                                    <MudSelectItem T="string" Value="@rol">@Roles.Etiqueta(rol)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="_nivel" Label="Nivel"
+                                       Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter"
+                                       HelperText="@NivelSeleccionado?.Descripcion">
+                                @foreach (var nivel in DatosDemo.Niveles)
+                                {
+                                    <MudSelectItem T="string" Value="@nivel.Nombre">@nivel.Nombre</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudSelect T="string" MultiSelection="true" @bind-SelectedValues="_plantasSeleccionadas"
+                                       Label="Plantas asignadas" Variant="Variant.Outlined"
+                                       HelperText="El usuario solo ve las máquinas, órdenes y alertas de las plantas seleccionadas">
+                                @foreach (var planta in DatosDemo.Plantas)
+                                {
+                                    <MudSelectItem T="string" Value="@planta.Nombre">
+                                        @planta.Nombre · @planta.Localidad
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+
+                    @if (EsAlta)
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4">
+                            El usuario se crea en el proveedor de identidad de la plataforma y recibe un correo de bienvenida
+                            con sus credenciales y el enlace para definir su contraseña. Hasta que complete ese paso, la cuenta
+                            figura activa pero sin accesos registrados.
+                        </MudAlert>
+                    }
+                </SectionCard>
+            </MudItem>
+
+            <MudItem xs="12" lg="5">
+                <SectionCard Titulo="Qué va a poder hacer este usuario"
+                             Bajada="@($"Permisos vigentes para el perfil {Roles.Etiqueta(_rol)} de nivel {_nivel}")">
+                    <div class="d-flex flex-wrap align-center mb-4" style="gap:.5rem">
+                        <StatusChip Texto="@Roles.Etiqueta(_rol)" ChipColor="Color.Primary" />
+                        <StatusChip Texto="@($"Nivel {_nivel}")"
+                                    ChipColor="@(_nivel == "Sr" ? Color.Info : Color.Default)" />
+                        <StatusChip Texto="@($"{AccionesHabilitadas} acciones habilitadas")"
+                                    ChipColor="Color.Default" Variante="Variant.Outlined" />
+                    </div>
+
+                    @if (AccionesHabilitadas == 0)
+                    {
+                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">
+                            La combinación de rol y nivel elegida no tiene ninguna acción habilitada. El usuario va a poder
+                            iniciar sesión pero no va a ver información. Revisá la matriz de permisos antes de guardar.
+                        </MudAlert>
+                    }
+
+                    <div class="mantia-lista-datos">
+                        @foreach (var (recurso, acciones) in ResumenPermisos)
+                        {
+                            <div class="d-flex flex-wrap align-center justify-space-between" style="gap:.5rem">
+                                <MudText Typo="Typo.body2"><b>@recurso</b></MudText>
+                                @if (acciones.Count == 0)
+                                {
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Sin acceso</MudText>
+                                }
+                                else
+                                {
+                                    <div class="d-flex flex-wrap justify-end" style="gap:.25rem">
+                                        @foreach (var accion in acciones)
+                                        {
+                                            <StatusChip Texto="@accion" ChipColor="@ColorAccion(accion)"
+                                                        Variante="Variant.Outlined" />
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-4">
+                        Los permisos se administran por rol y nivel, no por persona. Si necesitás cambiarlos para todo un
+                        perfil, hacelo desde la matriz de permisos.
+                    </MudText>
+
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-3"
+                               StartIcon="@Icons.Material.Filled.AdminPanelSettings" Href="/empresa/permisos">
+                        Abrir matriz de permisos
+                    </MudButton>
+                </SectionCard>
+            </MudItem>
+
+            <MudItem xs="12">
+                <div class="d-flex flex-wrap justify-end align-center" style="gap:.75rem">
+                    <MudButton Variant="Variant.Text" OnClick="Cancelar">Cancelar</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Save" OnClick="Guardar">
+                        @(EsAlta ? "Confirmar alta del usuario" : "Guardar cambios")
+                    </MudButton>
+                </div>
+            </MudItem>
+        </MudGrid>
+    </MudForm>
+}
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+
+    private MudForm _formulario = null!;
+    private UsuarioVm? _usuario;
+
+    private string _nombre = "";
+    private string _apellido = "";
+    private string _email = "";
+    private string _rol = Roles.Empleado;
+    private string _nivel = "Jr";
+    private IReadOnlyCollection<string?>? _plantasSeleccionadas = new List<string?>();
+
+    private static readonly string[] RolesDisponibles =
+        [Roles.Empleado, Roles.Supervisor, Roles.Gerente, Roles.AdminEmpresa];
+
+    private bool EsAlta => Id is null;
+
+    private List<BreadcrumbItem> Migas =>
+    [
+        new BreadcrumbItem("Administración de empresa", "/empresa"),
+        new BreadcrumbItem("Usuarios y niveles", "/empresa/usuarios"),
+        new BreadcrumbItem(EsAlta ? "Nuevo usuario" : "Edición", null, true)
+    ];
+
+    private NivelPermisoVm? NivelSeleccionado => DatosDemo.Niveles.FirstOrDefault(n => n.Nombre == _nivel);
+
+    private string DominioEsperado => "@" + DatosDemo.EmpresaActual.Dominio;
+
+    private string PlaceholderCorreo => "nombre.apellido" + DominioEsperado;
+
+    private bool CorreoConDominioValido =>
+        _email.Trim().EndsWith(DominioEsperado, StringComparison.OrdinalIgnoreCase)
+        && _email.Trim().Length > DominioEsperado.Length;
+
+    private bool CorreoConError => !string.IsNullOrWhiteSpace(_email) && !CorreoConDominioValido;
+
+    private string ErrorCorreo =>
+        $"El correo tiene que pertenecer al dominio corporativo {DominioEsperado}. Los usuarios externos no pueden acceder a la cuenta de {DatosDemo.EmpresaActual.RazonSocial}.";
+
+    private List<string> PlantasElegidas => _plantasSeleccionadas?
+        .Where(p => !string.IsNullOrWhiteSpace(p))
+        .Select(p => p!)
+        .ToList() ?? [];
+
+    private List<(string Recurso, List<string> Acciones)> ResumenPermisos => DatosDemo.Recursos
+        .Select(recurso => (
+            Recurso: recurso,
+            Acciones: DatosDemo.Permisos
+                .Where(p => p.Rol == _rol && p.Nivel == _nivel && p.Recurso == recurso && p.Habilitado)
+                .Select(p => p.Accion)
+                .ToList()))
+        .ToList();
+
+    private int AccionesHabilitadas =>
+        DatosDemo.Permisos.Count(p => p.Rol == _rol && p.Nivel == _nivel && p.Habilitado);
+
+    protected override void OnParametersSet()
+    {
+        if (EsAlta)
+        {
+            _usuario = null;
+            return;
+        }
+
+        _usuario = DatosDemo.Usuarios.FirstOrDefault(u => u.Id == Id);
+        if (_usuario is null) return;
+
+        _nombre = _usuario.Nombre;
+        _apellido = _usuario.Apellido;
+        _email = _usuario.Email;
+        _rol = _usuario.Rol;
+        _nivel = _usuario.Nivel;
+        _plantasSeleccionadas = _usuario.Plantas.Select(p => (string?)p).ToList();
+    }
+
+    private void Cancelar() => Nav.NavigateTo("/empresa/usuarios");
+
+    private async Task Guardar()
+    {
+        await _formulario.ValidateAsync();
+
+        if (!_formulario.IsValid)
+        {
+            Snackbar.Add("Revisá los campos obligatorios antes de guardar", Severity.Warning);
+            return;
+        }
+
+        if (!CorreoConDominioValido)
+        {
+            Snackbar.Add($"El correo tiene que terminar en {DominioEsperado}", Severity.Warning);
+            return;
+        }
+
+        if (PlantasElegidas.Count == 0)
+        {
+            Snackbar.Add("Asigná al menos una planta: sin alcance el usuario no ve información", Severity.Warning);
+            return;
+        }
+
+        if (EsAlta)
+        {
+            var nuevo = new UsuarioVm
+            {
+                Nombre = _nombre.Trim(),
+                Apellido = _apellido.Trim(),
+                Email = _email.Trim().ToLowerInvariant(),
+                Rol = _rol,
+                Nivel = _nivel,
+                Estado = EstadoGenerico.Activo,
+                Plantas = PlantasElegidas,
+                FechaAlta = DateTime.Today,
+                UltimoAcceso = null,
+                OrdenesAsignadas = 0
+            };
+
+            DatosDemo.Usuarios.Add(nuevo);
+            ActualizarContadorDeNivel(nuevo.Nivel);
+
+            Snackbar.Add($"{nuevo.NombreCompleto} quedó habilitado como {Roles.Etiqueta(nuevo.Rol)} de nivel {nuevo.Nivel}. Se envió el correo de bienvenida a {nuevo.Email}.",
+                Severity.Success);
+
+            Nav.NavigateTo("/empresa/usuarios");
+            return;
+        }
+
+        if (_usuario is null) return;
+
+        var nivelAnterior = _usuario.Nivel;
+
+        _usuario.Nombre = _nombre.Trim();
+        _usuario.Apellido = _apellido.Trim();
+        _usuario.Email = _email.Trim().ToLowerInvariant();
+        _usuario.Rol = _rol;
+        _usuario.Nivel = _nivel;
+        _usuario.Plantas = PlantasElegidas;
+
+        ActualizarContadorDeNivel(nivelAnterior);
+        ActualizarContadorDeNivel(_usuario.Nivel);
+
+        Snackbar.Add($"Se actualizaron los datos de {_usuario.NombreCompleto}. Los permisos nuevos aplican en su próxima sesión.",
+            Severity.Success);
+
+        Nav.NavigateTo("/empresa/usuarios");
+    }
+
+    private static Color ColorAccion(string accion) => accion switch
+    {
+        "Alta" => Color.Success,
+        "Baja" => Color.Error,
+        "Modificación" => Color.Warning,
+        _ => Color.Info
+    };
+
+    private static void ActualizarContadorDeNivel(string nivel)
+    {
+        var registro = DatosDemo.Niveles.FirstOrDefault(n => n.Nombre == nivel);
+        if (registro is not null) registro.Usuarios = DatosDemo.Usuarios.Count(u => u.Nivel == nivel);
+    }
+}

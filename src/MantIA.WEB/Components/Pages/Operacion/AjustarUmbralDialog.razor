@@ -1,0 +1,90 @@
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center" style="gap:.5rem">
+            <MudIcon Icon="@Icons.Material.Filled.Tune" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Ajustar umbral mínimo</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+            @Repuesto.Nombre · Parte @Repuesto.NumeroParte. El umbral mínimo es la cantidad por debajo
+            de la cual MantIA considera que el repuesto está en riesgo de quiebre.
+        </MudText>
+
+        <div class="mantia-lista-datos mb-4">
+            <DataPoint Etiqueta="Stock actual"
+                       Valor="@($"{Ui.Numero(Repuesto.StockActual)} {Repuesto.UnidadMedida}")" />
+            <DataPoint Etiqueta="Mínimo vigente" Valor="@Ui.Numero(Repuesto.StockMinimo)" />
+            <DataPoint Etiqueta="Plazo de reposición" Valor="@($"{Repuesto.PlazoReposicionDias} días")" />
+        </div>
+
+        <MudNumericField T="decimal" @bind-Value="_nuevoMinimo" Label="Nuevo umbral mínimo"
+                         Variant="Variant.Outlined" Min="0" Immediate="true"
+                         Adornment="Adornment.End" AdornmentText="@Repuesto.UnidadMedida" />
+
+        <div class="mt-4">
+            @if (QuedaBajoMinimo)
+            {
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined"
+                          Icon="@Icons.Material.Filled.WarningAmber">
+                    <MudText Typo="Typo.body2">
+                        Con un mínimo de @Ui.Numero(_nuevoMinimo) y un stock actual de
+                        @Ui.Numero(Repuesto.StockActual), al confirmar el repuesto queda por debajo del umbral
+                        y @(AlertaVigente ? "la alerta de stock activa se mantiene" : "se va a generar una alerta de stock").
+                    </MudText>
+                </MudAlert>
+            }
+            else if (AlertaVigente)
+            {
+                <MudAlert Severity="Severity.Success" Variant="Variant.Outlined"
+                          Icon="@Icons.Material.Filled.CheckCircle">
+                    <MudText Typo="Typo.body2">
+                        Con un mínimo de @Ui.Numero(_nuevoMinimo) el stock actual de
+                        @Ui.Numero(Repuesto.StockActual) queda por encima del umbral: al confirmar se va a
+                        resolver la alerta activa de este repuesto.
+                    </MudText>
+                </MudAlert>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined"
+                          Icon="@Icons.Material.Filled.Info">
+                    <MudText Typo="Typo.body2">
+                        El stock actual de @Ui.Numero(Repuesto.StockActual) sigue por encima del umbral.
+                        No hay alertas para generar ni para resolver.
+                    </MudText>
+                </MudAlert>
+            }
+        </div>
+
+        <div class="mt-4">
+            <div class="mantia-dato__label mb-1">Cobertura con el nuevo umbral</div>
+            <CoverageBar Actual="Repuesto.StockActual" Minimo="_nuevoMinimo" Unidad="@Repuesto.UnidadMedida" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton OnClick="Confirmar" Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Save">
+            Confirmar nuevo mínimo
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialogo { get; set; } = null!;
+
+    [Parameter, EditorRequired] public RepuestoVm Repuesto { get; set; } = null!;
+
+    private decimal _nuevoMinimo;
+
+    protected override void OnInitialized() => _nuevoMinimo = Repuesto.StockMinimo;
+
+    private bool AlertaVigente => Repuesto.StockActual <= Repuesto.StockMinimo;
+
+    private bool QuedaBajoMinimo => Repuesto.StockActual <= _nuevoMinimo;
+
+    private void Cancelar() => Dialogo.Cancel();
+
+    private void Confirmar() => Dialogo.Close(DialogResult.Ok(_nuevoMinimo));
+}

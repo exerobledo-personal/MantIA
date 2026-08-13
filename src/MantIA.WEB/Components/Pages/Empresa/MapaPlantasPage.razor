@@ -1,0 +1,227 @@
+@page "/empresa/mapa"
+
+<PageTitle>Mapa de plantas · MantIA</PageTitle>
+
+<PageHeader Titulo="Mapa de instalaciones"
+            Bajada="@($"Vista consolidada de las plantas de {DatosDemo.EmpresaActual.RazonSocial} con el estado de cada instalación. En producción la vista se integra con un servicio de mapas; acá se renderiza con una proyección propia del área metropolitana de Buenos Aires.")"
+            Icono="@Icons.Material.Filled.Map"
+            Migas="@Migas">
+    <Acciones>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Factory" Href="/empresa/plantas">
+            Gestionar plantas
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add" Href="/empresa/plantas/nueva">
+            Nueva planta
+        </MudButton>
+    </Acciones>
+</PageHeader>
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Plantas activas"
+                    Valor="@DatosDemo.Plantas.Count(p => p.Estado == EstadoGenerico.Activo).ToString()"
+                    Detalle="@($"Sobre {DatosDemo.Plantas.Count} instalaciones registradas")"
+                    Icono="@Icons.Material.Filled.Factory" Acento="Color.Primary" Href="/empresa/plantas" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Máquinas totales" Valor="@DatosDemo.Maquinas.Count.ToString()"
+                    Detalle="@($"{DatosDemo.Maquinas.Count(m => m.CriticidadOperativa == Criticidad.Critica)} de criticidad crítica")"
+                    Icono="@Icons.Material.Filled.PrecisionManufacturing" Acento="Color.Tertiary" Href="/maquinas" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Alertas de stock activas" Valor="@_alertas.Count.ToString()"
+                    Detalle="@($"{_alertas.Count(a => a.Criticidad == Criticidad.Critica)} sobre repuestos críticos")"
+                    Icono="@Icons.Material.Filled.WarningAmber"
+                    Acento="@(_alertas.Any(a => a.Criticidad == Criticidad.Critica) ? Color.Error : Color.Warning)"
+                    Href="/alertas" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Órdenes abiertas"
+                    Valor="@DatosDemo.Ordenes.Count(o => o.Estado is EstadoOrden.Abierta or EstadoOrden.EnCurso).ToString()"
+                    Detalle="@($"{DatosDemo.Ordenes.Count(o => o.Prioridad == Prioridad.Urgente && o.Estado != EstadoOrden.Cerrada)} urgentes sin cerrar")"
+                    Icono="@Icons.Material.Filled.Assignment" Acento="Color.Info" Href="/ordenes" />
+    </MudItem>
+</MudGrid>
+
+<MudGrid Spacing="3" Class="mt-1">
+    <MudItem xs="12" lg="7">
+        <SectionCard Titulo="Plantas en el área metropolitana"
+                     Bajada="Tocá un pin para ver el detalle de la instalación. El color del pin depende de las alertas de stock activas.">
+            <MapaPlantas Plantas="@DatosDemo.Plantas" @bind-PlantaSeleccionada="_plantaSeleccionada" />
+
+            <div class="d-flex flex-wrap align-center mt-4" style="gap:1.25rem">
+                <div class="d-flex align-center" style="gap:.5rem">
+                    <MudIcon Icon="@Icons.Material.Filled.FiberManualRecord" Style="color:#1E9E62" Size="Size.Small" />
+                    <MudText Typo="Typo.body2">Sin alertas activas</MudText>
+                </div>
+                <div class="d-flex align-center" style="gap:.5rem">
+                    <MudIcon Icon="@Icons.Material.Filled.FiberManualRecord" Style="color:#DE9021" Size="Size.Small" />
+                    <MudText Typo="Typo.body2">Entre una y tres alertas</MudText>
+                </div>
+                <div class="d-flex align-center" style="gap:.5rem">
+                    <MudIcon Icon="@Icons.Material.Filled.FiberManualRecord" Style="color:#D14343" Size="Size.Small" />
+                    <MudText Typo="Typo.body2">Cuatro alertas o más</MudText>
+                </div>
+            </div>
+        </SectionCard>
+    </MudItem>
+
+    <MudItem xs="12" lg="5">
+        <SectionCard Titulo="@(_plantaSeleccionada?.Nombre ?? "Detalle de la instalación")"
+                     Bajada="Ubicación, parque de equipos y alertas de stock de la planta seleccionada">
+            <Acciones>
+                @if (_plantaSeleccionada is not null)
+                {
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Edit"
+                               Href="@($"/empresa/plantas/{_plantaSeleccionada.Id}/editar")">
+                        Editar planta
+                    </MudButton>
+                }
+            </Acciones>
+            <ChildContent>
+                @if (_plantaSeleccionada is null)
+                {
+                    <EmptyState Titulo="Elegí una planta en el mapa"
+                                Descripcion="El panel muestra la ubicación exacta, el parque de equipos y las alertas de stock activas de la instalación que selecciones."
+                                Icono="@Icons.Material.Filled.TouchApp" />
+                }
+                else
+                {
+                    <div class="d-flex flex-wrap align-center mb-3" style="gap:.5rem">
+                        <StatusChip Texto="@_plantaSeleccionada.Estado.ToString()"
+                                    ChipColor="@Ui.ColorDe(_plantaSeleccionada.Estado)" />
+                        <StatusChip Texto="@($"{MaquinasDeLaPlanta.Count} máquinas")" ChipColor="Color.Default"
+                                    Variante="Variant.Outlined" />
+                        <StatusChip Texto="@($"{AlertasDeLaPlanta.Count} alertas activas")"
+                                    ChipColor="@(AlertasDeLaPlanta.Count == 0 ? Color.Success : Color.Warning)"
+                                    Variante="Variant.Outlined" />
+                    </div>
+
+                    <div class="mantia-lista-datos mb-4">
+                        <DataPoint Etiqueta="Dirección" Valor="@_plantaSeleccionada.Direccion" />
+                        <DataPoint Etiqueta="Localidad" Valor="@_plantaSeleccionada.Localidad" />
+                        <DataPoint Etiqueta="Coordenadas" Valor="@Coordenadas(_plantaSeleccionada)" />
+                        <DataPoint Etiqueta="Órdenes de trabajo abiertas"
+                                   Valor="@_plantaSeleccionada.OrdenesAbiertas.ToString()" />
+                        <DataPoint Etiqueta="Usuarios asignados"
+                                   Valor="@UsuariosDe(_plantaSeleccionada).ToString()" />
+                    </div>
+
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Parque de equipos de la planta</MudText>
+                    @if (MaquinasDeLaPlanta.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+                            La planta todavía no tiene máquinas registradas.
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudTable Items="@MaquinasDeLaPlanta" Dense="true" Hover="true" Elevation="0"
+                                  Class="mantia-tabla mb-4" Breakpoint="Breakpoint.Sm" Striped="false">
+                            <HeaderContent>
+                                <MudTh>Máquina</MudTh>
+                                <MudTh>Criticidad</MudTh>
+                                <MudTh>Estado</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Máquina">
+                                    <div class="mantia-celda-principal">
+                                        <strong>@context.Codigo · @context.Nombre</strong>
+                                        <span>@context.Linea</span>
+                                    </div>
+                                </MudTd>
+                                <MudTd DataLabel="Criticidad">
+                                    <StatusChip Texto="@Ui.TextoDe(context.CriticidadOperativa)"
+                                                ChipColor="@Ui.ColorDe(context.CriticidadOperativa)" />
+                                </MudTd>
+                                <MudTd DataLabel="Estado">
+                                    <StatusChip Texto="@Ui.TextoDe(context.Estado)"
+                                                ChipColor="@Ui.ColorDe(context.Estado)"
+                                                Icono="@Ui.IconoDe(context.Estado)" />
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Alertas de stock activas</MudText>
+                    @if (AlertasDeLaPlanta.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                            Todos los repuestos asociados a esta planta están por encima de su umbral mínimo.
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudTable Items="@AlertasDeLaPlanta" Dense="true" Hover="true" Elevation="0"
+                                  Class="mantia-tabla" Breakpoint="Breakpoint.Sm" Striped="false">
+                            <HeaderContent>
+                                <MudTh>Repuesto</MudTh>
+                                <MudTh>Criticidad</MudTh>
+                                <MudTh Style="min-width:150px">Cobertura</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Repuesto">
+                                    <div class="mantia-celda-principal">
+                                        <strong>@context.Repuesto</strong>
+                                        <span>@context.NumeroParte · @context.Maquina</span>
+                                    </div>
+                                </MudTd>
+                                <MudTd DataLabel="Criticidad">
+                                    <StatusChip Texto="@Ui.TextoDe(context.Criticidad)"
+                                                ChipColor="@Ui.ColorDe(context.Criticidad)" />
+                                </MudTd>
+                                <MudTd DataLabel="Cobertura">
+                                    <CoverageBar Actual="context.StockActual" Minimo="context.StockMinimo" />
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                }
+            </ChildContent>
+        </SectionCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private PlantaVm? _plantaSeleccionada;
+    private List<AlertaStockVm> _alertas = [];
+
+    private static readonly List<BreadcrumbItem> Migas =
+    [
+        new BreadcrumbItem("Administración de empresa", "/empresa"),
+        new BreadcrumbItem("Mapa de plantas", "/empresa/mapa")
+    ];
+
+    protected override void OnInitialized()
+    {
+        _alertas = DatosDemo.Alertas();
+
+        foreach (var planta in DatosDemo.Plantas)
+        {
+            planta.Maquinas = DatosDemo.Maquinas.Count(m => m.PlantaId == planta.Id);
+            planta.AlertasActivas = _alertas.Count(a => a.Planta == planta.Nombre);
+            planta.OrdenesAbiertas = DatosDemo.Ordenes.Count(o => o.Planta == planta.Nombre
+                                                                  && o.Estado is EstadoOrden.Abierta or EstadoOrden.EnCurso);
+        }
+
+        _plantaSeleccionada = DatosDemo.Plantas.FirstOrDefault(p => p.Estado == EstadoGenerico.Activo)
+                              ?? DatosDemo.Plantas.FirstOrDefault();
+    }
+
+    private List<MaquinaVm> MaquinasDeLaPlanta => _plantaSeleccionada is null
+        ? []
+        : DatosDemo.Maquinas.Where(m => m.PlantaId == _plantaSeleccionada.Id).OrderBy(m => m.Codigo).ToList();
+
+    private List<AlertaStockVm> AlertasDeLaPlanta => _plantaSeleccionada is null
+        ? []
+        : _alertas.Where(a => a.Planta == _plantaSeleccionada.Nombre).ToList();
+
+    private static string Coordenadas(PlantaVm planta) =>
+        planta.Latitud.ToString("F4") + ", " + planta.Longitud.ToString("F4");
+
+    private static int UsuariosDe(PlantaVm planta) => DatosDemo.Usuarios
+        .Count(u => u.Estado == EstadoGenerico.Activo && u.Plantas.Contains(planta.Nombre));
+}

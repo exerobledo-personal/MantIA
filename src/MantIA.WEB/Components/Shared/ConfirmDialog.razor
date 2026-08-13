@@ -1,0 +1,32 @@
+<MudDialog>
+    <DialogContent>
+        <div class="d-flex" style="gap:1rem">
+            <MudIcon Icon="@Icono" Color="@ColorAccion" Size="Size.Large" />
+            <div>
+                <MudText Typo="Typo.body1">@Mensaje</MudText>
+                @if (!string.IsNullOrEmpty(Detalle))
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary mt-2">@Detalle</MudText>
+                }
+            </div>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton OnClick="Confirmar" Variant="Variant.Filled" Color="@ColorAccion">@TextoConfirmar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialogo { get; set; } = null!;
+
+    [Parameter] public string Mensaje { get; set; } = "¿Confirmás la operación?";
+    [Parameter] public string? Detalle { get; set; }
+    [Parameter] public string TextoConfirmar { get; set; } = "Confirmar";
+    [Parameter] public Color ColorAccion { get; set; } = Color.Primary;
+    [Parameter] public string Icono { get; set; } = Icons.Material.Filled.HelpOutline;
+
+    private void Cancelar() => Dialogo.Cancel();
+
+    private void Confirmar() => Dialogo.Close(DialogResult.Ok(true));
+}

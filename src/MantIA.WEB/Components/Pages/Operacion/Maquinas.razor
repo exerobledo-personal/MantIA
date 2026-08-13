@@ -1,0 +1,232 @@
+@page "/maquinas"
+@inject NavigationManager Nav
+
+<PageTitle>Máquinas · MantIA</PageTitle>
+
+<PageHeader Titulo="Parque de equipos"
+            Bajada="@($"Máquinas registradas por {DatosDemo.EmpresaActual.RazonSocial} en sus plantas. Cada alta vincula el equipo con una ficha del catálogo técnico compartido y habilita el seguimiento de fallas, órdenes de trabajo y repuestos críticos asociados.")"
+            Icono="@Icons.Material.Filled.PrecisionManufacturing"
+            Migas="@Migas">
+    <Acciones>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.MenuBook" Href="/catalogo">
+            Catálogo técnico
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add" Href="/maquinas/nueva">
+            Nueva máquina
+        </MudButton>
+    </Acciones>
+</PageHeader>
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Máquinas registradas" Valor="@DatosDemo.Maquinas.Count.ToString()"
+                    Unidad="@($"/ {DatosDemo.EmpresaActual.MaxMaquinasHabilitadas}")"
+                    Detalle="@($"Límite del plan {DatosDemo.EmpresaActual.Plan}")"
+                    Icono="@Icons.Material.Filled.PrecisionManufacturing" Acento="Color.Primary" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Operativas" Valor="@DatosDemo.Maquinas.Count(m => m.Estado == EstadoMaquina.Operativa).ToString()"
+                    Detalle="En producción en este momento"
+                    Icono="@Icons.Material.Filled.CheckCircle" Acento="Color.Success" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="En mantenimiento o detenidas"
+                    Valor="@DatosDemo.Maquinas.Count(m => m.Estado is EstadoMaquina.EnMantenimiento or EstadoMaquina.Detenida).ToString()"
+                    Detalle="@($"{DatosDemo.Maquinas.Count(m => m.Estado == EstadoMaquina.Detenida)} detenidas con producción comprometida")"
+                    Icono="@Icons.Material.Filled.Build" Acento="Color.Warning" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Criticidad crítica"
+                    Valor="@DatosDemo.Maquinas.Count(m => m.CriticidadOperativa == Criticidad.Critica).ToString()"
+                    Detalle="Equipos cuya parada frena una línea completa"
+                    Icono="@Icons.Material.Filled.PriorityHigh" Acento="Color.Error" />
+    </MudItem>
+</MudGrid>
+
+<FilterBar>
+    <MudTextField @bind-Value="_busqueda" Immediate="true"
+                  Placeholder="Buscar por nombre, código, marca, modelo o número de serie"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                  Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"
+                  Class="mantia-filtros__buscador" />
+
+    <MudSelect T="string" @bind-Value="_planta" Label="Planta" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@TodasLasPlantas">@TodasLasPlantas</MudSelectItem>
+        @foreach (var planta in DatosDemo.Plantas)
+        {
+            <MudSelectItem T="string" Value="@planta.Nombre">@planta.Nombre</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="string" @bind-Value="_estado" Label="Estado" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@TodosLosEstados">@TodosLosEstados</MudSelectItem>
+        @foreach (var estado in Enum.GetValues<EstadoMaquina>())
+        {
+            <MudSelectItem T="string" Value="@Ui.TextoDe(estado)">@Ui.TextoDe(estado)</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="string" @bind-Value="_criticidad" Label="Criticidad" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@TodasLasCriticidades">@TodasLasCriticidades</MudSelectItem>
+        @foreach (var criticidad in Enum.GetValues<Criticidad>())
+        {
+            <MudSelectItem T="string" Value="@Ui.TextoDe(criticidad)">@Ui.TextoDe(criticidad)</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSpacer />
+
+    <MudText Typo="Typo.body2" Class="mud-text-secondary">
+        @Filtradas.Count de @DatosDemo.Maquinas.Count máquinas
+    </MudText>
+</FilterBar>
+
+@if (Filtradas.Count == 0)
+{
+    <SectionCard>
+        <EmptyState Titulo="No hay máquinas que coincidan con el filtro"
+                    Descripcion="Probá con otro texto de búsqueda o ampliá el alcance a todas las plantas, estados y criticidades."
+                    Icono="@Icons.Material.Filled.SearchOff">
+            <Accion>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LimpiarFiltros">
+                    Limpiar filtros
+                </MudButton>
+            </Accion>
+        </EmptyState>
+    </SectionCard>
+}
+else
+{
+    <SectionCard Titulo="Listado de equipos"
+                 Bajada="Cada fila abre la ficha del activo con su historial de fallas y sus repuestos asociados"
+                 SinPadding="true">
+        <MudTable Items="@Filtradas" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                  Breakpoint="Breakpoint.Sm" Striped="false"
+                  OnRowClick="@((TableRowClickEventArgs<MaquinaVm> e) => Abrir(e.Item))"
+                  RowStyle="cursor:pointer">
+            <HeaderContent>
+                <MudTh>Máquina</MudTh>
+                <MudTh>Marca y modelo</MudTh>
+                <MudTh>Ubicación</MudTh>
+                <MudTh>Criticidad</MudTh>
+                <MudTh>Estado</MudTh>
+                <MudTh>Última intervención</MudTh>
+                <MudTh Style="text-align:right">Acciones</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Máquina">
+                    <div class="mantia-celda-principal">
+                        <strong>@context.Codigo · @context.Nombre</strong>
+                        <span>Número de serie @context.NumeroSerie</span>
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="Marca y modelo">
+                    <div class="mantia-celda-principal">
+                        <strong>@context.Marca</strong>
+                        <span>@context.Modelo</span>
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="Ubicación">
+                    <div class="mantia-celda-principal">
+                        <strong>@context.Planta</strong>
+                        <span>@context.Linea</span>
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="Criticidad">
+                    <StatusChip Texto="@Ui.TextoDe(context.CriticidadOperativa)"
+                                ChipColor="@Ui.ColorDe(context.CriticidadOperativa)" />
+                </MudTd>
+                <MudTd DataLabel="Estado">
+                    <StatusChip Texto="@Ui.TextoDe(context.Estado)"
+                                ChipColor="@Ui.ColorDe(context.Estado)"
+                                Icono="@Ui.IconoDe(context.Estado)" />
+                </MudTd>
+                <MudTd DataLabel="Última intervención">
+                    @if (context.UltimaIntervencion is null)
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">Sin intervenciones</MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2">@Ui.Relativo(context.UltimaIntervencion.Value)</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Acciones" Style="text-align:right">
+                    <div class="d-flex justify-end" style="gap:.25rem"
+                         @onclick="Ignorar" @onclick:stopPropagation="true">
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small"
+                                       Color="Color.Primary" aria-label="Ver ficha del activo"
+                                       Href="@($"/maquinas/{context.Id}")" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       Color="Color.Default" aria-label="Editar datos del activo"
+                                       Href="@($"/maquinas/{context.Id}/editar")" />
+                    </div>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager RowsPerPageString="Filas por página"
+                                   InfoFormat="{first_item}-{last_item} de {all_items}"
+                                   AllItemsText="Todas" />
+            </PagerContent>
+        </MudTable>
+    </SectionCard>
+}
+
+@code {
+    private const string TodasLasPlantas = "Todas las plantas";
+    private const string TodosLosEstados = "Todos los estados";
+    private const string TodasLasCriticidades = "Todas las criticidades";
+
+    private string _busqueda = "";
+    private string _planta = TodasLasPlantas;
+    private string _estado = TodosLosEstados;
+    private string _criticidad = TodasLasCriticidades;
+
+    private static readonly List<BreadcrumbItem> Migas =
+    [
+        new BreadcrumbItem("Operación", null, true),
+        new BreadcrumbItem("Máquinas", "/maquinas")
+    ];
+
+    private List<MaquinaVm> Filtradas => DatosDemo.Maquinas
+        .Where(m => _planta == TodasLasPlantas || m.Planta == _planta)
+        .Where(m => _estado == TodosLosEstados || Ui.TextoDe(m.Estado) == _estado)
+        .Where(m => _criticidad == TodasLasCriticidades || Ui.TextoDe(m.CriticidadOperativa) == _criticidad)
+        .Where(Coincide)
+        .OrderBy(m => m.Codigo)
+        .ToList();
+
+    private bool Coincide(MaquinaVm maquina)
+    {
+        if (string.IsNullOrWhiteSpace(_busqueda)) return true;
+
+        var texto = _busqueda.Trim();
+        return maquina.Nombre.Contains(texto, StringComparison.OrdinalIgnoreCase)
+               || maquina.Codigo.Contains(texto, StringComparison.OrdinalIgnoreCase)
+               || maquina.Marca.Contains(texto, StringComparison.OrdinalIgnoreCase)
+               || maquina.Modelo.Contains(texto, StringComparison.OrdinalIgnoreCase)
+               || maquina.NumeroSerie.Contains(texto, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void LimpiarFiltros()
+    {
+        _busqueda = "";
+        _planta = TodasLasPlantas;
+        _estado = TodosLosEstados;
+        _criticidad = TodasLasCriticidades;
+    }
+
+    private void Abrir(MaquinaVm? maquina)
+    {
+        if (maquina is not null) Nav.NavigateTo($"/maquinas/{maquina.Id}");
+    }
+
+    private void Ignorar()
+    {
+    }
+}

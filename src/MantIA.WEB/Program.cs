@@ -2,6 +2,7 @@ using Auth0.AspNetCore.Authentication;
 using MantIA.WEB.Components;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
+using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services
@@ -56,6 +57,7 @@ builder.Services.AddScoped<MantIA.DAL.Tenancy.ICurrentTenant, MantIA.DAL.Tenancy
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+builder.Services.AddMudServices();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<MantIA.BLL.Authorization.IPermisoService, MantIA.BLL.Authorization.PermisoService>();
 builder.Services.AddScoped<MantIA.BLL.Authorization.IUsuarioActual, MantIA.BLL.Authorization.UsuarioActual>();

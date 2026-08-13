@@ -1,0 +1,86 @@
+<div class="mantia-mapa">
+    <svg viewBox="0 0 800 520" role="img" aria-label="Mapa de plantas industriales en el área metropolitana de Buenos Aires">
+        <defs>
+            <linearGradient id="mantia-tierra" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#152C3F" />
+                <stop offset="100%" stop-color="#0E1F2E" />
+            </linearGradient>
+            <linearGradient id="mantia-agua" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#123A52" />
+                <stop offset="100%" stop-color="#0C2739" />
+            </linearGradient>
+        </defs>
+
+        <rect width="800" height="520" fill="url(#mantia-tierra)" />
+
+        <g stroke="#22415A" stroke-width="1" opacity=".5">
+            @for (var i = 1; i < 8; i++)
+            {
+                <line x1="@(i * 100)" y1="0" x2="@(i * 100)" y2="520" />
+            }
+            @for (var i = 1; i < 6; i++)
+            {
+                <line x1="0" y1="@(i * 87)" x2="800" y2="@(i * 87)" />
+            }
+        </g>
+
+        <polygon points="500,27 578,123 622,219 711,301 733,369 778,438 800,520 800,0"
+                 fill="url(#mantia-agua)" />
+        <polyline points="500,27 578,123 622,219 711,301 733,369 778,438"
+                  fill="none" stroke="#2E7295" stroke-width="2.5" />
+
+        <g stroke="#2A4A63" stroke-width="3" fill="none" opacity=".8">
+            <path d="M 95 108 L 320 190 L 515 261" />
+            <path d="M 515 261 L 640 320 L 687 388" />
+            <path d="M 95 108 L 240 300 L 400 470" />
+        </g>
+
+        <text x="700" y="180" fill="#3E7B9C" font-size="15" font-style="italic" font-family="inherit">Río de la Plata</text>
+        <text x="24" y="500" fill="#5A7C94" font-size="13" font-family="inherit">Área Metropolitana de Buenos Aires</text>
+
+        @foreach (var planta in Plantas)
+        {
+            var punto = Proyectar(planta);
+            var color = ColorPlanta(planta);
+            var seleccionada = PlantaSeleccionada?.Id == planta.Id;
+            <g class="mantia-mapa__pin" @onclick="@(() => Seleccionar(planta))" @onclick:stopPropagation="true">
+                @if (seleccionada)
+                {
+                    <circle cx="@punto.X" cy="@punto.Y" r="30" fill="@color" opacity=".18" />
+                }
+                <circle cx="@punto.X" cy="@punto.Y" r="20" fill="@color" opacity=".26" />
+                <circle cx="@punto.X" cy="@punto.Y" r="10" fill="@color" stroke="#0B1620" stroke-width="2.5" />
+                <text x="@punto.X" y="@(punto.Y - 30)" fill="#E8F1F7" font-size="15" font-weight="600"
+                      text-anchor="middle" font-family="inherit">@planta.Nombre</text>
+                <text x="@punto.X" y="@(punto.Y + 38)" fill="#9FBACE" font-size="12.5"
+                      text-anchor="middle" font-family="inherit">
+                    @planta.Maquinas máquinas · @planta.AlertasActivas alertas
+                </text>
+            </g>
+        }
+    </svg>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public List<PlantaVm> Plantas { get; set; } = [];
+    [Parameter] public PlantaVm? PlantaSeleccionada { get; set; }
+    [Parameter] public EventCallback<PlantaVm> PlantaSeleccionadaChanged { get; set; }
+
+    private const decimal LonMin = -59.00m, LonMax = -58.28m, LatMin = -34.76m, LatMax = -34.38m;
+
+    private static (int X, int Y) Proyectar(PlantaVm planta)
+    {
+        var x = (int)Math.Round((planta.Longitud - LonMin) / (LonMax - LonMin) * 800);
+        var y = (int)Math.Round((LatMax - planta.Latitud) / (LatMax - LatMin) * 520);
+        return (Math.Clamp(x, 60, 740), Math.Clamp(y, 60, 460));
+    }
+
+    private static string ColorPlanta(PlantaVm planta) => planta.AlertasActivas switch
+    {
+        >= 4 => "#D14343",
+        >= 1 => "#DE9021",
+        _ => "#1E9E62"
+    };
+
+    private Task Seleccionar(PlantaVm planta) => PlantaSeleccionadaChanged.InvokeAsync(planta);
+}

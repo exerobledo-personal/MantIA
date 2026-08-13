@@ -1,0 +1,148 @@
+@page "/empresa/plantas"
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Plantas · MantIA</PageTitle>
+
+<PageHeader Titulo="Plantas de la empresa"
+            Bajada="@($"Instalaciones habilitadas para {DatosDemo.EmpresaActual.RazonSocial}. Cada planta agrupa máquinas, órdenes de trabajo y usuarios: es la unidad con la que MantIA acota el alcance de las alertas de stock y de las recomendaciones de reposición.")"
+            Icono="@Icons.Material.Filled.Factory"
+            Migas="@Migas">
+    <Acciones>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Map" Href="/empresa/mapa">
+            Ver en el mapa
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add" Href="/empresa/plantas/nueva">
+            Nueva planta
+        </MudButton>
+    </Acciones>
+</PageHeader>
+
+@if (DatosDemo.Plantas.Count == 0)
+{
+    <SectionCard>
+        <EmptyState Titulo="Todavía no hay plantas registradas"
+                    Descripcion="Registrá la primera instalación para poder dar de alta máquinas, asignar usuarios y empezar a controlar el stock de repuestos críticos."
+                    Icono="@Icons.Material.Filled.Factory">
+            <Accion>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/empresa/plantas/nueva">
+                    Registrar una planta
+                </MudButton>
+            </Accion>
+        </EmptyState>
+    </SectionCard>
+}
+else
+{
+    <MudGrid Spacing="3">
+        @foreach (var planta in Ordenadas)
+        {
+            <MudItem xs="12" md="6" lg="4">
+                <SectionCard Titulo="@planta.Nombre" Bajada="@($"{planta.Direccion} · {planta.Localidad}")">
+                    <div class="d-flex flex-wrap align-center mb-4" style="gap:.5rem">
+                        <StatusChip Texto="@planta.Estado.ToString()" ChipColor="@Ui.ColorDe(planta.Estado)" />
+                        <StatusChip Texto="@($"Alta {Ui.Fecha(planta.FechaAlta)}")" ChipColor="Color.Default"
+                                    Variante="Variant.Outlined" />
+                    </div>
+
+                    <div class="d-flex flex-wrap justify-space-between" style="gap:1rem">
+                        <DataPoint Etiqueta="Máquinas" Valor="@planta.Maquinas.ToString()" />
+                        <DataPoint Etiqueta="Alertas activas" Valor="@planta.AlertasActivas.ToString()" />
+                        <DataPoint Etiqueta="Órdenes abiertas" Valor="@planta.OrdenesAbiertas.ToString()" />
+                    </div>
+
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-3">
+                        Coordenadas @Ui.Numero(planta.Latitud), @Ui.Numero(planta.Longitud) ·
+                        @UsuariosDe(planta) usuarios asignados
+                    </MudText>
+
+                    <div class="d-flex flex-wrap justify-end mt-4" style="gap:.5rem">
+                        <MudButton Variant="Variant.Text" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Edit"
+                                   Href="@($"/empresa/plantas/{planta.Id}/editar")">
+                            Editar
+                        </MudButton>
+                        @if (planta.Estado == EstadoGenerico.Activo)
+                        {
+                            <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                                       StartIcon="@Icons.Material.Filled.PowerSettingsNew"
+                                       OnClick="@(() => Desactivar(planta))">
+                                Desactivar
+                            </MudButton>
+                        }
+                        else
+                        {
+                            <MudButton Variant="Variant.Outlined" Color="Color.Success"
+                                       StartIcon="@Icons.Material.Filled.PlayArrow"
+                                       OnClick="@(() => Reactivar(planta))">
+                                Reactivar
+                            </MudButton>
+                        }
+                    </div>
+                </SectionCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private static readonly List<BreadcrumbItem> Migas =
+    [
+        new BreadcrumbItem("Administración de empresa", "/empresa"),
+        new BreadcrumbItem("Plantas", "/empresa/plantas")
+    ];
+
+    protected override void OnInitialized() => RecalcularContadores();
+
+    private static void RecalcularContadores()
+    {
+        var alertas = DatosDemo.Alertas();
+
+        foreach (var planta in DatosDemo.Plantas)
+        {
+            planta.Maquinas = DatosDemo.Maquinas.Count(m => m.PlantaId == planta.Id);
+            planta.AlertasActivas = alertas.Count(a => a.Planta == planta.Nombre);
+            planta.OrdenesAbiertas = DatosDemo.Ordenes.Count(o => o.Planta == planta.Nombre
+                                                                  && o.Estado is EstadoOrden.Abierta or EstadoOrden.EnCurso);
+        }
+    }
+
+    private static List<PlantaVm> Ordenadas => DatosDemo.Plantas
+        .OrderByDescending(p => p.Estado == EstadoGenerico.Activo)
+        .ThenBy(p => p.Nombre)
+        .ToList();
+
+    private static int UsuariosDe(PlantaVm planta) => DatosDemo.Usuarios
+        .Count(u => u.Estado == EstadoGenerico.Activo && u.Plantas.Contains(planta.Nombre));
+
+    private async Task Desactivar(PlantaVm planta)
+    {
+        var parametros = new DialogParameters
+        {
+            { "Mensaje", $"¿Confirmás la desactivación de {planta.Nombre}?" },
+            { "Detalle", $"Las {planta.Maquinas} máquinas registradas y los {UsuariosDe(planta)} usuarios asignados quedan sin planta activa: dejan de generar alertas de stock y recomendaciones hasta que se los reasigne a otra instalación. Las {planta.OrdenesAbiertas} órdenes abiertas se conservan y siguen siendo consultables." },
+            { "TextoConfirmar", "Desactivar planta" },
+            { "ColorAccion", Color.Error },
+            { "Icono", Icons.Material.Filled.PowerSettingsNew }
+        };
+
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dialogo = await DialogService.ShowAsync<ConfirmDialog>("Desactivar planta", parametros, opciones);
+        var resultado = await dialogo.Result;
+
+        if (resultado is null || resultado.Canceled) return;
+
+        planta.Estado = EstadoGenerico.Inactivo;
+        Snackbar.Add($"{planta.Nombre} quedó inactiva. Reasigná sus máquinas y usuarios a otra planta para seguir operando.",
+            Severity.Success);
+    }
+
+    private void Reactivar(PlantaVm planta)
+    {
+        planta.Estado = EstadoGenerico.Activo;
+        RecalcularContadores();
+        Snackbar.Add($"{planta.Nombre} volvió a estar activa con {planta.Maquinas} máquinas registradas", Severity.Success);
+    }
+}

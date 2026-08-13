@@ -1,0 +1,463 @@
+@page "/mi-perfil"
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Mi perfil · MantIA</PageTitle>
+
+<PageHeader Titulo="Mi perfil"
+            Bajada="Datos de la cuenta con la que estás operando la plataforma, alcance de acceso, preferencias de notificación y sesiones abiertas."
+            Icono="@Icons.Material.Filled.AccountCircle"
+            Migas="@Migas" />
+
+<SectionCard Class="mb-4">
+    <div class="d-flex flex-wrap align-center" style="gap:1.5rem">
+        <MudAvatar Color="Color.Primary" Style="height:88px;width:88px;font-size:2rem">
+            @Usuario.Iniciales
+        </MudAvatar>
+        <div>
+            <MudText Typo="Typo.h5">@Usuario.NombreCompleto</MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary mt-1">@Usuario.Email</MudText>
+            <div class="d-flex flex-wrap align-center mt-3" style="gap:.5rem">
+                <StatusChip Texto="@Roles.Etiqueta(Usuario.Rol)" ChipColor="Color.Primary"
+                            Icono="@Icons.Material.Filled.AdminPanelSettings" />
+                <StatusChip Texto="@($"Nivel {Usuario.Nivel}")" ChipColor="Color.Default" Variante="Variant.Outlined" />
+                <StatusChip Texto="@TextoEstado" ChipColor="@Ui.ColorDe(Usuario.Estado)" Variante="Variant.Outlined" />
+            </div>
+        </div>
+        <MudSpacer />
+        <div class="mantia-lista-datos">
+            <DataPoint Etiqueta="Empresa en contexto" Valor="@DatosDemo.EmpresaActual.RazonSocial" />
+            <DataPoint Etiqueta="Último acceso" Valor="@UltimoAccesoTexto" />
+        </div>
+    </div>
+</SectionCard>
+
+<MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pt-4" Class="mantia-superficie pa-2">
+    <MudTabPanel Text="Datos de la cuenta" Icon="@Icons.Material.Filled.Badge">
+        <MudGrid Spacing="3">
+            <MudItem xs="12">
+                <SectionCard Titulo="Datos registrados"
+                             Bajada="Información con la que figurás en la empresa y en la bitácora de la plataforma">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" sm="6" md="3">
+                            <DataPoint Etiqueta="Nombre" Valor="@Usuario.Nombre" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <DataPoint Etiqueta="Apellido" Valor="@Usuario.Apellido" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <DataPoint Etiqueta="Correo corporativo" Valor="@Usuario.Email" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <DataPoint Etiqueta="Rol" Valor="@Roles.Etiqueta(Usuario.Rol)" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <DataPoint Etiqueta="Nivel" Valor="@Usuario.Nivel" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <DataPoint Etiqueta="Estado de la cuenta">
+                                <StatusChip Texto="@TextoEstado" ChipColor="@Ui.ColorDe(Usuario.Estado)" />
+                            </DataPoint>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <DataPoint Etiqueta="Fecha de alta" Valor="@Ui.Fecha(Usuario.FechaAlta)" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <DataPoint Etiqueta="Último acceso" Valor="@Ui.FechaHora(Usuario.UltimoAcceso)" />
+                        </MudItem>
+                    </MudGrid>
+                </SectionCard>
+            </MudItem>
+
+            <MudItem xs="12" md="8">
+                <SectionCard Titulo="Editar mis datos"
+                             Bajada="El correo corporativo y el rol los administra el responsable de la empresa: no se modifican desde el perfil">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudTextField T="string" @bind-Value="_nombre" Label="Nombre"
+                                          Variant="Variant.Outlined"
+                                          Required="true" RequiredError="El nombre no puede quedar vacío" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField T="string" @bind-Value="_apellido" Label="Apellido"
+                                          Variant="Variant.Outlined"
+                                          Required="true" RequiredError="El apellido no puede quedar vacío" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField T="string" Value="@Usuario.Email" Label="Correo corporativo"
+                                          Variant="Variant.Outlined" ReadOnly="true"
+                                          HelperText="Definido por el dominio corporativo de la empresa" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField T="string" Value="@Roles.Etiqueta(Usuario.Rol)" Label="Rol asignado"
+                                          Variant="Variant.Outlined" ReadOnly="true"
+                                          HelperText="Se modifica desde la administración de usuarios de la empresa" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <div class="d-flex justify-end">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.Save" OnClick="GuardarDatos">
+                                    Guardar los datos
+                                </MudButton>
+                            </div>
+                        </MudItem>
+                    </MudGrid>
+                </SectionCard>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <SectionCard Titulo="Seguridad de la cuenta"
+                             Bajada="El ingreso se resuelve contra el proveedor de identidad de la plataforma">
+                    <div class="mantia-lista-datos">
+                        <DataPoint Etiqueta="Método de ingreso" Valor="Correo corporativo y contraseña" />
+                        <DataPoint Etiqueta="Dominio habilitado" Valor="@DatosDemo.EmpresaActual.Dominio" />
+                        <DataPoint Etiqueta="Identificador de empresa" Valor="@DatosDemo.EmpresaActual.TenantId" />
+                    </div>
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-4">
+                        El cambio de contraseña se hace desde la pantalla de recuperación, con el correo corporativo.
+                    </MudAlert>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-3"
+                               StartIcon="@Icons.Material.Filled.LockReset" Href="/recuperar">
+                        Cambiar la contraseña
+                    </MudButton>
+                </SectionCard>
+            </MudItem>
+        </MudGrid>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Alcance y permisos" Icon="@Icons.Material.Filled.AdminPanelSettings">
+        <MudGrid Spacing="3">
+            <MudItem xs="12">
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                    <MudText Typo="Typo.subtitle2">Acceso completo a la plataforma</MudText>
+                    <MudText Typo="Typo.body2" Class="mt-1">
+                        Como superadministrador de MantIA, tu cuenta accede al conjunto completo de funcionalidades:
+                        la operación de cualquier empresa cliente, su administración interna y el panel de plataforma.
+                        Los demás roles ven un subconjunto de estas pantallas según la matriz de permisos por rol y
+                        nivel que define el administrador de cada empresa.
+                    </MudText>
+                </MudAlert>
+            </MudItem>
+
+            <MudItem xs="12">
+                <SectionCard Titulo="Módulos y pantallas habilitadas"
+                             Bajada="@($"{Accesos.Count} pantallas accesibles en {ModulosDistintos} módulos")"
+                             SinPadding="true">
+                    <Acciones>
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                                   EndIcon="@Icons.Material.Filled.ArrowForward" Href="/empresa/permisos">
+                            Ver la matriz de permisos
+                        </MudButton>
+                    </Acciones>
+                    <ChildContent>
+                        <MudTable Items="@Accesos" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                                  Breakpoint="Breakpoint.Sm" Striped="false">
+                            <HeaderContent>
+                                <MudTh>Módulo</MudTh>
+                                <MudTh>Pantalla</MudTh>
+                                <MudTh>Ruta</MudTh>
+                                <MudTh>Acceso</MudTh>
+                                <MudTh Style="text-align:right">Acciones</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Módulo">@context.Modulo</MudTd>
+                                <MudTd DataLabel="Pantalla">
+                                    <div class="mantia-celda-principal">
+                                        <strong>@context.Pantalla</strong>
+                                        <span>@context.Descripcion</span>
+                                    </div>
+                                </MudTd>
+                                <MudTd DataLabel="Ruta">@context.Ruta</MudTd>
+                                <MudTd DataLabel="Acceso">
+                                    <StatusChip Texto="Habilitado" ChipColor="Color.Success"
+                                                Icono="@Icons.Material.Filled.CheckCircle" />
+                                </MudTd>
+                                <MudTd DataLabel="Acciones" Style="text-align:right">
+                                    <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Primary"
+                                               EndIcon="@Icons.Material.Filled.ArrowForward" Href="@context.Ruta">
+                                        Abrir
+                                    </MudButton>
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </ChildContent>
+                </SectionCard>
+            </MudItem>
+
+            <MudItem xs="12">
+                <SectionCard Titulo="Cómo se restringe el acceso del resto de los usuarios"
+                             Bajada="El alcance de cada cuenta surge del cruce entre su rol y su nivel">
+                    <MudText Typo="Typo.body2">
+                        Cada empresa define, sobre los recursos de la plataforma, qué acciones de alta, baja,
+                        modificación y consulta habilita para cada combinación de rol y nivel. Un empleado de nivel
+                        Jr, por ejemplo, consulta el inventario y registra órdenes, pero no da de baja repuestos ni
+                        cierra intervenciones. Ese cruce se administra en la matriz de permisos de la empresa.
+                    </MudText>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-4"
+                               StartIcon="@Icons.Material.Filled.AdminPanelSettings" Href="/empresa/permisos">
+                        Ir a la matriz de permisos
+                    </MudButton>
+                </SectionCard>
+            </MudItem>
+        </MudGrid>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Preferencias" Icon="@Icons.Material.Filled.Tune">
+        <MudGrid Spacing="3">
+            <MudItem xs="12" md="7">
+                <SectionCard Titulo="Notificaciones"
+                             Bajada="Qué avisos querés recibir por correo además de los que aparecen en la plataforma">
+                    <div class="mantia-lista-datos">
+                        <MudSwitch T="bool" @bind-Value="_avisoCriticas" Color="Color.Error"
+                                   Label="Avisarme por correo cuando se genere una alerta de stock crítico" />
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                            Se envía en el momento en que un repuesto de criticidad crítica queda por debajo de su
+                            umbral mínimo.
+                        </MudText>
+
+                        <MudDivider Class="my-2" />
+
+                        <MudSwitch T="bool" @bind-Value="_resumenDiario" Color="Color.Primary"
+                                   Label="Enviarme el resumen diario de la operación" />
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                            Un correo por día, a las 7 de la mañana, con las alertas abiertas, las órdenes sin cerrar
+                            y las recomendaciones pendientes de validación.
+                        </MudText>
+                    </div>
+                </SectionCard>
+            </MudItem>
+
+            <MudItem xs="12" md="5">
+                <SectionCard Titulo="Preferencias de visualización"
+                             Bajada="Con qué recorte y en qué idioma se muestra la plataforma al ingresar">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12">
+                            <MudSelect T="string" @bind-Value="_plantaPorDefecto" Label="Planta por defecto"
+                                       Variant="Variant.Outlined"
+                                       HelperText="Se aplica al filtro de planta del panel principal">
+                                <MudSelectItem T="string" Value="@TodasLasPlantas">Todas las plantas</MudSelectItem>
+                                @foreach (var planta in DatosDemo.Plantas)
+                                {
+                                    <MudSelectItem T="string" Value="@planta.Nombre">@planta.Nombre</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudSelect T="string" @bind-Value="_idioma" Label="Idioma de la interfaz"
+                                       Variant="Variant.Outlined"
+                                       HelperText="Los reportes y las notificaciones usan el mismo idioma">
+                                @foreach (var idioma in Idiomas)
+                                {
+                                    <MudSelectItem T="string" Value="@idioma">@idioma</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+                </SectionCard>
+            </MudItem>
+
+            <MudItem xs="12">
+                <div class="d-flex justify-end">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Save" OnClick="GuardarPreferencias">
+                        Guardar las preferencias
+                    </MudButton>
+                </div>
+            </MudItem>
+        </MudGrid>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Sesiones activas" Icon="@Icons.Material.Filled.Devices">
+        <SectionCard Titulo="Dispositivos con la sesión abierta"
+                     Bajada="Si no reconocés alguno de estos accesos, cerralo y cambiá la contraseña"
+                     SinPadding="true">
+            @if (_sesiones.Count == 0)
+            {
+                <EmptyState Titulo="No quedan sesiones abiertas"
+                            Descripcion="Cerraste todas las sesiones registradas. Al volver a ingresar se registra una nueva."
+                            Icono="@Icons.Material.Filled.Devices" />
+            }
+            else
+            {
+                <MudTable Items="@_sesiones" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                          Breakpoint="Breakpoint.Sm" Striped="false">
+                    <HeaderContent>
+                        <MudTh>Navegador</MudTh>
+                        <MudTh>Sistema operativo</MudTh>
+                        <MudTh>Dirección IP</MudTh>
+                        <MudTh>Ubicación</MudTh>
+                        <MudTh Style="text-align:right">Último uso</MudTh>
+                        <MudTh Style="text-align:right">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Navegador">
+                            <div class="mantia-celda-principal">
+                                <strong>@context.Navegador</strong>
+                                <span>@(context.Actual ? "Sesión actual" : "Sesión abierta en otro dispositivo")</span>
+                            </div>
+                        </MudTd>
+                        <MudTd DataLabel="Sistema operativo">@context.SistemaOperativo</MudTd>
+                        <MudTd DataLabel="Dirección IP">@context.DireccionIp</MudTd>
+                        <MudTd DataLabel="Ubicación">@context.Ubicacion</MudTd>
+                        <MudTd DataLabel="Último uso" Style="text-align:right">@Ui.Relativo(context.UltimoUso)</MudTd>
+                        <MudTd DataLabel="Acciones" Style="text-align:right">
+                            <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error"
+                                       StartIcon="@Icons.Material.Filled.Logout"
+                                       OnClick="@(() => CerrarSesion(context))">
+                                Cerrar sesión
+                            </MudButton>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </SectionCard>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private const string TodasLasPlantas = "Todas";
+
+    private static readonly List<BreadcrumbItem> Migas =
+    [
+        new BreadcrumbItem("Panel principal", "/dashboard"),
+        new BreadcrumbItem("Mi perfil", null, true)
+    ];
+
+    private static readonly string[] Idiomas =
+        ["Español rioplatense", "Español neutro", "Portugués de Brasil", "Inglés"];
+
+    private string _nombre = DatosDemo.UsuarioActual.Nombre;
+    private string _apellido = DatosDemo.UsuarioActual.Apellido;
+
+    private bool _avisoCriticas = true;
+    private bool _resumenDiario = true;
+    private string _plantaPorDefecto = TodasLasPlantas;
+    private string _idioma = "Español rioplatense";
+
+    private static UsuarioVm Usuario => DatosDemo.UsuarioActual;
+
+    private static string TextoEstado =>
+        Usuario.Estado == EstadoGenerico.Activo ? "Cuenta activa" : "Cuenta inactiva";
+
+    private static string UltimoAccesoTexto =>
+        Usuario.UltimoAcceso is null ? "Sin registros" : Ui.Relativo(Usuario.UltimoAcceso.Value);
+
+    private sealed class AccesoVm
+    {
+        public string Modulo { get; init; } = "";
+        public string Pantalla { get; init; } = "";
+        public string Ruta { get; init; } = "";
+        public string Descripcion { get; init; } = "";
+    }
+
+    private sealed class SesionVm
+    {
+        public Guid Id { get; init; } = Guid.NewGuid();
+        public string Navegador { get; init; } = "";
+        public string SistemaOperativo { get; init; } = "";
+        public string DireccionIp { get; init; } = "";
+        public string Ubicacion { get; init; } = "";
+        public DateTime UltimoUso { get; init; }
+        public bool Actual { get; init; }
+    }
+
+    private static readonly List<AccesoVm> Accesos =
+    [
+        new() { Modulo = "Operación", Pantalla = "Panel principal", Ruta = "/dashboard",
+                Descripcion = "Indicadores del parque de equipos y del stock crítico" },
+        new() { Modulo = "Operación", Pantalla = "Máquinas", Ruta = "/maquinas",
+                Descripcion = "Alta, edición y ficha de los activos de la empresa" },
+        new() { Modulo = "Operación", Pantalla = "Repuestos críticos", Ruta = "/repuestos",
+                Descripcion = "Inventario, umbrales mínimos y valorización del stock" },
+        new() { Modulo = "Operación", Pantalla = "Alertas de stock", Ruta = "/alertas",
+                Descripcion = "Repuestos por debajo del umbral con su cobertura restante" },
+        new() { Modulo = "Operación", Pantalla = "Órdenes de trabajo", Ruta = "/ordenes",
+                Descripcion = "Registro, seguimiento y cierre de intervenciones" },
+        new() { Modulo = "Operación", Pantalla = "Recomendaciones", Ruta = "/recomendaciones",
+                Descripcion = "Sugerencias de reposición por reglas de negocio y modelo" },
+        new() { Modulo = "Operación", Pantalla = "Catálogo técnico", Ruta = "/catalogo",
+                Descripcion = "Fichas de marca y modelo compartidas por la plataforma" },
+        new() { Modulo = "Operación", Pantalla = "Reportes", Ruta = "/reportes",
+                Descripcion = "Generación, consulta y exportación de reportes operativos" },
+
+        new() { Modulo = "Administración de empresa", Pantalla = "Panel de empresa", Ruta = "/empresa",
+                Descripcion = "Estado del contrato, plan y consumo de la empresa" },
+        new() { Modulo = "Administración de empresa", Pantalla = "Usuarios y niveles", Ruta = "/empresa/usuarios",
+                Descripcion = "Alta de cuentas, asignación de rol, nivel y plantas" },
+        new() { Modulo = "Administración de empresa", Pantalla = "Plantas", Ruta = "/empresa/plantas",
+                Descripcion = "Ubicaciones productivas registradas por la empresa" },
+        new() { Modulo = "Administración de empresa", Pantalla = "Mapa de plantas", Ruta = "/empresa/mapa",
+                Descripcion = "Distribución geográfica de las plantas y sus alertas" },
+        new() { Modulo = "Administración de empresa", Pantalla = "Matriz de permisos", Ruta = "/empresa/permisos",
+                Descripcion = "Acciones habilitadas por combinación de rol y nivel" },
+        new() { Modulo = "Administración de empresa", Pantalla = "Bitácora de empresa", Ruta = "/empresa/bitacora",
+                Descripcion = "Trazabilidad de las operaciones realizadas por los usuarios" },
+
+        new() { Modulo = "Plataforma MantIA", Pantalla = "Panel de plataforma", Ruta = "/plataforma",
+                Descripcion = "Vista consolidada de todas las empresas cliente" },
+        new() { Modulo = "Plataforma MantIA", Pantalla = "Empresas cliente", Ruta = "/plataforma/empresas",
+                Descripcion = "Alta y administración de los tenants de la plataforma" },
+        new() { Modulo = "Plataforma MantIA", Pantalla = "Planes de suscripción", Ruta = "/plataforma/planes",
+                Descripcion = "Límites y precios de cada plan comercial" },
+        new() { Modulo = "Plataforma MantIA", Pantalla = "Panel de sistema", Ruta = "/plataforma/sistema",
+                Descripcion = "Estado de los servicios y bitácora técnica" }
+    ];
+
+    private static int ModulosDistintos => Accesos.Select(a => a.Modulo).Distinct().Count();
+
+    private readonly List<SesionVm> _sesiones =
+    [
+        new() { Navegador = "Chrome 141", SistemaOperativo = "Windows 11", DireccionIp = "190.211.44.18",
+                Ubicacion = "Ciudad Autónoma de Buenos Aires", UltimoUso = DateTime.Now.AddMinutes(-3), Actual = true },
+        new() { Navegador = "Edge 140", SistemaOperativo = "Windows 10", DireccionIp = "200.117.9.203",
+                Ubicacion = "Pilar, Buenos Aires", UltimoUso = DateTime.Now.AddHours(-6) },
+        new() { Navegador = "Safari 18", SistemaOperativo = "iPadOS 18", DireccionIp = "181.44.120.77",
+                Ubicacion = "Avellaneda, Buenos Aires", UltimoUso = DateTime.Now.AddDays(-2) }
+    ];
+
+    private void GuardarDatos()
+    {
+        if (string.IsNullOrWhiteSpace(_nombre) || string.IsNullOrWhiteSpace(_apellido))
+        {
+            Snackbar.Add("El nombre y el apellido son obligatorios.", Severity.Warning);
+            return;
+        }
+
+        Usuario.Nombre = _nombre.Trim();
+        Usuario.Apellido = _apellido.Trim();
+
+        Snackbar.Add($"Tus datos quedaron actualizados como {Usuario.NombreCompleto}.", Severity.Success);
+    }
+
+    private void GuardarPreferencias()
+    {
+        var planta = _plantaPorDefecto == TodasLasPlantas ? "todas las plantas" : _plantaPorDefecto;
+        Snackbar.Add($"Preferencias guardadas. Vas a ver {planta} al ingresar, en {_idioma}.", Severity.Success);
+    }
+
+    private async Task CerrarSesion(SesionVm sesion)
+    {
+        var detalle = sesion.Actual
+            ? "Es la sesión desde la que estás operando ahora. Vas a tener que ingresar de nuevo con tus credenciales corporativas."
+            : $"Se cierra el acceso abierto en {sesion.SistemaOperativo} desde {sesion.Ubicacion}. El dispositivo va a pedir las credenciales la próxima vez.";
+
+        var parametros = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Mensaje, $"¿Cerrar la sesión de {sesion.Navegador}?" },
+            { x => x.Detalle, detalle },
+            { x => x.TextoConfirmar, "Cerrar la sesión" },
+            { x => x.ColorAccion, Color.Error },
+            { x => x.Icono, Icons.Material.Filled.Logout }
+        };
+
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialogo = await DialogService.ShowAsync<ConfirmDialog>("Cerrar sesión", parametros, opciones);
+        var resultado = await dialogo.Result;
+
+        if (resultado is null || resultado.Canceled) return;
+
+        _sesiones.Remove(sesion);
+        Snackbar.Add($"Se cerró la sesión de {sesion.Navegador} en {sesion.SistemaOperativo}.", Severity.Success);
+        StateHasChanged();
+    }
+}

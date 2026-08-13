@@ -1,0 +1,215 @@
+@page "/plataforma/planes"
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Planes de suscripción · MantIA</PageTitle>
+
+<PageHeader Titulo="Planes de suscripción"
+            Bajada="Catálogo comercial de MantIA. Cada plan define el cupo de máquinas habilitadas, el alcance funcional del motor de recomendaciones y el importe mensual que se factura a la empresa cliente."
+            Icono="@Icons.Material.Filled.Sell"
+            Migas="@Migas">
+    <Acciones>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Domain" Href="/plataforma/empresas">
+            Empresas cliente
+        </MudButton>
+    </Acciones>
+</PageHeader>
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Ingreso mensual recurrente" Valor="@Ui.Moneda(IngresoTotal)"
+                    Detalle="@($"Sobre {EmpresasActivas} empresas con contrato vigente")"
+                    Icono="@Icons.Material.Filled.PriceCheck" Acento="Color.Secondary" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Ingreso promedio por empresa" Valor="@Ui.Moneda(IngresoPromedio)"
+                    Detalle="Incluye a las empresas en plan Piloto, que no facturan"
+                    Icono="@Icons.Material.Filled.Analytics" Acento="Color.Primary" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Plan más contratado" Valor="@(PlanMasContratado?.Nombre ?? "—")"
+                    Detalle="@($"{ContratosDe(PlanMasContratado)} empresas lo tienen contratado")"
+                    Icono="@Icons.Material.Filled.Star" Acento="Color.Info" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Empresas en piloto" Valor="@EmpresasEnPiloto.ToString()"
+                    Detalle="Pruebas sin costo de 60 días pendientes de conversión"
+                    Icono="@Icons.Material.Filled.Timelapse" Acento="Color.Tertiary" />
+    </MudItem>
+</MudGrid>
+
+<MudGrid Spacing="3" Class="mt-1">
+    @foreach (var plan in DatosDemo.Planes)
+    {
+        <MudItem xs="12" sm="6" lg="3">
+            <div class="mantia-superficie pa-4 d-flex flex-column" style="@EstiloTarjeta(plan)">
+                <div class="d-flex align-center justify-space-between mb-2" style="gap:.5rem">
+                    <MudText Typo="Typo.h6">@plan.Nombre</MudText>
+                    @if (EsDestacado(plan))
+                    {
+                        <StatusChip Texto="Más contratado" ChipColor="Color.Primary"
+                                    Icono="@Icons.Material.Filled.Star" />
+                    }
+                </div>
+
+                <MudText Typo="Typo.h4" Color="@(EsDestacado(plan) ? Color.Primary : Color.Default)">
+                    @Ui.Moneda(plan.Precio)
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+                    @(plan.Precio == 0 ? "Sin costo durante 60 días" : "Por mes, por empresa cliente")
+                </MudText>
+
+                <MudText Typo="Typo.body2" Class="mb-4" Style="min-height:4.5rem">@plan.Descripcion</MudText>
+
+                <div class="mantia-lista-datos mb-4">
+                    <DataPoint Etiqueta="Máquinas incluidas" Valor="@($"{plan.MaxMaquinas} máquinas")" />
+                    <DataPoint Etiqueta="Empresas que lo tienen contratado"
+                               Valor="@($"{ContratosDe(plan)} de {DatosDemo.Empresas.Count}")" />
+                    <DataPoint Etiqueta="Ingreso mensual que aporta" Valor="@Ui.Moneda(IngresoDe(plan))" />
+                </div>
+
+                <MudSpacer />
+
+                <div class="d-flex flex-wrap" style="gap:.5rem">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Edit"
+                               OnClick="@(() => Editar(plan))">
+                        Editar
+                    </MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                               EndIcon="@Icons.Material.Filled.ArrowForward" Href="/plataforma/empresas">
+                        Ver empresas
+                    </MudButton>
+                </div>
+            </div>
+        </MudItem>
+    }
+</MudGrid>
+
+<MudGrid Spacing="3" Class="mt-1">
+    <MudItem xs="12" lg="7">
+        <SectionCard Titulo="Comparación de planes"
+                     Bajada="Cupo, precio y peso comercial de cada plan del catálogo"
+                     SinPadding="true">
+            <MudTable Items="@DatosDemo.Planes" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                      Breakpoint="Breakpoint.Sm" Striped="false">
+                <HeaderContent>
+                    <MudTh>Plan</MudTh>
+                    <MudTh Style="text-align:right">Precio mensual</MudTh>
+                    <MudTh Style="text-align:right">Máquinas incluidas</MudTh>
+                    <MudTh Style="text-align:right">Empresas contratadas</MudTh>
+                    <MudTh Style="text-align:right">Ingreso mensual</MudTh>
+                    <MudTh Style="text-align:right">Participación</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Plan">
+                        <div class="mantia-celda-principal">
+                            <strong>@context.Nombre</strong>
+                            <span>@context.Descripcion</span>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Precio mensual" Style="text-align:right">@Ui.Moneda(context.Precio)</MudTd>
+                    <MudTd DataLabel="Máquinas incluidas" Style="text-align:right">@context.MaxMaquinas</MudTd>
+                    <MudTd DataLabel="Empresas contratadas" Style="text-align:right">@ContratosDe(context)</MudTd>
+                    <MudTd DataLabel="Ingreso mensual" Style="text-align:right">@Ui.Moneda(IngresoDe(context))</MudTd>
+                    <MudTd DataLabel="Participación" Style="text-align:right;min-width:140px">
+                        <div class="d-flex justify-end mb-1" style="font-size:.78rem">
+                            <span>@Participacion(context) % del ingreso</span>
+                        </div>
+                        <MudProgressLinear Value="@((double)Participacion(context))" Color="Color.Primary"
+                                           Rounded="true" Size="Size.Small" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </SectionCard>
+    </MudItem>
+
+    <MudItem xs="12" lg="5">
+        <SectionCard Titulo="Ingreso mensual por plan"
+                     Bajada="Importe recurrente que aporta cada plan, expresado en miles de pesos">
+            <MudChart T="double" ChartType="ChartType.Bar"
+                      ChartSeries="@SeriesIngreso"
+                      ChartLabels="@EtiquetasPlanes"
+                      ChartOptions="@_opcionesIngreso"
+                      Width="100%" Height="300px" />
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                Sólo se computan las empresas activas. El plan Piloto no genera ingreso recurrente.
+            </MudText>
+        </SectionCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private static readonly List<BreadcrumbItem> Migas =
+    [
+        new BreadcrumbItem("Plataforma MantIA", "/plataforma"),
+        new BreadcrumbItem("Planes de suscripción", "/plataforma/planes")
+    ];
+
+    private readonly BarChartOptions _opcionesIngreso = new()
+    {
+        YAxisTicks = 250000,
+        MaxNumYAxisTicks = 6,
+        YAxisFormat = "N0",
+        ChartPalette = ["#0B6FA4"],
+    };
+
+    private static int EmpresasActivas =>
+        DatosDemo.Empresas.Count(e => e.Estado == EstadoGenerico.Activo);
+
+    private static int EmpresasEnPiloto =>
+        DatosDemo.Empresas.Count(e => DatosDemo.Planes.Any(p => p.Nombre == e.Plan && p.Precio == 0));
+
+    private static int ContratosDe(PlanVm? plan) => plan is null
+        ? 0
+        : DatosDemo.Empresas.Count(e => e.Plan == plan.Nombre);
+
+    private static decimal IngresoDe(PlanVm plan) =>
+        plan.Precio * DatosDemo.Empresas.Count(e => e.Plan == plan.Nombre && e.Estado == EstadoGenerico.Activo);
+
+    private static decimal IngresoTotal => DatosDemo.Planes.Sum(IngresoDe);
+
+    private static decimal IngresoPromedio => EmpresasActivas == 0
+        ? 0
+        : Math.Round(IngresoTotal / EmpresasActivas, 0);
+
+    private static int Participacion(PlanVm plan) => IngresoTotal <= 0
+        ? 0
+        : (int)Math.Round(IngresoDe(plan) / IngresoTotal * 100);
+
+    private static PlanVm? PlanMasContratado => DatosDemo.Planes
+        .OrderByDescending(ContratosDe)
+        .ThenByDescending(p => p.Precio)
+        .FirstOrDefault();
+
+    private static bool EsDestacado(PlanVm plan) => PlanMasContratado?.Nombre == plan.Nombre;
+
+    private static string EstiloTarjeta(PlanVm plan) => EsDestacado(plan)
+        ? "height:100%;border-color:#0B6FA4;box-shadow:0 0 0 1px #0B6FA4 inset"
+        : "height:100%";
+
+    private static List<ChartSeries<double>> SeriesIngreso =>
+    [
+        new ChartSeries<double>
+        {
+            Name = "Ingreso mensual en miles de pesos",
+            Data = DatosDemo.Planes.Select(p => (double)IngresoDe(p) / 1000d).ToArray()
+        }
+    ];
+
+    private static string[] EtiquetasPlanes => DatosDemo.Planes.Select(p => p.Nombre).ToArray();
+
+    private async Task Editar(PlanVm plan)
+    {
+        var parametros = new DialogParameters { ["Plan"] = plan };
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        var dialogo = await DialogService.ShowAsync<PlanDialog>("Editar plan de suscripción", parametros, opciones);
+        var resultado = await dialogo.Result;
+
+        if (resultado is null || resultado.Canceled) return;
+
+        Snackbar.Add($"El plan {plan.Nombre} quedó actualizado: {Ui.Moneda(plan.Precio)} por mes y {plan.MaxMaquinas} máquinas incluidas.", Severity.Success);
+    }
+}

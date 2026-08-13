@@ -1,0 +1,21 @@
+<div class="mantia-vacio">
+    <div class="mantia-vacio__icono">
+        <MudIcon Icon="@Icono" Size="Size.Large" />
+    </div>
+    <MudText Typo="Typo.h6">@Titulo</MudText>
+    @if (!string.IsNullOrEmpty(Descripcion))
+    {
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mt-1 mx-auto" Style="max-width:48ch">@Descripcion</MudText>
+    }
+    @if (Accion is not null)
+    {
+        <div class="mt-4">@Accion</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Titulo { get; set; } = "";
+    [Parameter] public string? Descripcion { get; set; }
+    [Parameter] public string Icono { get; set; } = Icons.Material.Filled.Inbox;
+    [Parameter] public RenderFragment? Accion { get; set; }
+}

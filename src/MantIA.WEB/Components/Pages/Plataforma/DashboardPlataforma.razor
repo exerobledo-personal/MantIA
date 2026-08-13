@@ -1,0 +1,363 @@
+@page "/plataforma"
+@inject NavigationManager Nav
+
+<PageTitle>Panel de plataforma · MantIA</PageTitle>
+
+<PageHeader Titulo="Panel de plataforma"
+            Bajada="Estado del negocio y de la infraestructura de MantIA. Acá se mira la cartera de empresas cliente, el ingreso mensual recurrente, el consumo real del servicio y la salud de los componentes sobre los que corre la plataforma."
+            Icono="@Icons.Material.Filled.Hub"
+            Migas="@Migas">
+    <Acciones>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.MonitorHeart" Href="/plataforma/sistema">
+            Panel de sistema
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add" Href="/plataforma/empresas/nueva">
+            Nueva empresa
+        </MudButton>
+    </Acciones>
+</PageHeader>
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" sm="6" md="4" lg="2">
+        <MetricCard Etiqueta="Empresas activas" Valor="@Activas.Count.ToString()"
+                    Unidad="@($"/ {DatosDemo.Empresas.Count}")"
+                    Detalle="@($"{DatosDemo.Empresas.Count(e => e.Estado == EstadoGenerico.Inactivo)} desactivadas por baja de contrato")"
+                    Icono="@Icons.Material.Filled.Domain" Acento="Color.Primary" Href="/plataforma/empresas" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4" lg="2">
+        <MetricCard Etiqueta="Máquinas gestionadas" Valor="@MaquinasGestionadas.ToString()"
+                    Detalle="@($"Sobre {CupoTotal} habilitadas por los planes vigentes")"
+                    Icono="@Icons.Material.Filled.PrecisionManufacturing" Acento="Color.Info" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4" lg="2">
+        <MetricCard Etiqueta="Usuarios totales" Valor="@UsuariosTotales.ToString()"
+                    Detalle="@($"Promedio de {PromedioUsuarios:0.0} por empresa cliente")"
+                    Icono="@Icons.Material.Filled.Group" Acento="Color.Tertiary" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4" lg="2">
+        <MetricCard Etiqueta="Ingreso mensual recurrente" Valor="@Ui.Moneda(IngresoMensual)"
+                    Detalle="@($"Sobre {Activas.Count} contratos activos, sin contar el plan Piloto")"
+                    Icono="@Icons.Material.Filled.PriceCheck" Acento="Color.Secondary" Href="/plataforma/planes" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4" lg="2">
+        <MetricCard Etiqueta="Órdenes procesadas" Valor="@OrdenesUltimoMes.ToString()"
+                    Detalle="Órdenes de trabajo registradas en el último mes en toda la plataforma"
+                    Icono="@Icons.Material.Filled.Assignment" Acento="Color.Success" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4" lg="2">
+        <MetricCard Etiqueta="Recomendaciones procesadas" Valor="@RecomendacionesProcesadas.ToString()"
+                    Detalle="Sugerencias de reposición emitidas por el motor desde el alta de cada tenant"
+                    Icono="@Icons.Material.Filled.Psychology" Acento="Color.Warning" />
+    </MudItem>
+</MudGrid>
+
+<MudGrid Spacing="3" Class="mt-1">
+    <MudItem xs="12" lg="8">
+        <SectionCard Titulo="Máquinas registradas por empresa"
+                     Bajada="Volumen de activos que cada tenant administra en MantIA">
+            <MudChart T="double" ChartType="ChartType.Bar"
+                      ChartSeries="@SeriesMaquinas"
+                      ChartLabels="@EtiquetasEmpresas"
+                      ChartOptions="@_opcionesMaquinas"
+                      Width="100%" Height="300px" />
+        </SectionCard>
+    </MudItem>
+
+    <MudItem xs="12" lg="4">
+        <SectionCard Titulo="Distribución por plan"
+                     Bajada="@($"{DatosDemo.Empresas.Count} empresas cliente sobre {DistribucionPlanes.Count} planes contratados")">
+            <div class="d-flex justify-center">
+                <MudChart T="double" ChartType="ChartType.Donut"
+                          ChartSeries="@(new List<ChartSeries<double>> { new() { Name = "Empresas", Data = DatosPlanes } })"
+                          ChartLabels="@EtiquetasPlanes"
+                          ChartOptions="@_opcionesPlanes"
+                          Width="230px" Height="230px" />
+            </div>
+            <div class="mantia-lista-datos mt-3">
+                @foreach (var (plan, cantidad) in DistribucionPlanes)
+                {
+                    <div class="d-flex align-center justify-space-between">
+                        <MudText Typo="Typo.body2">@plan</MudText>
+                        <MudText Typo="Typo.body2">
+                            <b>@cantidad</b> @(cantidad == 1 ? "empresa" : "empresas")
+                        </MudText>
+                    </div>
+                }
+            </div>
+        </SectionCard>
+    </MudItem>
+
+    <MudItem xs="12" lg="7">
+        <SectionCard Titulo="Salud de los servicios"
+                     Bajada="Componentes de infraestructura sobre los que se apoya la plataforma">
+            <Acciones>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/plataforma/sistema"
+                           EndIcon="@Icons.Material.Filled.ArrowForward" Size="Size.Small">
+                    Ver panel de sistema
+                </MudButton>
+            </Acciones>
+            <ChildContent>
+                @foreach (var servicio in DatosDemo.Servicios)
+                {
+                    <div class="mantia-timeline-item align-center justify-space-between flex-wrap"
+                         style="@EstiloServicio(servicio)">
+                        <div class="d-flex align-center" style="gap:.625rem;min-width:220px">
+                            <MudIcon Icon="@Icons.Material.Filled.FiberManualRecord"
+                                     Color="@Ui.ColorDe(servicio.Estado)" Size="Size.Small" />
+                            <div class="mantia-celda-principal">
+                                <strong>@servicio.Nombre</strong>
+                                <span>@servicio.Tecnologia</span>
+                            </div>
+                        </div>
+                        <div class="d-flex align-center flex-wrap" style="gap:1.25rem">
+                            <div>
+                                <div class="mantia-dato__label">Latencia</div>
+                                <MudText Typo="Typo.body2">@Ui.Numero((decimal)servicio.LatenciaMs) ms</MudText>
+                            </div>
+                            <div>
+                                <div class="mantia-dato__label">Disponibilidad</div>
+                                <MudText Typo="Typo.body2">@servicio.Disponibilidad.ToString("0.00") %</MudText>
+                            </div>
+                            <StatusChip Texto="@TextoServicio(servicio.Estado)"
+                                        ChipColor="@Ui.ColorDe(servicio.Estado)" />
+                        </div>
+                    </div>
+                }
+
+                @if (ServicioComprometido is not null)
+                {
+                    <MudAlert Severity="@(ServicioComprometido.Estado == EstadoServicio.Caido ? Severity.Error : Severity.Warning)"
+                              Variant="Variant.Outlined" Class="mt-4"
+                              Icon="@Icons.Material.Filled.WarningAmber">
+                        Estado @TextoServicio(ServicioComprometido.Estado) en @ServicioComprometido.Nombre
+                        (@ServicioComprometido.Tecnologia). Último incidente registrado:
+                        @ServicioComprometido.UltimoIncidente.
+                    </MudAlert>
+                }
+            </ChildContent>
+        </SectionCard>
+    </MudItem>
+
+    <MudItem xs="12" lg="5">
+        <SectionCard Titulo="Eventos que requieren atención"
+                     Bajada="Entradas de bitácora de nivel Advertencia o Error de las últimas horas">
+            <Acciones>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/plataforma/sistema"
+                           EndIcon="@Icons.Material.Filled.ArrowForward" Size="Size.Small">
+                    Ver bitácoras
+                </MudButton>
+            </Acciones>
+            <ChildContent>
+                @if (EventosCriticos.Count == 0)
+                {
+                    <EmptyState Titulo="Sin eventos de atención"
+                                Descripcion="No hay advertencias ni errores registrados en la bitácora de la plataforma."
+                                Icono="@Icons.Material.Filled.CheckCircle" />
+                }
+                else
+                {
+                    <div>
+                        @foreach (var evento in EventosCriticos)
+                        {
+                            <div class="mantia-timeline-item">
+                                <MudIcon Icon="@(evento.Nivel == NivelLog.Error ? Icons.Material.Filled.ErrorOutline : Icons.Material.Filled.WarningAmber)"
+                                         Color="@Ui.ColorDe(evento.Nivel)" Size="Size.Small" Class="mt-1" />
+                                <div style="flex:1 1 auto">
+                                    <div class="d-flex flex-wrap align-center" style="gap:.5rem">
+                                        <MudText Typo="Typo.body2"><b>@evento.Accion sobre @evento.Recurso</b></MudText>
+                                        <StatusChip Texto="@NombreEmpresa(evento)" ChipColor="Color.Default"
+                                                    Variante="Variant.Outlined" />
+                                    </div>
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">@evento.Detalle</MudText>
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                        @Ui.Relativo(evento.Fecha) · Origen @evento.Origen
+                                    </MudText>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </ChildContent>
+        </SectionCard>
+    </MudItem>
+
+    <MudItem xs="12">
+        <SectionCard Titulo="Empresas cliente"
+                     Bajada="Cada fila abre la ficha del tenant con su suscripción y su actividad"
+                     SinPadding="true">
+            <Acciones>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/plataforma/empresas"
+                           EndIcon="@Icons.Material.Filled.ArrowForward" Size="Size.Small">
+                    Gestionar empresas
+                </MudButton>
+            </Acciones>
+            <ChildContent>
+                <MudTable Items="@EmpresasOrdenadas" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                          Breakpoint="Breakpoint.Sm" Striped="false"
+                          OnRowClick="@((TableRowClickEventArgs<EmpresaVm> e) => Abrir(e.Item))"
+                          RowStyle="cursor:pointer">
+                    <HeaderContent>
+                        <MudTh>Razón social</MudTh>
+                        <MudTh>Rubro</MudTh>
+                        <MudTh>Plan</MudTh>
+                        <MudTh>Uso del plan</MudTh>
+                        <MudTh Style="text-align:right">Usuarios</MudTh>
+                        <MudTh Style="text-align:right">Órdenes del mes</MudTh>
+                        <MudTh>Estado</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Razón social">
+                            <div class="mantia-celda-principal">
+                                <strong>@context.RazonSocial</strong>
+                                <span>@context.Dominio · @context.TenantId</span>
+                            </div>
+                        </MudTd>
+                        <MudTd DataLabel="Rubro">@context.Rubro</MudTd>
+                        <MudTd DataLabel="Plan">
+                            <StatusChip Texto="@context.Plan" ChipColor="Color.Info" Variante="Variant.Outlined" />
+                        </MudTd>
+                        <MudTd DataLabel="Uso del plan" Style="min-width:170px">
+                            <div class="d-flex justify-space-between" style="font-size:.78rem">
+                                <span><b>@context.MaquinasRegistradas</b> de @context.MaxMaquinasHabilitadas máquinas</span>
+                                <span>@Uso(context) %</span>
+                            </div>
+                            <MudProgressLinear Value="@((double)Uso(context))" Color="@ColorUso(Uso(context))"
+                                               Rounded="true" Size="Size.Small" Class="mt-1" />
+                        </MudTd>
+                        <MudTd DataLabel="Usuarios" Style="text-align:right">@context.UsuariosActivos</MudTd>
+                        <MudTd DataLabel="Órdenes del mes" Style="text-align:right">@context.OrdenesUltimoMes</MudTd>
+                        <MudTd DataLabel="Estado">
+                            <StatusChip Texto="@context.Estado.ToString()" ChipColor="@Ui.ColorDe(context.Estado)" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </ChildContent>
+        </SectionCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private static readonly List<BreadcrumbItem> Migas =
+    [
+        new BreadcrumbItem("Plataforma MantIA", null, true),
+        new BreadcrumbItem("Panel de plataforma", "/plataforma")
+    ];
+
+    private readonly BarChartOptions _opcionesMaquinas = new()
+    {
+        YAxisTicks = 10,
+        MaxNumYAxisTicks = 6,
+        XAxisLabelRotation = 30,
+        ChartPalette = ["#0B6FA4"],
+    };
+
+    private readonly ChartOptions _opcionesPlanes = new()
+    {
+        ChartPalette = ["#0B6FA4", "#2E90C4", "#00909B", "#8FA8BC"]
+    };
+
+    private static List<EmpresaVm> Activas => DatosDemo.Empresas
+        .Where(e => e.Estado == EstadoGenerico.Activo)
+        .ToList();
+
+    private static List<EmpresaVm> EmpresasOrdenadas => DatosDemo.Empresas
+        .OrderByDescending(e => e.Estado == EstadoGenerico.Activo)
+        .ThenByDescending(e => e.MaquinasRegistradas)
+        .ToList();
+
+    private static List<EmpresaVm> PorMaquinas => DatosDemo.Empresas
+        .OrderByDescending(e => e.MaquinasRegistradas)
+        .ToList();
+
+    private static int MaquinasGestionadas => DatosDemo.Empresas.Sum(e => e.MaquinasRegistradas);
+
+    private static int CupoTotal => DatosDemo.Empresas.Sum(e => e.MaxMaquinasHabilitadas);
+
+    private static int UsuariosTotales => DatosDemo.Empresas.Sum(e => e.UsuariosActivos);
+
+    private static int OrdenesUltimoMes => DatosDemo.Empresas.Sum(e => e.OrdenesUltimoMes);
+
+    private static int RecomendacionesProcesadas => DatosDemo.Empresas.Sum(e => e.RecomendacionesProcesadas);
+
+    private static double PromedioUsuarios => DatosDemo.Empresas.Count == 0
+        ? 0
+        : (double)UsuariosTotales / DatosDemo.Empresas.Count;
+
+    private static decimal IngresoMensual => Activas.Sum(PrecioDe);
+
+    private static decimal PrecioDe(EmpresaVm empresa) =>
+        DatosDemo.Planes.FirstOrDefault(p => p.Nombre == empresa.Plan)?.Precio ?? 0;
+
+    private static List<ChartSeries<double>> SeriesMaquinas =>
+    [
+        new ChartSeries<double>
+        {
+            Name = "Máquinas registradas",
+            Data = PorMaquinas.Select(e => (double)e.MaquinasRegistradas).ToArray()
+        }
+    ];
+
+    private static string[] EtiquetasEmpresas => PorMaquinas.Select(e => Corto(e.RazonSocial)).ToArray();
+
+    private static List<(string Plan, int Cantidad)> DistribucionPlanes => DatosDemo.Planes
+        .Select(p => (Plan: p.Nombre, Cantidad: DatosDemo.Empresas.Count(e => e.Plan == p.Nombre)))
+        .Where(x => x.Cantidad > 0)
+        .ToList();
+
+    private static double[] DatosPlanes => DistribucionPlanes.Select(x => (double)x.Cantidad).ToArray();
+
+    private static string[] EtiquetasPlanes => DistribucionPlanes.Select(x => x.Plan).ToArray();
+
+    private static ServicioVm? ServicioComprometido => DatosDemo.Servicios
+        .FirstOrDefault(s => s.Estado != EstadoServicio.Operativo);
+
+    private static List<EventoBitacoraVm> EventosCriticos => DatosDemo.Bitacora
+        .Where(e => e.Nivel is NivelLog.Warning or NivelLog.Error)
+        .OrderByDescending(e => e.Fecha)
+        .Take(6)
+        .ToList();
+
+    private static string Corto(string razonSocial)
+    {
+        var corte = razonSocial.IndexOf(" S.", StringComparison.Ordinal);
+        var nombre = corte > 0 ? razonSocial[..corte] : razonSocial;
+        return nombre.Length > 14 ? nombre[..13].TrimEnd() + "…" : nombre;
+    }
+
+    private static string TextoServicio(EstadoServicio estado) => estado switch
+    {
+        EstadoServicio.Operativo => "Operativo",
+        EstadoServicio.Degradado => "Degradado",
+        _ => "Caído"
+    };
+
+    private static string EstiloServicio(ServicioVm servicio) => servicio.Estado switch
+    {
+        EstadoServicio.Degradado => "border-left:3px solid #DE9021;padding-left:.75rem",
+        EstadoServicio.Caido => "border-left:3px solid #D14343;padding-left:.75rem",
+        _ => ""
+    };
+
+    private static string NombreEmpresa(EventoBitacoraVm evento) =>
+        string.IsNullOrWhiteSpace(evento.Empresa) || evento.Empresa == "—"
+            ? "Plataforma MantIA"
+            : evento.Empresa;
+
+    private static int Uso(EmpresaVm empresa) => empresa.MaxMaquinasHabilitadas <= 0
+        ? 0
+        : (int)Math.Round(empresa.MaquinasRegistradas * 100d / empresa.MaxMaquinasHabilitadas);
+
+    private static Color ColorUso(int uso) => uso switch
+    {
+        >= 90 => Color.Error,
+        >= 80 => Color.Warning,
+        _ => Color.Primary
+    };
+
+    private void Abrir(EmpresaVm? empresa)
+    {
+        if (empresa is not null) Nav.NavigateTo($"/plataforma/empresas/{empresa.Id}");
+    }
+}

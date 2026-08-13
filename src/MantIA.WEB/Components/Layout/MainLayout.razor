@@ -1,23 +1,335 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject NavigationManager Nav
+@inject IJSRuntime JS
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+<MudThemeProvider Theme="MantiaTheme.Actual" @bind-IsDarkMode="_modoOscuro" />
+<MudPopoverProvider />
+<MudDialogProvider CloseButton="true" MaxWidth="MaxWidth.Medium" FullWidth="true" />
+<MudSnackbarProvider />
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+<MudLayout>
+    <MudAppBar Elevation="0" Class="mantia-appbar">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                       Color="Color.Inherit"
+                       Edge="Edge.Start"
+                       aria-label="@Idioma.T("barra.menu")"
+                       OnClick="AlternarMenu" />
+
+        <MudMenu Dense="true" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft">
+            <ActivatorContent Context="menu">
+                <span class="mantia-vista" role="button" tabindex="0" @onclick="@(e => menu.ToggleAsync(e))">
+                    <MudIcon Icon="@Sesion.Icono(Sesion.Actual)" Size="Size.Small" />
+                    <span class="mantia-vista__texto">
+                        <span class="mantia-vista__label">@Idioma.T("barra.verComo")</span>
+                        <span class="mantia-vista__valor">@Sesion.Nombre(Sesion.Actual)</span>
+                    </span>
+                    <MudIcon Icon="@Icons.Material.Filled.UnfoldMore" Size="Size.Small" />
+                </span>
+            </ActivatorContent>
+            <ChildContent>
+                <div class="mantia-vista__ayuda">
+                    Elegí qué parte de MantIA querés ver. Cada vista muestra los módulos que le corresponden a un perfil.
+                </div>
+                <MudDivider />
+                @foreach (var vista in Sesion.Disponibles)
+                {
+                    <MudMenuItem OnClick="@(() => CambiarVista(vista))">
+                        <div class="mantia-vista__opcion">
+                            <MudIcon Icon="@(vista == Sesion.Actual ? Icons.Material.Filled.RadioButtonChecked : Sesion.Icono(vista))"
+                                     Size="Size.Small"
+                                     Color="@(vista == Sesion.Actual ? Color.Primary : Color.Default)" />
+                            <span>
+                                <strong>@Sesion.Nombre(vista)</strong>
+                                <span>@Sesion.Descripcion(vista)</span>
+                            </span>
+                        </div>
+                    </MudMenuItem>
+                }
+            </ChildContent>
+        </MudMenu>
+
+        <div class="mantia-tenant d-none d-xl-flex">
+            <MudIcon Icon="@Icons.Material.Filled.Factory" Size="Size.Small" Class="mantia-tenant__icono" />
+            <div class="mantia-tenant__texto">
+                <span class="mantia-tenant__label">@Idioma.T("barra.empresa")</span>
+                <MudMenu Dense="true">
+                    <ActivatorContent Context="menu">
+                        <span class="mantia-tenant__valor" role="button" tabindex="0" @onclick="@(e => menu.ToggleAsync(e))">
+                            @_empresaContexto
+                            <MudIcon Icon="@Icons.Material.Filled.ExpandMore" Size="Size.Small" />
+                        </span>
+                    </ActivatorContent>
+                    <ChildContent>
+                        <div class="px-4 py-2" style="max-width:320px">
+                            <MudText Typo="Typo.caption">@Idioma.T("barra.empresaAyuda")</MudText>
+                        </div>
+                        <MudDivider />
+                        @foreach (var empresa in DatosDemo.Empresas.Where(e => e.Estado == EstadoGenerico.Activo))
+                        {
+                            <MudMenuItem OnClick="@(() => CambiarEmpresa(empresa.RazonSocial))">
+                                @empresa.RazonSocial
+                            </MudMenuItem>
+                        }
+                    </ChildContent>
+                </MudMenu>
+            </div>
         </div>
 
-        <article class="content px-4">
+        <MudSpacer />
+
+        <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Dense="true">
+            <ActivatorContent Context="menu">
+                <span class="mantia-campana" role="button" tabindex="0" title="@Idioma.T("barra.alertas")" @onclick="@(e => menu.ToggleAsync(e))">
+                    <MudIcon Icon="@Icons.Material.Filled.NotificationsNone" />
+                    @if (Alertas.Count > 0)
+                    {
+                        <span class="mantia-campana__contador">@Alertas.Count</span>
+                    }
+                </span>
+            </ActivatorContent>
+            <ChildContent>
+                <div class="mantia-notif">
+                    <div class="mantia-notif__cabecera">
+                        <span>@Idioma.T("barra.alertas")</span>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error" Class="ma-0">@Alertas.Count</MudChip>
+                    </div>
+                    <MudDivider />
+                    @if (Alertas.Count == 0)
+                    {
+                        <div class="mantia-notif__vacio">
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" />
+                            <MudText Typo="Typo.body2">@Idioma.T("barra.sinAlertas")</MudText>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mantia-notif__lista">
+                            @foreach (var alerta in Alertas.Take(6))
+                            {
+                                <div class="mantia-notif__item" role="button" tabindex="0"
+                                     @onclick="@(() => IrAlRepuesto(alerta))">
+                                    <span class="mantia-notif__punto" style="@($"background:{ColorCriticidad(alerta.Criticidad)}")"></span>
+                                    <span class="mantia-notif__texto">
+                                        <strong>@alerta.Repuesto</strong>
+                                        <span>@alerta.NumeroParte · @alerta.Maquina</span>
+                                        <span>Stock @Ui.Numero(alerta.StockActual) sobre un mínimo de @Ui.Numero(alerta.StockMinimo)</span>
+                                    </span>
+                                    <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" />
+                                </div>
+                            }
+                        </div>
+                        <MudDivider />
+                        <div class="mantia-notif__pie">
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" FullWidth="true"
+                                       EndIcon="@Icons.Material.Filled.ArrowForward"
+                                       OnClick="@(() => Nav.NavigateTo("/alertas"))">
+                                @Idioma.T("barra.verTodas")
+                            </MudButton>
+                        </div>
+                    }
+                </div>
+            </ChildContent>
+        </MudMenu>
+
+        <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Dense="true">
+            <ActivatorContent Context="menu">
+                <span class="mantia-idioma" role="button" tabindex="0" title="@Idioma.T("barra.idioma")" @onclick="@(e => menu.ToggleAsync(e))">
+                    <MudIcon Icon="@Icons.Material.Filled.Language" Size="Size.Small" />
+                    <span>@Idioma.Actual.ToUpperInvariant()</span>
+                    <MudIcon Icon="@Icons.Material.Filled.ExpandMore" Size="Size.Small" />
+                </span>
+            </ActivatorContent>
+            <ChildContent>
+                @foreach (var (codigo, nombre) in Idioma.Disponibles)
+                {
+                    <MudMenuItem OnClick="@(() => CambiarIdioma(codigo))">
+                        <div class="d-flex align-center" style="gap:.5rem">
+                            <MudIcon Icon="@(codigo == Idioma.Actual ? Icons.Material.Filled.Check : Icons.Material.Filled.Translate)"
+                                     Size="Size.Small"
+                                     Color="@(codigo == Idioma.Actual ? Color.Primary : Color.Default)" />
+                            <span>@nombre</span>
+                        </div>
+                    </MudMenuItem>
+                }
+            </ChildContent>
+        </MudMenu>
+
+        <MudTooltip Text="@(_modoOscuro ? Idioma.T("barra.modoClaro") : Idioma.T("barra.modoOscuro"))">
+            <MudIconButton Icon="@(_modoOscuro ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                           Color="Color.Inherit"
+                           aria-label="@(_modoOscuro ? Idioma.T("barra.modoClaro") : Idioma.T("barra.modoOscuro"))"
+                           OnClick="AlternarTema" />
+        </MudTooltip>
+
+        <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Dense="true">
+            <ActivatorContent Context="menu">
+                <span class="mantia-usuario" role="button" tabindex="0" @onclick="@(e => menu.ToggleAsync(e))">
+                    <MudAvatar Color="@(Sesion.EsCompleta ? Color.Primary : Color.Secondary)" Size="Size.Medium">
+                        @Sesion.UsuarioVisible.Iniciales
+                    </MudAvatar>
+                    <span class="mantia-usuario__texto d-none d-md-flex">
+                        <span class="mantia-usuario__nombre">@Sesion.UsuarioVisible.NombreCompleto</span>
+                        <span class="mantia-usuario__rol">@Roles.Etiqueta(Sesion.Rol(Sesion.Actual))</span>
+                    </span>
+                </span>
+            </ActivatorContent>
+            <ChildContent>
+                <MudMenuItem Icon="@Icons.Material.Filled.Person" Href="/mi-perfil">@Idioma.T("barra.miPerfil")</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Filled.MonitorHeart" Href="/plataforma/sistema">@Idioma.T("barra.sistema")</MudMenuItem>
+                <MudDivider />
+                <MudMenuItem Icon="@Icons.Material.Filled.Logout" Href="/">@Idioma.T("barra.salir")</MudMenuItem>
+            </ChildContent>
+        </MudMenu>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_menuAbierto"
+               Elevation="0"
+               ClipMode="DrawerClipMode.Never"
+               Variant="DrawerVariant.Mini"
+               MiniWidth="76px"
+               Class="mantia-drawer">
+        <MudDrawerHeader Class="mantia-marca">
+            <MudLink Href="/dashboard" Underline="Underline.None" Class="mantia-marca__link">
+                <span class="mantia-marca__icono">
+                    <MudIcon Icon="@Icons.Material.Filled.Insights" />
+                </span>
+                <span class="mantia-marca__texto">
+                    <span class="mantia-marca__nombre">Mant<b>IA</b></span>
+                    <span class="mantia-marca__bajada">@Idioma.T("marca.bajada")</span>
+                </span>
+            </MudLink>
+        </MudDrawerHeader>
+        <NavMenu />
+    </MudDrawer>
+
+    <MudMainContent Class="mantia-contenido">
+        @if (!Sesion.EsCompleta)
+        {
+            <div class="mantia-suplantacion">
+                <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" />
+                <span>
+                    Estás viendo la vista <b>@Sesion.Nombre(Sesion.Actual)</b>
+                    · @Sesion.Descripcion(Sesion.Actual)
+                    <span class="mantia-suplantacion__nota">
+                        El menú se recorta a los módulos habilitados para el perfil de @Roles.Etiqueta(Sesion.Rol(Sesion.Actual)).
+                    </span>
+                </span>
+                <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Warning"
+                           StartIcon="@Icons.Material.Filled.Undo" OnClick="@(() => CambiarVista(Vista.Completa))">
+                    Ver toda la aplicación
+                </MudButton>
+            </div>
+        }
+        <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="py-6 px-4 px-sm-6">
             @Body
-        </article>
-    </main>
-</div>
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
 
 <div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
+    Se produjo un error inesperado.
+    <a href="." class="reload">Recargar</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private bool _menuAbierto = true;
+    private bool _modoOscuro;
+    private string _empresaContexto = DatosDemo.EmpresaActual.RazonSocial;
+
+    private static List<AlertaStockVm> Alertas => DatosDemo.Alertas();
+
+    protected override void OnInitialized()
+    {
+        Idioma.Cambio += Refrescar;
+        Sesion.Cambio += Refrescar;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool primeraVez)
+    {
+        if (!primeraVez) return;
+
+        var tema = await LeerPreferencia("mantia.tema");
+        var idioma = await LeerPreferencia("mantia.idioma");
+
+        var cambio = false;
+
+        if (tema is "oscuro" or "claro")
+        {
+            _modoOscuro = tema == "oscuro";
+            cambio = true;
+        }
+
+        if (idioma is not null && idioma != Idioma.Actual)
+        {
+            Idioma.Cambiar(idioma);
+            cambio = true;
+        }
+
+        if (cambio) StateHasChanged();
+    }
+
+    private async Task<string?> LeerPreferencia(string clave)
+    {
+        try
+        {
+            return await JS.InvokeAsync<string?>("localStorage.getItem", clave);
+        }
+        catch (JSException)
+        {
+            return null;
+        }
+    }
+
+    private async Task GuardarPreferencia(string clave, string valor)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.setItem", clave, valor);
+        }
+        catch (JSException)
+        {
+        }
+    }
+
+    public void Dispose()
+    {
+        Idioma.Cambio -= Refrescar;
+        Sesion.Cambio -= Refrescar;
+    }
+
+    private void CambiarVista(Vista vista)
+    {
+        Sesion.Ver(vista);
+        Nav.NavigateTo(Sesion.RutaInicio(vista));
+    }
+
+    private void Refrescar() => InvokeAsync(StateHasChanged);
+
+    private void AlternarMenu() => _menuAbierto = !_menuAbierto;
+
+    private async Task AlternarTema()
+    {
+        _modoOscuro = !_modoOscuro;
+        await GuardarPreferencia("mantia.tema", _modoOscuro ? "oscuro" : "claro");
+    }
+
+    private async Task CambiarIdioma(string codigo)
+    {
+        Idioma.Cambiar(codigo);
+        await GuardarPreferencia("mantia.idioma", codigo);
+    }
+
+    private void CambiarEmpresa(string razonSocial) => _empresaContexto = razonSocial;
+
+    private void IrAlRepuesto(AlertaStockVm alerta) => Nav.NavigateTo($"/repuestos/{alerta.RepuestoId}");
+
+    private static string ColorCriticidad(Criticidad criticidad) => criticidad switch
+    {
+        Criticidad.Critica => "#D14343",
+        Criticidad.Alta => "#DE9021",
+        Criticidad.Media => "#2E90C4",
+        _ => "#8FA8BC"
+    };
+}

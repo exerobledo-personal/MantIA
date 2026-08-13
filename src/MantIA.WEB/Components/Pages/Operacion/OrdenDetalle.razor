@@ -1,0 +1,264 @@
+@page "/ordenes/{Id:guid}"
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_orden is null ? "Orden de trabajo" : _orden.Numero) · MantIA</PageTitle>
+
+@if (_orden is null)
+{
+    <PageHeader Titulo="Orden de trabajo" Icono="@Icons.Material.Filled.Assignment" Migas="@_migas" />
+    <EmptyState Titulo="No encontramos la orden"
+                Descripcion="La orden que buscás no existe en el listado. Puede haber sido dada de baja o el enlace estar vencido."
+                Icono="@Icons.Material.Filled.SearchOff">
+        <Accion>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/ordenes">
+                Volver al listado
+            </MudButton>
+        </Accion>
+    </EmptyState>
+}
+else
+{
+    var orden = _orden;
+    var maquina = DatosDemo.Maquinas.FirstOrDefault(m => m.Id == orden.MaquinaId);
+
+    <PageHeader Titulo="@orden.Numero"
+                Bajada="@($"{orden.Maquina} · {orden.Planta} · {orden.TipoFalla}")"
+                Icono="@Icons.Material.Filled.Assignment"
+                Migas="@_migas">
+        <EtiquetaExtra>
+            <StatusChip Texto="@Ui.TextoDe(orden.Estado)" ChipColor="@Ui.ColorDe(orden.Estado)" />
+            <StatusChip Texto="@orden.TipoMantenimiento.ToString()"
+                        ChipColor="@Ui.ColorDe(orden.TipoMantenimiento)" Variante="Variant.Outlined" />
+            <StatusChip Texto="@($"Prioridad {orden.Prioridad}")" ChipColor="@Ui.ColorDe(orden.Prioridad)" />
+        </EtiquetaExtra>
+        <Acciones>
+            <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/ordenes">
+                Volver al listado
+            </MudButton>
+
+            @if (orden.Estado is EstadoOrden.Abierta or EstadoOrden.EnCurso)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Edit" Href="@($"/ordenes/{orden.Id}/editar")">
+                    Editar
+                </MudButton>
+            }
+
+            @if (orden.Estado == EstadoOrden.Abierta)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Warning"
+                           StartIcon="@Icons.Material.Filled.PlayArrow" OnClick="TomarLaOrden">
+                    Tomar la orden
+                </MudButton>
+            }
+
+            @if (orden.Estado is EstadoOrden.Abierta or EstadoOrden.EnCurso)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Success"
+                           StartIcon="@Icons.Material.Filled.CheckCircle" OnClick="CerrarOrden">
+                    Cerrar orden
+                </MudButton>
+            }
+        </Acciones>
+    </PageHeader>
+
+    @if (orden.Estado == EstadoOrden.Cerrada)
+    {
+        <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Class="mb-4"
+                  Icon="@Icons.Material.Filled.TaskAlt">
+            <MudText Typo="Typo.subtitle2">
+                Orden cerrada el @Ui.FechaHora(orden.FechaCierre) por @orden.UsuarioAsignado
+                en @HorasDe(orden) horas de trabajo.
+            </MudText>
+            <MudText Typo="Typo.body2" Class="mt-1">@ResolucionDe(orden)</MudText>
+        </MudAlert>
+    }
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="5">
+            <SectionCard Titulo="Datos de la orden"
+                         Bajada="Trazabilidad completa de la intervención">
+                <div class="mantia-lista-datos">
+                    <DataPoint Etiqueta="Número de orden" Valor="@orden.Numero" />
+                    <DataPoint Etiqueta="Máquina afectada" Valor="@orden.Maquina" />
+                    <DataPoint Etiqueta="Planta" Valor="@orden.Planta" />
+                    <DataPoint Etiqueta="Tipo de mantenimiento" Valor="@orden.TipoMantenimiento.ToString()" />
+                    <DataPoint Etiqueta="Tipo de falla" Valor="@orden.TipoFalla" />
+                    <DataPoint Etiqueta="Prioridad">
+                        <StatusChip Texto="@orden.Prioridad.ToString()" ChipColor="@Ui.ColorDe(orden.Prioridad)" />
+                    </DataPoint>
+                    <DataPoint Etiqueta="Estado">
+                        <StatusChip Texto="@Ui.TextoDe(orden.Estado)" ChipColor="@Ui.ColorDe(orden.Estado)" />
+                    </DataPoint>
+                    <DataPoint Etiqueta="Responsable asignado" Valor="@orden.UsuarioAsignado" />
+                    <DataPoint Etiqueta="Fecha de apertura" Valor="@Ui.FechaHora(orden.FechaApertura)" />
+                    <DataPoint Etiqueta="Fecha de cierre" Valor="@Ui.FechaHora(orden.FechaCierre)" />
+                    <DataPoint Etiqueta="Duración" Valor="@TextoDuracion(orden)" />
+                    @if (maquina is not null)
+                    {
+                        <DataPoint Etiqueta="Criticidad de la máquina">
+                            <StatusChip Texto="@Ui.TextoDe(maquina.CriticidadOperativa)"
+                                        ChipColor="@Ui.ColorDe(maquina.CriticidadOperativa)" />
+                        </DataPoint>
+                        <DataPoint Etiqueta="Línea de producción" Valor="@maquina.Linea" />
+                    }
+                </div>
+            </SectionCard>
+        </MudItem>
+
+        <MudItem xs="12" md="7">
+            <SectionCard Titulo="Descripción y resolución"
+                         Bajada="Lo que reportó el operador y lo que finalmente se hizo sobre el equipo">
+                <div class="mantia-reco__bloque">
+                    <div class="mantia-reco__bloque-titulo">Descripción del problema</div>
+                    <MudText Typo="Typo.body2">@DescripcionDe(orden)</MudText>
+                </div>
+
+                <div class="mantia-reco__bloque mt-3">
+                    <div class="mantia-reco__bloque-titulo">Resolución aplicada</div>
+                    @if (string.IsNullOrWhiteSpace(orden.ResolucionAplicada))
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                            La resolución se registra al cerrar la orden, junto con los repuestos consumidos.
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2">@orden.ResolucionAplicada</MudText>
+                    }
+                </div>
+            </SectionCard>
+        </MudItem>
+
+        <MudItem xs="12">
+            <SectionCard Titulo="Repuestos consumidos"
+                         Bajada="Cada línea descontó stock real del inventario en el momento del cierre"
+                         SinPadding="true">
+                @if (orden.Repuestos.Count == 0)
+                {
+                    <EmptyState Titulo="Sin consumo de repuestos"
+                                Descripcion="Esta intervención no registró consumo de materiales. Si la orden todavía está abierta, los repuestos se cargan en el momento del cierre."
+                                Icono="@Icons.Material.Filled.Inventory2" />
+                }
+                else
+                {
+                    <MudTable Items="@orden.Repuestos" Dense="true" Hover="true" Elevation="0"
+                              Class="mantia-tabla" Breakpoint="Breakpoint.Sm" Striped="false">
+                        <HeaderContent>
+                            <MudTh>Repuesto</MudTh>
+                            <MudTh>Número de parte</MudTh>
+                            <MudTh Style="text-align:right">Cantidad</MudTh>
+                            <MudTh Style="text-align:right">Stock anterior</MudTh>
+                            <MudTh Style="text-align:right">Stock resultante</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Repuesto">
+                                <div class="mantia-celda-principal">
+                                    <strong>@context.Repuesto</strong>
+                                    <span>@ProveedorDe(context.RepuestoId)</span>
+                                </div>
+                            </MudTd>
+                            <MudTd DataLabel="Número de parte">@context.NumeroParte</MudTd>
+                            <MudTd DataLabel="Cantidad" Style="text-align:right">
+                                <b>@Ui.Numero(context.Cantidad)</b>
+                            </MudTd>
+                            <MudTd DataLabel="Stock anterior" Style="text-align:right">
+                                @Ui.Numero(context.StockAnterior)
+                            </MudTd>
+                            <MudTd DataLabel="Stock resultante" Style="text-align:right">
+                                <MudText Typo="Typo.body2"
+                                         Color="@(context.StockAnterior - context.Cantidad <= 0 ? Color.Error : Color.Default)">
+                                    <b>@Ui.Numero(context.StockAnterior - context.Cantidad)</b>
+                                </MudText>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </SectionCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private OrdenTrabajoVm? _orden;
+
+    private readonly List<BreadcrumbItem> _migas =
+    [
+        new("Operación", href: null, disabled: true),
+        new("Órdenes de trabajo", href: "/ordenes"),
+        new("Detalle", href: null, disabled: true)
+    ];
+
+    protected override void OnParametersSet() =>
+        _orden = DatosDemo.Ordenes.FirstOrDefault(o => o.Id == Id);
+
+    private static string HorasDe(OrdenTrabajoVm orden) =>
+        orden.HorasResolucion.HasValue ? orden.HorasResolucion.Value.ToString("0.#") : "—";
+
+    private static string ResolucionDe(OrdenTrabajoVm orden) =>
+        string.IsNullOrWhiteSpace(orden.ResolucionAplicada)
+            ? "No se registró el detalle de la resolución aplicada."
+            : orden.ResolucionAplicada;
+
+    private static string DescripcionDe(OrdenTrabajoVm orden) =>
+        string.IsNullOrWhiteSpace(orden.Descripcion)
+            ? "No se registró una descripción del problema."
+            : orden.Descripcion;
+
+    private static string ProveedorDe(Guid repuestoId)
+    {
+        var repuesto = DatosDemo.Repuestos.FirstOrDefault(r => r.Id == repuestoId);
+        return repuesto is null ? "Repuesto fuera de catálogo" : repuesto.ProveedorReferencia;
+    }
+
+    private static string TextoDuracion(OrdenTrabajoVm orden)
+    {
+        if (orden.HorasResolucion.HasValue) return $"{orden.HorasResolucion.Value:0.#} h de resolución";
+
+        var transcurrido = DateTime.Now - orden.FechaApertura;
+        if (transcurrido.TotalHours < 1) return $"Abierta hace {(int)transcurrido.TotalMinutes} min";
+        if (transcurrido.TotalHours < 24) return $"Abierta hace {(int)transcurrido.TotalHours} h";
+        return $"Abierta hace {(int)transcurrido.TotalDays} d";
+    }
+
+    private async Task TomarLaOrden()
+    {
+        var orden = _orden;
+        if (orden is null) return;
+
+        var parametros = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Mensaje, $"¿Tomás la orden {orden.Numero}?" },
+            { x => x.Detalle, $"La orden pasa a estado En curso sobre {orden.Maquina} y queda visible como intervención activa en el panel operativo." },
+            { x => x.TextoConfirmar, "Tomar la orden" },
+            { x => x.ColorAccion, Color.Warning },
+            { x => x.Icono, Icons.Material.Filled.PlayArrow }
+        };
+
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialogo = await DialogService.ShowAsync<ConfirmDialog>("Tomar la orden", parametros, opciones);
+        var resultado = await dialogo.Result;
+
+        if (resultado is null || resultado.Canceled) return;
+
+        orden.Estado = EstadoOrden.EnCurso;
+        Snackbar.Add($"{orden.Numero} pasó a En curso.", Severity.Success);
+        StateHasChanged();
+    }
+
+    private async Task CerrarOrden()
+    {
+        var orden = _orden;
+        if (orden is null) return;
+
+        var parametros = new DialogParameters<CerrarOrdenDialog> { { x => x.Orden, orden } };
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialogo = await DialogService.ShowAsync<CerrarOrdenDialog>($"Cerrar {orden.Numero}", parametros, opciones);
+
+        await dialogo.Result;
+        StateHasChanged();
+    }
+}

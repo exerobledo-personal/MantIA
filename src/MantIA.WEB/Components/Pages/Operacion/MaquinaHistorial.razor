@@ -1,0 +1,237 @@
+@page "/maquinas/{Id:guid}/historial"
+
+<PageTitle>Historial de fallas · MantIA</PageTitle>
+
+@if (_maquina is null)
+{
+    <PageHeader Titulo="Historial de fallas" Icono="@Icons.Material.Filled.History" Migas="@Migas" />
+    <SectionCard>
+        <EmptyState Titulo="No encontramos la máquina"
+                    Descripcion="El activo cuyo historial buscás no existe en el parque de equipos de la empresa."
+                    Icono="@Icons.Material.Filled.SearchOff">
+            <Accion>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/maquinas">
+                    Volver al listado
+                </MudButton>
+            </Accion>
+        </EmptyState>
+    </SectionCard>
+}
+else
+{
+    var maquina = _maquina!;
+
+    <PageHeader Titulo="@($"Historial de fallas de {maquina.Nombre}")"
+                Bajada="@($"Intervenciones cerradas sobre {maquina.Codigo} · {maquina.Marca} {maquina.Modelo} en {maquina.Planta}. Este historial alimenta el motor de recomendaciones: de acá salen la frecuencia de falla, el consumo real de repuestos y el tiempo de resolución del equipo.")"
+                Icono="@Icons.Material.Filled.History"
+                Migas="@Migas">
+        <EtiquetaExtra>
+            <StatusChip Texto="@Ui.TextoDe(maquina.Estado)" ChipColor="@Ui.ColorDe(maquina.Estado)"
+                        Icono="@Ui.IconoDe(maquina.Estado)" />
+        </EtiquetaExtra>
+        <Acciones>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.ArrowBack" Href="@($"/maquinas/{maquina.Id}")">
+                Volver a la ficha del activo
+            </MudButton>
+        </Acciones>
+    </PageHeader>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" sm="6" md="3">
+            <MetricCard Etiqueta="Intervenciones en el período" Valor="@Filtrado.Count.ToString()"
+                        Detalle="@DescripcionPeriodo"
+                        Icono="@Icons.Material.Filled.Build" Acento="Color.Primary" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MetricCard Etiqueta="Correctivas" Valor="@Filtrado.Count(h => h.Tipo == TipoMantenimiento.Correctivo).ToString()"
+                        Detalle="Intervenciones no planificadas por falla"
+                        Icono="@Icons.Material.Filled.ReportProblem" Acento="Color.Error" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MetricCard Etiqueta="Preventivas" Valor="@Filtrado.Count(h => h.Tipo == TipoMantenimiento.Preventivo).ToString()"
+                        Detalle="Intervenciones programadas por plan"
+                        Icono="@Icons.Material.Filled.EventAvailable" Acento="Color.Info" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MetricCard Etiqueta="Tiempo medio de resolución" Valor="@TiempoMedio.ToString("0.0")" Unidad="h"
+                        Detalle="Promedio de horas entre apertura y cierre"
+                        Icono="@Icons.Material.Filled.Timer" Acento="Color.Success" />
+        </MudItem>
+    </MudGrid>
+
+    <FilterBar>
+        <MudSelect T="string" @bind-Value="_tipo" Label="Tipo de intervención" Dense="true"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+            <MudSelectItem T="string" Value="@TodosLosTipos">@TodosLosTipos</MudSelectItem>
+            @foreach (var tipo in Enum.GetValues<TipoMantenimiento>())
+            {
+                <MudSelectItem T="string" Value="@tipo.ToString()">@tipo.ToString()</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSelect T="string" @bind-Value="_periodo" Label="Período" Dense="true"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+            @foreach (var periodo in Periodos)
+            {
+                <MudSelectItem T="string" Value="@periodo">@periodo</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSpacer />
+
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            @Filtrado.Count de @Historial.Count intervenciones registradas
+        </MudText>
+    </FilterBar>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12">
+            <SectionCard Titulo="Intervenciones por mes"
+                         Bajada="Cantidad de órdenes cerradas sobre el activo en los últimos seis meses">
+                <MudChart T="double" ChartType="ChartType.Bar"
+                          ChartSeries="@SeriesIntervenciones"
+                          ChartLabels="@MesesEtiquetas"
+                          ChartOptions="@_opcionesBarras"
+                          Width="100%" Height="280px" />
+            </SectionCard>
+        </MudItem>
+
+        <MudItem xs="12">
+            @if (Filtrado.Count == 0)
+            {
+                <SectionCard>
+                    <EmptyState Titulo="Sin intervenciones en el período seleccionado"
+                                Descripcion="Ampliá el período o quitá el filtro de tipo de intervención para ver el historial completo del activo."
+                                Icono="@Icons.Material.Filled.History">
+                        <Accion>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LimpiarFiltros">
+                                Ver todo el historial
+                            </MudButton>
+                        </Accion>
+                    </EmptyState>
+                </SectionCard>
+            }
+            else
+            {
+                <SectionCard Titulo="Detalle de intervenciones"
+                             Bajada="Cada fila corresponde a una orden de trabajo cerrada sobre el activo"
+                             SinPadding="true">
+                    <MudTable Items="@Filtrado" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                              Breakpoint="Breakpoint.Sm" Striped="false">
+                        <HeaderContent>
+                            <MudTh>Fecha</MudTh>
+                            <MudTh>Orden</MudTh>
+                            <MudTh>Tipo de falla</MudTh>
+                            <MudTh>Mantenimiento</MudTh>
+                            <MudTh>Repuesto utilizado</MudTh>
+                            <MudTh>Técnico</MudTh>
+                            <MudTh Style="text-align:right">Horas de resolución</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Fecha">@Ui.Fecha(context.Fecha)</MudTd>
+                            <MudTd DataLabel="Orden"><b>@context.Orden</b></MudTd>
+                            <MudTd DataLabel="Tipo de falla">@context.TipoFalla</MudTd>
+                            <MudTd DataLabel="Mantenimiento">
+                                <StatusChip Texto="@context.Tipo.ToString()"
+                                            ChipColor="@Ui.ColorDe(context.Tipo)" Variante="Variant.Outlined" />
+                            </MudTd>
+                            <MudTd DataLabel="Repuesto utilizado">@context.RepuestoUtilizado</MudTd>
+                            <MudTd DataLabel="Técnico">@context.Tecnico</MudTd>
+                            <MudTd DataLabel="Horas de resolución" Style="text-align:right">
+                                @context.HorasResolucion.ToString("0.0") h
+                            </MudTd>
+                        </RowTemplate>
+                        <PagerContent>
+                            <MudTablePager RowsPerPageString="Filas por página"
+                                   InfoFormat="{first_item}-{last_item} de {all_items}"
+                                   AllItemsText="Todas" />
+                        </PagerContent>
+                    </MudTable>
+                </SectionCard>
+            }
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private const string TodosLosTipos = "Todos los tipos";
+    private const string TodoElHistorial = "Todo el historial";
+
+    private static readonly string[] Periodos =
+        ["Últimos 3 meses", "Últimos 6 meses", "Últimos 12 meses", TodoElHistorial];
+
+    [Parameter] public Guid Id { get; set; }
+
+    private MaquinaVm? _maquina;
+    private string _tipo = TodosLosTipos;
+    private string _periodo = "Últimos 6 meses";
+
+    private readonly BarChartOptions _opcionesBarras = new()
+    {
+        YAxisTicks = 1,
+        MaxNumYAxisTicks = 6,
+        ChartPalette = ["#0B6FA4"],
+    };
+
+    private List<BreadcrumbItem> Migas =>
+    [
+        new BreadcrumbItem("Máquinas", "/maquinas"),
+        new BreadcrumbItem(_maquina is null ? "Ficha del activo" : _maquina.Codigo, _maquina is null ? "/maquinas" : $"/maquinas/{_maquina.Id}"),
+        new BreadcrumbItem("Historial de fallas", null, true)
+    ];
+
+    private List<HistorialFallaVm> Historial => DatosDemo.HistorialDe(Id);
+
+    private int Meses => _periodo switch
+    {
+        "Últimos 3 meses" => 3,
+        "Últimos 6 meses" => 6,
+        "Últimos 12 meses" => 12,
+        _ => 0
+    };
+
+    private List<HistorialFallaVm> Filtrado => Historial
+        .Where(h => _tipo == TodosLosTipos || h.Tipo.ToString() == _tipo)
+        .Where(h => Meses == 0 || h.Fecha >= DateTime.Today.AddMonths(-Meses))
+        .OrderByDescending(h => h.Fecha)
+        .ToList();
+
+    private string DescripcionPeriodo => Meses == 0
+        ? "Historial completo del activo"
+        : $"Últimos {Meses} meses de operación";
+
+    private double TiempoMedio => Filtrado.Count == 0 ? 0 : Filtrado.Average(h => h.HorasResolucion);
+
+    private string[] MesesEtiquetas => Enumerable.Range(0, 6)
+        .Select(i => DateTime.Today.AddMonths(-5 + i).ToString("MMM").ToUpperInvariant())
+        .ToArray();
+
+    private List<ChartSeries<double>> SeriesIntervenciones
+    {
+        get
+        {
+            var datos = new double[6];
+
+            foreach (var intervencion in Historial.Where(h => _tipo == TodosLosTipos || h.Tipo.ToString() == _tipo))
+            {
+                var meses = (DateTime.Today.Year - intervencion.Fecha.Year) * 12
+                            + DateTime.Today.Month - intervencion.Fecha.Month;
+                var indice = 5 - meses;
+                if (indice is < 0 or > 5) continue;
+                datos[indice]++;
+            }
+
+            return [new ChartSeries<double> { Name = "Intervenciones", Data = datos }];
+        }
+    }
+
+    protected override void OnParametersSet() =>
+        _maquina = DatosDemo.Maquinas.FirstOrDefault(m => m.Id == Id);
+
+    private void LimpiarFiltros()
+    {
+        _tipo = TodosLosTipos;
+        _periodo = TodoElHistorial;
+    }
+}

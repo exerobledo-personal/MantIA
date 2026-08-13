@@ -1,0 +1,295 @@
+@page "/empresa/plantas/nueva"
+@page "/empresa/plantas/{Id:guid}/editar"
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>@(EsAlta ? "Nueva planta" : "Editar planta") · MantIA</PageTitle>
+
+<PageHeader Titulo="@(EsAlta ? "Registrar una planta" : $"Editar {_nombre}")"
+            Bajada="@(EsAlta
+                        ? "El alta de la planta habilita el registro de máquinas y la asignación de usuarios. Las coordenadas ubican la instalación en el mapa consolidado de la empresa."
+                        : "Los cambios se reflejan en el mapa de instalaciones y en el alcance de las máquinas, las órdenes y los usuarios asociados a esta planta.")"
+            Icono="@Icons.Material.Filled.Factory"
+            Migas="@Migas" />
+
+@if (!EsAlta && _planta is null)
+{
+    <SectionCard>
+        <EmptyState Titulo="No encontramos la planta"
+                    Descripcion="La instalación que intentás editar no existe en la cuenta de la empresa."
+                    Icono="@Icons.Material.Filled.SearchOff">
+            <Accion>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/empresa/plantas">
+                    Volver al listado
+                </MudButton>
+            </Accion>
+        </EmptyState>
+    </SectionCard>
+}
+else
+{
+    <MudForm @ref="_formulario">
+        <MudGrid Spacing="3">
+            <MudItem xs="12" lg="6">
+                <SectionCard Titulo="Identificación de la planta"
+                             Bajada="Con estos datos la instalación se reconoce en las órdenes de trabajo y en los reportes">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_nombre" Label="Nombre de la planta"
+                                          Variant="Variant.Outlined" Immediate="true"
+                                          Placeholder="Planta Norte"
+                                          Required="true" RequiredError="Indicá con qué nombre se conoce la instalación" />
+                        </MudItem>
+                        <MudItem xs="12" md="7">
+                            <MudTextField @bind-Value="_direccion" Label="Dirección"
+                                          Variant="Variant.Outlined"
+                                          Placeholder="Ruta Panamericana Km 44,5"
+                                          Required="true" RequiredError="Indicá la dirección de la instalación" />
+                        </MudItem>
+                        <MudItem xs="12" md="5">
+                            <MudTextField @bind-Value="_localidad" Label="Localidad"
+                                          Variant="Variant.Outlined"
+                                          Placeholder="Pilar, Buenos Aires"
+                                          Required="true" RequiredError="Indicá la localidad y la provincia" />
+                        </MudItem>
+                    </MudGrid>
+                </SectionCard>
+
+                <SectionCard Titulo="Ubicación geográfica" Class="mt-4"
+                             Bajada="Las coordenadas se expresan en grados decimales, con cuatro decimales de precisión">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudNumericField T="decimal" @bind-Value="_latitud" Label="Latitud"
+                                             Variant="Variant.Outlined" Format="F4" Step="0.0001m"
+                                             Immediate="true"
+                                             Error="@(!LatitudValida)"
+                                             ErrorText="La latitud tiene que estar entre -90 y 90 grados."
+                                             HelperText="Valores negativos para el hemisferio sur" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudNumericField T="decimal" @bind-Value="_longitud" Label="Longitud"
+                                             Variant="Variant.Outlined" Format="F4" Step="0.0001m"
+                                             Immediate="true"
+                                             Error="@(!LongitudValida)"
+                                             ErrorText="La longitud tiene que estar entre -180 y 180 grados."
+                                             HelperText="Valores negativos para el hemisferio oeste" />
+                        </MudItem>
+                    </MudGrid>
+
+                    @if (!LatitudValida || !LongitudValida)
+                    {
+                        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mt-4">
+                            Las coordenadas están fuera de rango. La latitud admite valores de -90 a 90 grados y la
+                            longitud de -180 a 180. Revisalas antes de guardar.
+                        </MudAlert>
+                    }
+                    else if (!DentroDelAreaDelMapa)
+                    {
+                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mt-4">
+                            Las coordenadas son válidas pero caen fuera del área metropolitana de Buenos Aires, que es la
+                            que muestra el mapa consolidado. El pin se va a dibujar en el borde de la vista previa.
+                        </MudAlert>
+                    }
+                </SectionCard>
+            </MudItem>
+
+            <MudItem xs="12" lg="6">
+                <SectionCard Titulo="Vista previa en el mapa"
+                             Bajada="Ubicación de la planta frente al resto de las instalaciones de la empresa">
+                    <MapaPlantas Plantas="@PlantasParaPrevisualizar" PlantaSeleccionada="@PlantaPrevia" />
+
+                    <div class="mantia-lista-datos mt-4">
+                        <DataPoint Etiqueta="Planta" Valor="@NombrePrevio" />
+                        <DataPoint Etiqueta="Dirección"
+                                   Valor="@(string.IsNullOrWhiteSpace(_direccion) ? "Sin dirección cargada" : _direccion)" />
+                        <DataPoint Etiqueta="Localidad"
+                                   Valor="@(string.IsNullOrWhiteSpace(_localidad) ? "Sin localidad cargada" : _localidad)" />
+                        <DataPoint Etiqueta="Coordenadas" Valor="@CoordenadasTexto" />
+                        <DataPoint Etiqueta="Máquinas registradas"
+                                   Valor="@(EsAlta ? "0, la planta todavía no tiene equipos" : MaquinasDeLaPlanta.ToString())" />
+                    </div>
+
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-3">
+                        La vista previa se dibuja con la proyección propia del área metropolitana que usa MantIA. En
+                        producción, la ubicación se valida además contra el servicio de mapas.
+                    </MudText>
+                </SectionCard>
+            </MudItem>
+
+            <MudItem xs="12">
+                <div class="d-flex flex-wrap justify-end align-center" style="gap:.75rem">
+                    <MudButton Variant="Variant.Text" OnClick="Cancelar">Cancelar</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Save" OnClick="Guardar">
+                        @(EsAlta ? "Confirmar alta de la planta" : "Guardar cambios")
+                    </MudButton>
+                </div>
+            </MudItem>
+        </MudGrid>
+    </MudForm>
+}
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+
+    private MudForm _formulario = null!;
+    private PlantaVm? _planta;
+    private Guid _idPrevio = Guid.NewGuid();
+
+    private string _nombre = "";
+    private string _direccion = "";
+    private string _localidad = "";
+    private decimal _latitud = -34.6037m;
+    private decimal _longitud = -58.3816m;
+
+    private bool EsAlta => Id is null;
+
+    private List<BreadcrumbItem> Migas =>
+    [
+        new BreadcrumbItem("Administración de empresa", "/empresa"),
+        new BreadcrumbItem("Plantas", "/empresa/plantas"),
+        new BreadcrumbItem(EsAlta ? "Nueva planta" : "Edición", null, true)
+    ];
+
+    private bool LatitudValida => _latitud is >= -90m and <= 90m;
+
+    private bool LongitudValida => _longitud is >= -180m and <= 180m;
+
+    private bool DentroDelAreaDelMapa =>
+        _latitud is >= -34.76m and <= -34.38m && _longitud is >= -59.00m and <= -58.28m;
+
+    private string NombrePrevio => string.IsNullOrWhiteSpace(_nombre) ? "Planta sin nombre" : _nombre.Trim();
+
+    private string CoordenadasTexto => _latitud.ToString("F4") + ", " + _longitud.ToString("F4");
+
+    private int MaquinasDeLaPlanta => _planta is null ? 0 : DatosDemo.Maquinas.Count(m => m.PlantaId == _planta.Id);
+
+    private PlantaVm PlantaPrevia => new()
+    {
+        Id = _idPrevio,
+        Nombre = NombrePrevio,
+        Direccion = _direccion,
+        Localidad = _localidad,
+        Latitud = _latitud,
+        Longitud = _longitud,
+        Estado = EstadoGenerico.Activo,
+        FechaAlta = _planta?.FechaAlta ?? DateTime.Today,
+        Maquinas = MaquinasDeLaPlanta,
+        AlertasActivas = _planta?.AlertasActivas ?? 0,
+        OrdenesAbiertas = _planta?.OrdenesAbiertas ?? 0
+    };
+
+    private List<PlantaVm> PlantasParaPrevisualizar
+    {
+        get
+        {
+            var lista = DatosDemo.Plantas.Where(p => p.Id != _idPrevio).ToList();
+            lista.Add(PlantaPrevia);
+            return lista;
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (EsAlta)
+        {
+            _planta = null;
+            return;
+        }
+
+        _planta = DatosDemo.Plantas.FirstOrDefault(p => p.Id == Id);
+        if (_planta is null) return;
+
+        _idPrevio = _planta.Id;
+        _nombre = _planta.Nombre;
+        _direccion = _planta.Direccion;
+        _localidad = _planta.Localidad;
+        _latitud = _planta.Latitud;
+        _longitud = _planta.Longitud;
+    }
+
+    private void Cancelar() => Nav.NavigateTo("/empresa/plantas");
+
+    private async Task Guardar()
+    {
+        await _formulario.ValidateAsync();
+
+        if (!_formulario.IsValid)
+        {
+            Snackbar.Add("Revisá los campos obligatorios antes de guardar", Severity.Warning);
+            return;
+        }
+
+        if (!LatitudValida)
+        {
+            Snackbar.Add("La latitud tiene que estar entre -90 y 90 grados", Severity.Warning);
+            return;
+        }
+
+        if (!LongitudValida)
+        {
+            Snackbar.Add("La longitud tiene que estar entre -180 y 180 grados", Severity.Warning);
+            return;
+        }
+
+        if (EsAlta)
+        {
+            var nueva = new PlantaVm
+            {
+                Id = _idPrevio,
+                Nombre = _nombre.Trim(),
+                Direccion = _direccion.Trim(),
+                Localidad = _localidad.Trim(),
+                Latitud = _latitud,
+                Longitud = _longitud,
+                Estado = EstadoGenerico.Activo,
+                FechaAlta = DateTime.Today,
+                Maquinas = 0,
+                AlertasActivas = 0,
+                OrdenesAbiertas = 0
+            };
+
+            DatosDemo.Plantas.Add(nueva);
+
+            Snackbar.Add($"{nueva.Nombre} quedó registrada en {nueva.Localidad}. Ya podés dar de alta máquinas y asignar usuarios.",
+                Severity.Success);
+
+            Nav.NavigateTo("/empresa/plantas");
+            return;
+        }
+
+        if (_planta is null) return;
+
+        var nombreAnterior = _planta.Nombre;
+        var nombreNuevo = _nombre.Trim();
+
+        _planta.Nombre = nombreNuevo;
+        _planta.Direccion = _direccion.Trim();
+        _planta.Localidad = _localidad.Trim();
+        _planta.Latitud = _latitud;
+        _planta.Longitud = _longitud;
+
+        if (nombreAnterior != nombreNuevo) PropagarNombre(nombreAnterior, nombreNuevo);
+
+        Snackbar.Add($"Se actualizaron los datos de {_planta.Nombre}", Severity.Success);
+        Nav.NavigateTo("/empresa/plantas");
+    }
+
+    private static void PropagarNombre(string anterior, string nuevo)
+    {
+        foreach (var maquina in DatosDemo.Maquinas.Where(m => m.Planta == anterior))
+        {
+            maquina.Planta = nuevo;
+        }
+
+        foreach (var orden in DatosDemo.Ordenes.Where(o => o.Planta == anterior))
+        {
+            orden.Planta = nuevo;
+        }
+
+        foreach (var usuario in DatosDemo.Usuarios.Where(u => u.Plantas.Contains(anterior)))
+        {
+            usuario.Plantas = usuario.Plantas.Select(p => p == anterior ? nuevo : p).ToList();
+        }
+    }
+}

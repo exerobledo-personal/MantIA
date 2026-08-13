@@ -1,0 +1,172 @@
+@page "/catalogo"
+
+<PageTitle>Catálogo técnico · MantIA</PageTitle>
+
+<PageHeader Titulo="Catálogo técnico compartido"
+            Bajada="El catálogo es un activo común de la plataforma: cada máquina que registra cualquier empresa cliente enriquece la ficha de su marca y modelo, y esa ficha queda disponible para todas las demás. Por eso una empresa que se suma hoy arranca con fallas comunes, repuestos sugeridos e intervalos de mantenimiento ya documentados por el resto del parque instalado."
+            Icono="@Icons.Material.Filled.MenuBook"
+            Migas="@Migas">
+    <Acciones>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.PrecisionManufacturing" Href="/maquinas">
+            Ver parque de equipos
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add" Href="/maquinas/nueva">
+            Nueva máquina
+        </MudButton>
+    </Acciones>
+</PageHeader>
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Fichas técnicas" Valor="@DatosDemo.Catalogo.Count.ToString()"
+                    Detalle="Modelos documentados en toda la plataforma"
+                    Icono="@Icons.Material.Filled.MenuBook" Acento="Color.Primary" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Completadas"
+                    Valor="@DatosDemo.Catalogo.Count(c => c.Estado == EstadoEnriquecimiento.Completado).ToString()"
+                    Detalle="Con fallas, repuestos e intervalos cargados"
+                    Icono="@Icons.Material.Filled.CheckCircle" Acento="Color.Success" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Pendientes o en proceso"
+                    Valor="@DatosDemo.Catalogo.Count(c => c.Estado is EstadoEnriquecimiento.Pendiente or EstadoEnriquecimiento.EnProceso).ToString()"
+                    Detalle="En cola del pipeline de enriquecimiento"
+                    Icono="@Icons.Material.Filled.HourglassTop" Acento="Color.Warning" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Máquinas propias cubiertas" Valor="@MaquinasCubiertas.ToString()"
+                    Unidad="@($"/ {DatosDemo.Maquinas.Count}")"
+                    Detalle="@($"Equipos de {DatosDemo.EmpresaActual.RazonSocial} con ficha completada")"
+                    Icono="@Icons.Material.Filled.PrecisionManufacturing" Acento="Color.Info" />
+    </MudItem>
+</MudGrid>
+
+<FilterBar>
+    <MudTextField @bind-Value="_busqueda" Immediate="true"
+                  Placeholder="Buscar por marca, modelo o categoría de equipo"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                  Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"
+                  Class="mantia-filtros__buscador" />
+
+    <MudSelect T="string" @bind-Value="_estado" Label="Estado del enriquecimiento" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@TodosLosEstados">@TodosLosEstados</MudSelectItem>
+        @foreach (var estado in Enum.GetValues<EstadoEnriquecimiento>())
+        {
+            <MudSelectItem T="string" Value="@Ui.TextoDe(estado)">@Ui.TextoDe(estado)</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSpacer />
+
+    <MudText Typo="Typo.body2" Class="mud-text-secondary">
+        @Filtradas.Count de @DatosDemo.Catalogo.Count fichas técnicas
+    </MudText>
+</FilterBar>
+
+@if (Filtradas.Count == 0)
+{
+    <SectionCard>
+        <EmptyState Titulo="No hay fichas que coincidan con el filtro"
+                    Descripcion="Probá con otra marca, modelo o categoría, o mostrá todos los estados de enriquecimiento."
+                    Icono="@Icons.Material.Filled.SearchOff">
+            <Accion>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LimpiarFiltros">
+                    Limpiar filtros
+                </MudButton>
+            </Accion>
+        </EmptyState>
+    </SectionCard>
+}
+else
+{
+    <MudGrid Spacing="3">
+        @foreach (var ficha in Filtradas)
+        {
+            <MudItem xs="12" md="6" lg="4" Class="d-flex">
+                <SectionCard Titulo="@($"{ficha.Marca} {ficha.Modelo}")"
+                             Bajada="@ficha.Categoria"
+                             Class="flex-grow-1">
+                    <div class="d-flex flex-wrap align-center mb-4" style="gap:.5rem">
+                        <StatusChip Texto="@Ui.TextoDe(ficha.Estado)" ChipColor="@Ui.ColorDe(ficha.Estado)" />
+                        <StatusChip Texto="@($"{ficha.TenantsQueLoUsan} empresas la utilizan")"
+                                    ChipColor="Color.Info" Variante="Variant.Outlined" />
+                        @if (MaquinasDe(ficha) > 0)
+                        {
+                            <StatusChip Texto="@($"{MaquinasDe(ficha)} máquinas propias")"
+                                        ChipColor="Color.Primary" Variante="Variant.Outlined" />
+                        }
+                    </div>
+
+                    <div class="d-flex flex-wrap" style="gap:2rem">
+                        <DataPoint Etiqueta="Fallas comunes" Valor="@ficha.FallasComunes.Count.ToString()" />
+                        <DataPoint Etiqueta="Repuestos sugeridos" Valor="@ficha.RepuestosSugeridos.Count.ToString()" />
+                        <DataPoint Etiqueta="Último enriquecimiento" Valor="@Ui.Fecha(ficha.FechaUltimoEnriquecimiento)" />
+                    </div>
+
+                    @if (ficha.Estado is EstadoEnriquecimiento.Pendiente or EstadoEnriquecimiento.EnProceso)
+                    {
+                        <MudProgressLinear Indeterminate="true" Color="Color.Info" Rounded="true"
+                                           Size="Size.Small" Class="mt-4" />
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                            El pipeline está completando la documentación de este modelo
+                        </MudText>
+                    }
+
+                    <div class="d-flex justify-end mt-4">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                   EndIcon="@Icons.Material.Filled.ArrowForward"
+                                   Href="@($"/catalogo/{ficha.Id}")">
+                            Ver ficha
+                        </MudButton>
+                    </div>
+                </SectionCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private const string TodosLosEstados = "Todos los estados";
+
+    private string _busqueda = "";
+    private string _estado = TodosLosEstados;
+
+    private static readonly List<BreadcrumbItem> Migas =
+    [
+        new BreadcrumbItem("Operación", null, true),
+        new BreadcrumbItem("Catálogo técnico", "/catalogo")
+    ];
+
+    private List<CatalogoMaquinaVm> Filtradas => DatosDemo.Catalogo
+        .Where(c => _estado == TodosLosEstados || Ui.TextoDe(c.Estado) == _estado)
+        .Where(Coincide)
+        .OrderBy(c => c.Marca)
+        .ThenBy(c => c.Modelo)
+        .ToList();
+
+    private int MaquinasCubiertas => DatosDemo.Maquinas
+        .Count(m => DatosDemo.Catalogo.Any(c => c.Id == m.CatalogoMaquinaId && c.Estado == EstadoEnriquecimiento.Completado));
+
+    private bool Coincide(CatalogoMaquinaVm ficha)
+    {
+        if (string.IsNullOrWhiteSpace(_busqueda)) return true;
+
+        var texto = _busqueda.Trim();
+        return ficha.Marca.Contains(texto, StringComparison.OrdinalIgnoreCase)
+               || ficha.Modelo.Contains(texto, StringComparison.OrdinalIgnoreCase)
+               || ficha.Categoria.Contains(texto, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int MaquinasDe(CatalogoMaquinaVm ficha) =>
+        DatosDemo.Maquinas.Count(m => m.CatalogoMaquinaId == ficha.Id);
+
+    private void LimpiarFiltros()
+    {
+        _busqueda = "";
+        _estado = TodosLosEstados;
+    }
+}

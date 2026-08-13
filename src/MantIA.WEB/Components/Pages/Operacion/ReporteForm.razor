@@ -1,0 +1,506 @@
+@page "/reportes/nuevo"
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Nuevo reporte · MantIA</PageTitle>
+
+<PageHeader Titulo="Nuevo reporte"
+            Bajada="Configurá qué información querés extraer y sobre qué recorte. Los filtros adicionales cambian según el tipo de reporte elegido, y la vista previa de la derecha se recalcula sobre los datos reales de la empresa a medida que los vas ajustando."
+            Icono="@Icons.Material.Filled.Analytics"
+            Migas="@_migas" />
+
+<MudForm @ref="_formulario">
+    <MudGrid Spacing="3">
+        <MudItem xs="12" lg="7">
+            <SectionCard Titulo="Definición del reporte"
+                         Bajada="Nombre con el que se va a guardar y tipo de información que se extrae">
+                <MudGrid Spacing="3">
+                    <MudItem xs="12">
+                        <MudTextField T="string" @bind-Value="_nombre" Label="Nombre del reporte"
+                                      Variant="Variant.Outlined"
+                                      Required="true" RequiredError="Poné un nombre que permita reconocer el reporte en el listado"
+                                      HelperText="Por ejemplo: Stock crítico consolidado — Agosto" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="string" @bind-Value="_tipo" Label="Tipo de reporte"
+                                   Variant="Variant.Outlined"
+                                   HelperText="Define las columnas del reporte y los filtros adicionales disponibles">
+                            @foreach (var tipo in Tipos)
+                            {
+                                <MudSelectItem T="string" Value="@tipo">@tipo</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="string" @bind-Value="_planta" Label="Planta"
+                                   Variant="Variant.Outlined"
+                                   HelperText="Elegí una planta o dejá el consolidado de toda la empresa">
+                            <MudSelectItem T="string" Value="@Consolidado">Todas las plantas</MudSelectItem>
+                            @foreach (var planta in DatosDemo.Plantas)
+                            {
+                                <MudSelectItem T="string" Value="@planta.Nombre">@planta.Nombre</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudDateRangePicker @bind-DateRange="_rango" Label="Rango de fechas"
+                                            Variant="Variant.Outlined" DateFormat="dd/MM/yyyy"
+                                            HelperText="@TextoAyudaRango" />
+                    </MudItem>
+                </MudGrid>
+            </SectionCard>
+
+            <SectionCard Titulo="Filtros adicionales"
+                         Bajada="@($"Filtros propios del tipo {_tipo}. Cambian al elegir otro tipo de reporte.")"
+                         Class="mt-4">
+                <MudGrid Spacing="3">
+                    @if (_tipo == TipoStock)
+                    {
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="_criticidad" Label="Criticidad del repuesto"
+                                       Variant="Variant.Outlined"
+                                       HelperText="Acota el reporte a los repuestos de una criticidad determinada">
+                                <MudSelectItem T="string" Value="@Todas">Todas las criticidades</MudSelectItem>
+                                @foreach (var nivel in Criticidades)
+                                {
+                                    <MudSelectItem T="string" Value="@Ui.TextoDe(nivel)">@Ui.TextoDe(nivel)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSwitch T="bool" @bind-Value="_soloBajoMinimo" Color="Color.Warning"
+                                       Label="Sólo los repuestos que están bajo el mínimo" />
+                        </MudItem>
+                    }
+                    else if (_tipo == TipoFallas)
+                    {
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="_tipoMantenimiento" Label="Tipo de mantenimiento"
+                                       Variant="Variant.Outlined"
+                                       HelperText="Correctivo para el análisis de fallas, preventivo para el cumplimiento del plan">
+                                <MudSelectItem T="string" Value="@Todas">Todos los tipos</MudSelectItem>
+                                @foreach (var tipo in Enum.GetValues<TipoMantenimiento>())
+                                {
+                                    <MudSelectItem T="string" Value="@tipo.ToString()">@tipo.ToString()</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="_maquina" Label="Máquina"
+                                       Variant="Variant.Outlined"
+                                       HelperText="Dejalo en todas para comparar la frecuencia de fallas entre equipos">
+                                <MudSelectItem T="string" Value="@Todas">Todas las máquinas</MudSelectItem>
+                                @foreach (var maquina in MaquinasDelAlcance)
+                                {
+                                    <MudSelectItem T="string" Value="@Etiqueta(maquina)">
+                                        @Etiqueta(maquina) · @maquina.Planta
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                    }
+                    else if (_tipo == TipoConsumo)
+                    {
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="_maquina" Label="Máquina"
+                                       Variant="Variant.Outlined"
+                                       HelperText="El consumo se toma de los repuestos descontados al cerrar cada orden">
+                                <MudSelectItem T="string" Value="@Todas">Todas las máquinas</MudSelectItem>
+                                @foreach (var maquina in MaquinasDelAlcance)
+                                {
+                                    <MudSelectItem T="string" Value="@Etiqueta(maquina)">
+                                        @Etiqueta(maquina) · @maquina.Planta
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="_criticidad" Label="Criticidad del repuesto"
+                                       Variant="Variant.Outlined"
+                                       HelperText="Permite aislar el consumo de los repuestos críticos">
+                                <MudSelectItem T="string" Value="@Todas">Todas las criticidades</MudSelectItem>
+                                @foreach (var nivel in Criticidades)
+                                {
+                                    <MudSelectItem T="string" Value="@Ui.TextoDe(nivel)">@Ui.TextoDe(nivel)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                    }
+                    else
+                    {
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="_estadoOrden" Label="Estado de la orden"
+                                       Variant="Variant.Outlined"
+                                       HelperText="Cerradas para medir tiempos de resolución, abiertas para ver la carga pendiente">
+                                <MudSelectItem T="string" Value="@Todas">Todos los estados</MudSelectItem>
+                                @foreach (var estado in Enum.GetValues<EstadoOrden>())
+                                {
+                                    <MudSelectItem T="string" Value="@Ui.TextoDe(estado)">@Ui.TextoDe(estado)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="_tecnico" Label="Responsable asignado"
+                                       Variant="Variant.Outlined"
+                                       HelperText="Dejalo en todos para comparar la carga entre los técnicos">
+                                <MudSelectItem T="string" Value="@Todas">Todos los responsables</MudSelectItem>
+                                @foreach (var usuario in DatosDemo.Usuarios.Where(u => u.Estado == EstadoGenerico.Activo))
+                                {
+                                    <MudSelectItem T="string" Value="@usuario.NombreCompleto">
+                                        @usuario.NombreCompleto · @Roles.Etiqueta(usuario.Rol)
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </SectionCard>
+        </MudItem>
+
+        <MudItem xs="12" lg="5">
+            <SectionCard Titulo="Vista previa"
+                         Bajada="@($"Calculada sobre los datos actuales de {DatosDemo.EmpresaActual.RazonSocial} con los filtros de esta pantalla")">
+                <div class="d-flex flex-wrap align-center mb-3" style="gap:.5rem">
+                    <StatusChip Texto="@_tipo" ChipColor="Color.Primary" Icono="@Icons.Material.Filled.Category" />
+                    <StatusChip Texto="@PlantaTexto" ChipColor="Color.Default" Variante="Variant.Outlined"
+                                Icono="@Icons.Material.Filled.Factory" />
+                    <StatusChip Texto="@PeriodoTexto" ChipColor="Color.Default" Variante="Variant.Outlined"
+                                Icono="@Icons.Material.Filled.DateRange" />
+                </div>
+
+                <MudAlert Severity="@(Filas.Count == 0 ? Severity.Warning : Severity.Info)"
+                          Variant="Variant.Outlined" Dense="true" Class="mb-3">
+                    @if (Filas.Count == 0)
+                    {
+                        <span>Con estos filtros el reporte no trae ninguna fila. Ampliá el rango de fechas o quitá alguno de los filtros adicionales.</span>
+                    }
+                    else
+                    {
+                        <span>El reporte va a traer <b>@Filas.Count</b> @(Filas.Count == 1 ? "fila" : "filas"). @NotaDelTipo</span>
+                    }
+                </MudAlert>
+
+                @if (Filas.Count == 0)
+                {
+                    <EmptyState Titulo="Sin datos para previsualizar"
+                                Descripcion="La vista previa muestra las primeras cinco filas del reporte una vez que los filtros devuelvan resultados."
+                                Icono="@Icons.Material.Filled.TableChart" />
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary mb-2">
+                        Primeras @Math.Min(5, Filas.Count) filas de @Filas.Count
+                    </MudText>
+                    <div class="mantia-scroll-x">
+                        <MudTable Items="@Filas.Take(5)" Dense="true" Hover="true" Elevation="0"
+                                  Class="mantia-tabla" Breakpoint="Breakpoint.Sm" Striped="false">
+                            <HeaderContent>
+                                <MudTh>@Encabezados[0]</MudTh>
+                                <MudTh>@Encabezados[1]</MudTh>
+                                <MudTh>@Encabezados[2]</MudTh>
+                                <MudTh Style="text-align:right">@Encabezados[3]</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="@Encabezados[0]">
+                                    <div class="mantia-celda-principal">
+                                        <strong>@context.Principal</strong>
+                                        <span>@context.Detalle</span>
+                                    </div>
+                                </MudTd>
+                                <MudTd DataLabel="@Encabezados[1]">@context.Valor1</MudTd>
+                                <MudTd DataLabel="@Encabezados[2]">@context.Valor2</MudTd>
+                                <MudTd DataLabel="@Encabezados[3]" Style="text-align:right">@context.Valor3</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </div>
+                }
+
+                <MudDivider Class="my-4" />
+
+                <div class="mantia-lista-datos">
+                    <DataPoint Etiqueta="Parámetros que se guardan" Valor="@ParametrosTexto" />
+                    <DataPoint Etiqueta="Autor" Valor="@DatosDemo.UsuarioActual.NombreCompleto" />
+                    <DataPoint Etiqueta="Fecha de generación" Valor="@Ui.FechaHora(DateTime.Now)" />
+                </div>
+            </SectionCard>
+        </MudItem>
+
+        <MudItem xs="12">
+            <div class="d-flex flex-wrap justify-end" style="gap:.75rem">
+                <MudButton Variant="Variant.Text" OnClick="Cancelar">Cancelar</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Save" OnClick="Guardar">
+                    Generar el reporte
+                </MudButton>
+            </div>
+        </MudItem>
+    </MudGrid>
+</MudForm>
+
+@code {
+    private const string Todas = "Todas";
+    private const string Consolidado = "Todas";
+
+    private const string TipoStock = "Estado de stock";
+    private const string TipoFallas = "Historial de fallas";
+    private const string TipoConsumo = "Consumo de repuestos";
+    private const string TipoOrdenes = "Órdenes de trabajo";
+
+    private MudForm _formulario = null!;
+
+    private string _nombre = "";
+    private string _tipo = TipoStock;
+    private string _planta = Consolidado;
+    private DateRange? _rango = new(DateTime.Today.AddDays(-30), DateTime.Today);
+
+    private string _criticidad = Todas;
+    private bool _soloBajoMinimo;
+    private string _tipoMantenimiento = Todas;
+    private string _maquina = Todas;
+    private string _estadoOrden = Todas;
+    private string _tecnico = Todas;
+
+    private static readonly string[] Tipos = [TipoStock, TipoFallas, TipoConsumo, TipoOrdenes];
+
+    private static readonly Criticidad[] Criticidades =
+        [Criticidad.Critica, Criticidad.Alta, Criticidad.Media, Criticidad.Baja];
+
+    private readonly List<BreadcrumbItem> _migas =
+    [
+        new("Operación", href: null, disabled: true),
+        new("Reportes", href: "/reportes"),
+        new("Nuevo reporte", href: null, disabled: true)
+    ];
+
+    private sealed class FilaPrevia
+    {
+        public string Principal { get; init; } = "";
+        public string Detalle { get; init; } = "";
+        public string Valor1 { get; init; } = "";
+        public string Valor2 { get; init; } = "";
+        public string Valor3 { get; init; } = "";
+    }
+
+    private static string Etiqueta(MaquinaVm maquina) => $"{maquina.Codigo} · {maquina.Nombre}";
+
+    private List<MaquinaVm> MaquinasDelAlcance => _planta == Consolidado
+        ? DatosDemo.Maquinas.OrderBy(m => m.Codigo).ToList()
+        : DatosDemo.Maquinas.Where(m => m.Planta == _planta).OrderBy(m => m.Codigo).ToList();
+
+    private string PlantaTexto => _planta == Consolidado ? "Todas las plantas" : _planta;
+
+    private string PeriodoTexto
+    {
+        get
+        {
+            var desde = _rango?.Start;
+            var hasta = _rango?.End;
+            if (desde is null || hasta is null) return "Período sin definir";
+            return $"{desde.Value:dd/MM} al {hasta.Value:dd/MM}";
+        }
+    }
+
+    private string TextoAyudaRango => _tipo == TipoStock
+        ? "El estado de stock es una foto del inventario al momento de generar el reporte: el rango queda registrado como período informado."
+        : "Se incluyen los registros cuya fecha cae dentro del rango elegido.";
+
+    private string NotaDelTipo => _tipo switch
+    {
+        TipoStock => "El conteo sale del inventario vigente de repuestos activos.",
+        TipoFallas => "Cada fila es una orden de trabajo registrada en el período.",
+        TipoConsumo => "Cada fila es un consumo de repuesto descontado al cerrar una orden.",
+        _ => "Cada fila es una orden de trabajo del período con su estado y responsable."
+    };
+
+    private string[] Encabezados => _tipo switch
+    {
+        TipoStock => ["Repuesto", "Stock actual", "Stock mínimo", "Criticidad"],
+        TipoFallas => ["Falla registrada", "Fecha", "Tipo", "Resolución"],
+        TipoConsumo => ["Repuesto consumido", "Cantidad", "Fecha", "Costo"],
+        _ => ["Orden", "Estado", "Responsable", "Apertura"]
+    };
+
+    private bool EnRango(DateTime fecha)
+    {
+        var desde = _rango?.Start;
+        var hasta = _rango?.End;
+        if (desde is not null && fecha.Date < desde.Value.Date) return false;
+        if (hasta is not null && fecha.Date > hasta.Value.Date) return false;
+        return true;
+    }
+
+    private bool RepuestoEnLaPlanta(RepuestoVm repuesto) =>
+        _planta == Consolidado
+        || DatosDemo.Maquinas.Any(m => m.Planta == _planta && repuesto.MaquinaIds.Contains(m.Id));
+
+    private List<FilaPrevia> Filas => _tipo switch
+    {
+        TipoStock => FilasDeStock(),
+        TipoFallas => FilasDeFallas(),
+        TipoConsumo => FilasDeConsumo(),
+        _ => FilasDeOrdenes()
+    };
+
+    private List<FilaPrevia> FilasDeStock() =>
+        DatosDemo.Repuestos
+            .Where(r => r.Estado == EstadoGenerico.Activo)
+            .Where(r => _criticidad == Todas || Ui.TextoDe(r.Criticidad) == _criticidad)
+            .Where(r => !_soloBajoMinimo || r.BajoMinimo)
+            .Where(RepuestoEnLaPlanta)
+            .OrderByDescending(r => r.Criticidad)
+            .ThenBy(r => r.Nombre)
+            .Select(r => new FilaPrevia
+            {
+                Principal = r.Nombre,
+                Detalle = $"Parte {r.NumeroParte} · {r.ProveedorReferencia}",
+                Valor1 = $"{Ui.Numero(r.StockActual)} {r.UnidadMedida}",
+                Valor2 = Ui.Numero(r.StockMinimo),
+                Valor3 = Ui.TextoDe(r.Criticidad)
+            })
+            .ToList();
+
+    private List<FilaPrevia> FilasDeFallas() =>
+        DatosDemo.Ordenes
+            .Where(o => EnRango(o.FechaApertura))
+            .Where(o => _planta == Consolidado || o.Planta == _planta)
+            .Where(o => _tipoMantenimiento == Todas || o.TipoMantenimiento.ToString() == _tipoMantenimiento)
+            .Where(o => _maquina == Todas || o.Maquina == _maquina)
+            .OrderByDescending(o => o.FechaApertura)
+            .Select(o => new FilaPrevia
+            {
+                Principal = o.TipoFalla,
+                Detalle = $"{o.Numero} · {o.Maquina}",
+                Valor1 = Ui.Fecha(o.FechaApertura),
+                Valor2 = o.TipoMantenimiento.ToString(),
+                Valor3 = o.HorasResolucion.HasValue ? $"{o.HorasResolucion.Value:0.#} h" : "Sin cerrar"
+            })
+            .ToList();
+
+    private List<FilaPrevia> FilasDeConsumo()
+    {
+        var filas = new List<FilaPrevia>();
+
+        foreach (var orden in DatosDemo.Ordenes.OrderByDescending(o => o.FechaCierre ?? o.FechaApertura))
+        {
+            var fecha = orden.FechaCierre ?? orden.FechaApertura;
+            if (!EnRango(fecha)) continue;
+            if (_planta != Consolidado && orden.Planta != _planta) continue;
+            if (_maquina != Todas && orden.Maquina != _maquina) continue;
+
+            foreach (var consumo in orden.Repuestos)
+            {
+                var repuesto = DatosDemo.Repuestos.FirstOrDefault(r => r.Id == consumo.RepuestoId);
+                if (_criticidad != Todas && (repuesto is null || Ui.TextoDe(repuesto.Criticidad) != _criticidad)) continue;
+
+                filas.Add(new FilaPrevia
+                {
+                    Principal = consumo.Repuesto,
+                    Detalle = $"Parte {consumo.NumeroParte} · {orden.Numero} · {orden.Maquina}",
+                    Valor1 = Ui.Numero(consumo.Cantidad),
+                    Valor2 = Ui.Fecha(fecha),
+                    Valor3 = repuesto is null ? "—" : Ui.Moneda(consumo.Cantidad * repuesto.CostoUnitario)
+                });
+            }
+        }
+
+        return filas;
+    }
+
+    private List<FilaPrevia> FilasDeOrdenes() =>
+        DatosDemo.Ordenes
+            .Where(o => EnRango(o.FechaApertura))
+            .Where(o => _planta == Consolidado || o.Planta == _planta)
+            .Where(o => _estadoOrden == Todas || Ui.TextoDe(o.Estado) == _estadoOrden)
+            .Where(o => _tecnico == Todas || o.UsuarioAsignado == _tecnico)
+            .OrderByDescending(o => o.FechaApertura)
+            .Select(o => new FilaPrevia
+            {
+                Principal = o.Numero,
+                Detalle = $"{o.Maquina} · {o.TipoFalla}",
+                Valor1 = Ui.TextoDe(o.Estado),
+                Valor2 = o.UsuarioAsignado,
+                Valor3 = Ui.Fecha(o.FechaApertura)
+            })
+            .ToList();
+
+    private string ParametrosTexto
+    {
+        get
+        {
+            var partes = new List<string> { PlantaTexto };
+
+            if (_tipo == TipoStock)
+            {
+                partes.Add(_criticidad == Todas ? "Todas las criticidades" : $"Criticidad {_criticidad}");
+                if (_soloBajoMinimo) partes.Add("Sólo bajo el mínimo");
+            }
+            else if (_tipo == TipoFallas)
+            {
+                partes.Add(_tipoMantenimiento == Todas ? "Todos los tipos de mantenimiento" : _tipoMantenimiento);
+                partes.Add(_maquina == Todas ? "Todas las máquinas" : _maquina);
+            }
+            else if (_tipo == TipoConsumo)
+            {
+                partes.Add(_maquina == Todas ? "Todas las máquinas" : _maquina);
+                partes.Add(_criticidad == Todas ? "Todas las criticidades" : $"Criticidad {_criticidad}");
+            }
+            else
+            {
+                partes.Add(_estadoOrden == Todas ? "Todos los estados" : $"Estado {_estadoOrden}");
+                partes.Add(_tecnico == Todas ? "Todos los responsables" : _tecnico);
+            }
+
+            return string.Join(" · ", partes);
+        }
+    }
+
+    private void Cancelar() => Nav.NavigateTo("/reportes");
+
+    private async Task Guardar()
+    {
+        await _formulario.ValidateAsync();
+
+        if (!_formulario.IsValid)
+        {
+            Snackbar.Add("Revisá los campos obligatorios antes de generar el reporte.", Severity.Warning);
+            return;
+        }
+
+        if (_rango?.Start is null || _rango?.End is null)
+        {
+            Snackbar.Add("Elegí el rango de fechas que abarca el reporte.", Severity.Warning);
+            return;
+        }
+
+        var filas = Filas.Count;
+
+        var reporte = new ReporteVm
+        {
+            Nombre = _nombre.Trim(),
+            TipoReporte = _tipo,
+            Parametros = ParametrosTexto,
+            Periodo = PeriodoTexto,
+            Planta = _planta,
+            UsuarioCreador = DatosDemo.UsuarioActual.NombreCompleto,
+            Estado = EstadoGenerico.Activo,
+            FechaGeneracion = DateTime.Now,
+            Filas = filas
+        };
+
+        reporte.Historial.Add(new ReporteHistorialVm
+        {
+            Usuario = DatosDemo.UsuarioActual.NombreCompleto,
+            Accion = "Generación",
+            Fecha = DateTime.Now,
+            Detalle = $"Reporte generado con {filas} {(filas == 1 ? "fila" : "filas")} · {ParametrosTexto}"
+        });
+
+        DatosDemo.Reportes.Add(reporte);
+
+        Snackbar.Add($"{reporte.Nombre} quedó generado con {filas} {(filas == 1 ? "fila" : "filas")}.", Severity.Success);
+        Nav.NavigateTo($"/reportes/{reporte.Id}");
+    }
+}

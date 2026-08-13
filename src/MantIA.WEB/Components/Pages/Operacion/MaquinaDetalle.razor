@@ -1,0 +1,421 @@
+@page "/maquinas/{Id:guid}"
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>@(_maquina is null ? "Máquina" : _maquina.Nombre) · MantIA</PageTitle>
+
+@if (_maquina is null)
+{
+    <PageHeader Titulo="Ficha del activo" Icono="@Icons.Material.Filled.PrecisionManufacturing" Migas="@Migas" />
+    <SectionCard>
+        <EmptyState Titulo="No encontramos la máquina"
+                    Descripcion="El activo que buscás no existe en el parque de equipos de la empresa o fue eliminado del registro."
+                    Icono="@Icons.Material.Filled.SearchOff">
+            <Accion>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/maquinas">
+                    Volver al listado
+                </MudButton>
+            </Accion>
+        </EmptyState>
+    </SectionCard>
+}
+else
+{
+    var maquina = _maquina!;
+
+    <PageHeader Titulo="@maquina.Nombre"
+                Bajada="@($"{maquina.Codigo} · {maquina.Marca} {maquina.Modelo} · {maquina.Planta} · {maquina.Linea}")"
+                Icono="@Icons.Material.Filled.PrecisionManufacturing"
+                Migas="@Migas">
+        <EtiquetaExtra>
+            <StatusChip Texto="@Ui.TextoDe(maquina.Estado)" ChipColor="@Ui.ColorDe(maquina.Estado)"
+                        Icono="@Ui.IconoDe(maquina.Estado)" />
+            <StatusChip Texto="@($"Criticidad {Ui.TextoDe(maquina.CriticidadOperativa)}")"
+                        ChipColor="@Ui.ColorDe(maquina.CriticidadOperativa)" Variante="Variant.Outlined" />
+        </EtiquetaExtra>
+        <Acciones>
+            <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                       StartIcon="@Icons.Material.Filled.PowerSettingsNew" OnClick="Desactivar"
+                       Disabled="@(maquina.Estado == EstadoMaquina.Inactiva)">
+                Desactivar
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Edit" Href="@($"/maquinas/{maquina.Id}/editar")">
+                Editar
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Assignment" Href="/ordenes/nueva">
+                Nueva orden de trabajo
+            </MudButton>
+        </Acciones>
+    </PageHeader>
+
+    <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pt-4" Class="mantia-superficie pa-2">
+        <MudTabPanel Text="Resumen" Icon="@Icons.Material.Filled.Info">
+            <MudGrid Spacing="3">
+                <MudItem xs="12" sm="4">
+                    <MetricCard Etiqueta="Órdenes de trabajo" Valor="@Ordenes.Count.ToString()"
+                                Detalle="@($"{Ordenes.Count(o => o.Estado is EstadoOrden.Abierta or EstadoOrden.EnCurso)} sin cerrar sobre este activo")"
+                                Icono="@Icons.Material.Filled.Assignment" Acento="Color.Info" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MetricCard Etiqueta="Horas de operación" Valor="@Ui.Numero(maquina.HorasOperacion)" Unidad="h"
+                                Detalle="Base de cálculo de los intervalos de mantenimiento"
+                                Icono="@Icons.Material.Filled.Timelapse" Acento="Color.Primary" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MetricCard Etiqueta="Tiempo medio de resolución" Valor="@TiempoMedio.ToString("0.0")" Unidad="h"
+                                Detalle="@($"Sobre {Ordenes.Count(o => o.Estado == EstadoOrden.Cerrada)} órdenes cerradas")"
+                                Icono="@Icons.Material.Filled.Timer" Acento="Color.Success" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <SectionCard Titulo="Datos del activo"
+                                 Bajada="Información de registro y de ubicación del equipo dentro de la empresa">
+                        <Acciones>
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                                       EndIcon="@Icons.Material.Filled.ArrowForward"
+                                       Href="@($"/maquinas/{maquina.Id}/historial")">
+                                Ver historial de fallas
+                            </MudButton>
+                        </Acciones>
+                        <ChildContent>
+                            <MudGrid Spacing="3">
+                                <MudItem xs="12" sm="6" md="3">
+                                    <DataPoint Etiqueta="Código interno" Valor="@maquina.Codigo" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <DataPoint Etiqueta="Número de serie" Valor="@maquina.NumeroSerie" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <DataPoint Etiqueta="Marca" Valor="@maquina.Marca" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <DataPoint Etiqueta="Modelo" Valor="@maquina.Modelo" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <DataPoint Etiqueta="Planta" Valor="@maquina.Planta" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <DataPoint Etiqueta="Línea o sector" Valor="@maquina.Linea" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <DataPoint Etiqueta="Criticidad operativa">
+                                        <StatusChip Texto="@Ui.TextoDe(maquina.CriticidadOperativa)"
+                                                    ChipColor="@Ui.ColorDe(maquina.CriticidadOperativa)" />
+                                    </DataPoint>
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <DataPoint Etiqueta="Estado">
+                                        <StatusChip Texto="@Ui.TextoDe(maquina.Estado)"
+                                                    ChipColor="@Ui.ColorDe(maquina.Estado)"
+                                                    Icono="@Ui.IconoDe(maquina.Estado)" />
+                                    </DataPoint>
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <DataPoint Etiqueta="Fecha de alta" Valor="@Ui.Fecha(maquina.FechaAlta)" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <DataPoint Etiqueta="Última intervención"
+                                               Valor="@(maquina.UltimaIntervencion is null ? "Sin intervenciones registradas" : Ui.Fecha(maquina.UltimaIntervencion))" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <DataPoint Etiqueta="Horas de operación" Valor="@($"{Ui.Numero(maquina.HorasOperacion)} h")" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <DataPoint Etiqueta="Ficha del catálogo">
+                                        <StatusChip Texto="@Ui.TextoDe(maquina.Enriquecimiento)"
+                                                    ChipColor="@Ui.ColorDe(maquina.Enriquecimiento)" />
+                                    </DataPoint>
+                                </MudItem>
+                            </MudGrid>
+                        </ChildContent>
+                    </SectionCard>
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Ficha técnica del catálogo" Icon="@Icons.Material.Filled.MenuBook">
+            @if (_ficha is null)
+            {
+                <EmptyState Titulo="El activo todavía no tiene ficha en el catálogo"
+                            Descripcion="La combinación de marca y modelo no está vinculada a ninguna ficha técnica compartida. Editá la máquina para asociarla o esperá a que el pipeline de enriquecimiento la genere."
+                            Icono="@Icons.Material.Filled.MenuBook" />
+            }
+            else
+            {
+                var ficha = _ficha!;
+
+                <MudGrid Spacing="3">
+                    <MudItem xs="12">
+                        <SectionCard Titulo="@($"{ficha.Marca} {ficha.Modelo}")"
+                                     Bajada="@($"Categoría: {ficha.Categoria}. Esta ficha es compartida por todas las empresas de la plataforma que operan el mismo modelo.")">
+                            <Acciones>
+                                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                                           EndIcon="@Icons.Material.Filled.ArrowForward"
+                                           Href="@($"/catalogo/{ficha.Id}")">
+                                    Ver ficha completa
+                                </MudButton>
+                            </Acciones>
+                            <ChildContent>
+                                <MudGrid Spacing="3">
+                                    <MudItem xs="12" sm="6" md="3">
+                                        <DataPoint Etiqueta="Estado del enriquecimiento">
+                                            <StatusChip Texto="@Ui.TextoDe(ficha.Estado)" ChipColor="@Ui.ColorDe(ficha.Estado)" />
+                                        </DataPoint>
+                                    </MudItem>
+                                    <MudItem xs="12" sm="6" md="3">
+                                        <DataPoint Etiqueta="Último enriquecimiento" Valor="@Ui.Fecha(ficha.FechaUltimoEnriquecimiento)" />
+                                    </MudItem>
+                                    <MudItem xs="12" sm="6" md="3">
+                                        <DataPoint Etiqueta="Empresas que usan la ficha" Valor="@ficha.TenantsQueLoUsan.ToString()" />
+                                    </MudItem>
+                                    <MudItem xs="12" sm="6" md="3">
+                                        <DataPoint Etiqueta="Intervalos de mantenimiento" Valor="@ficha.IntervalosMantenimiento" />
+                                    </MudItem>
+                                </MudGrid>
+
+                                @if (ficha.Estado is EstadoEnriquecimiento.Pendiente or EstadoEnriquecimiento.EnProceso)
+                                {
+                                    <MudProgressLinear Indeterminate="true" Color="Color.Info" Rounded="true"
+                                                       Size="Size.Small" Class="mt-4" />
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary mt-2">
+                                        El pipeline de enriquecimiento está trabajando sobre esta ficha. Cuando termine,
+                                        las fallas comunes, los repuestos sugeridos y los intervalos de mantenimiento
+                                        quedan disponibles para este activo y para el resto de las empresas de la plataforma.
+                                    </MudText>
+                                }
+                            </ChildContent>
+                        </SectionCard>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <SectionCard Titulo="Fallas comunes documentadas"
+                                     Bajada="Modos de falla registrados para este modelo en toda la plataforma">
+                            @if (ficha.FallasComunes.Count == 0)
+                            {
+                                <EmptyState Titulo="Sin fallas documentadas"
+                                            Descripcion="Todavía no hay modos de falla cargados para este modelo."
+                                            Icono="@Icons.Material.Filled.ReportProblem" />
+                            }
+                            else
+                            {
+                                <div class="mantia-lista-datos">
+                                    @foreach (var falla in ficha.FallasComunes)
+                                    {
+                                        <div class="d-flex align-start" style="gap:.6rem">
+                                            <MudIcon Icon="@Icons.Material.Filled.ReportProblem" Color="Color.Warning" Size="Size.Small" />
+                                            <MudText Typo="Typo.body2">@falla</MudText>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </SectionCard>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <SectionCard Titulo="Repuestos sugeridos por el catálogo"
+                                     Bajada="Piezas que el modelo recomienda tener disponibles para este equipo">
+                            @if (ficha.RepuestosSugeridos.Count == 0)
+                            {
+                                <EmptyState Titulo="Sin repuestos sugeridos"
+                                            Descripcion="Todavía no hay repuestos asociados a este modelo en el catálogo compartido."
+                                            Icono="@Icons.Material.Filled.Inventory2" />
+                            }
+                            else
+                            {
+                                <div class="mantia-lista-datos">
+                                    @foreach (var repuesto in ficha.RepuestosSugeridos)
+                                    {
+                                        <div class="d-flex align-start" style="gap:.6rem">
+                                            <MudIcon Icon="@Icons.Material.Filled.Inventory2" Color="Color.Primary" Size="Size.Small" />
+                                            <MudText Typo="Typo.body2">@repuesto</MudText>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </SectionCard>
+                    </MudItem>
+                </MudGrid>
+            }
+        </MudTabPanel>
+
+        <MudTabPanel Text="Repuestos asociados" Icon="@Icons.Material.Filled.Inventory2">
+            @if (Repuestos.Count == 0)
+            {
+                <EmptyState Titulo="Sin repuestos asociados"
+                            Descripcion="Ningún repuesto del inventario está vinculado a este activo. Vinculalos desde la ficha del repuesto para que el motor de recomendaciones los considere."
+                            Icono="@Icons.Material.Filled.Inventory2">
+                    <Accion>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/repuestos">
+                            Ir a repuestos críticos
+                        </MudButton>
+                    </Accion>
+                </EmptyState>
+            }
+            else
+            {
+                <SectionCard Titulo="Repuestos vinculados al activo"
+                             Bajada="@($"{Repuestos.Count(r => r.BajoMinimo)} de {Repuestos.Count} por debajo del umbral mínimo configurado")"
+                             SinPadding="true">
+                    <MudTable Items="@Repuestos" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                              Breakpoint="Breakpoint.Sm" Striped="false"
+                              OnRowClick="@((TableRowClickEventArgs<RepuestoVm> e) => AbrirRepuesto(e.Item))"
+                              RowStyle="cursor:pointer">
+                        <HeaderContent>
+                            <MudTh>Repuesto</MudTh>
+                            <MudTh>Criticidad</MudTh>
+                            <MudTh>Cobertura de stock</MudTh>
+                            <MudTh>Plazo de reposición</MudTh>
+                            <MudTh Style="text-align:right">Costo unitario</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Repuesto">
+                                <div class="mantia-celda-principal">
+                                    <strong>@context.Nombre</strong>
+                                    <span>Parte @context.NumeroParte · @context.ProveedorReferencia</span>
+                                </div>
+                            </MudTd>
+                            <MudTd DataLabel="Criticidad">
+                                <StatusChip Texto="@Ui.TextoDe(context.Criticidad)" ChipColor="@Ui.ColorDe(context.Criticidad)" />
+                            </MudTd>
+                            <MudTd DataLabel="Cobertura de stock" Style="min-width:160px">
+                                <CoverageBar Actual="context.StockActual" Minimo="context.StockMinimo" Unidad="@context.UnidadMedida" />
+                            </MudTd>
+                            <MudTd DataLabel="Plazo de reposición">@context.PlazoReposicionDias días</MudTd>
+                            <MudTd DataLabel="Costo unitario" Style="text-align:right">@Ui.Moneda(context.CostoUnitario)</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </SectionCard>
+            }
+        </MudTabPanel>
+
+        <MudTabPanel Text="Órdenes de trabajo" Icon="@Icons.Material.Filled.Assignment">
+            @if (Ordenes.Count == 0)
+            {
+                <EmptyState Titulo="Sin órdenes de trabajo"
+                            Descripcion="Este activo todavía no registra intervenciones de mantenimiento correctivo ni preventivo."
+                            Icono="@Icons.Material.Filled.Assignment">
+                    <Accion>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                   Href="/ordenes/nueva">
+                            Registrar la primera orden
+                        </MudButton>
+                    </Accion>
+                </EmptyState>
+            }
+            else
+            {
+                <SectionCard Titulo="Intervenciones registradas sobre el activo"
+                             Bajada="Órdenes ordenadas de la más reciente a la más antigua"
+                             SinPadding="true">
+                    <MudTable Items="@Ordenes" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                              Breakpoint="Breakpoint.Sm" Striped="false"
+                              OnRowClick="@((TableRowClickEventArgs<OrdenTrabajoVm> e) => AbrirOrden(e.Item))"
+                              RowStyle="cursor:pointer">
+                        <HeaderContent>
+                            <MudTh>Orden</MudTh>
+                            <MudTh>Tipo de falla</MudTh>
+                            <MudTh>Mantenimiento</MudTh>
+                            <MudTh>Responsable</MudTh>
+                            <MudTh>Estado</MudTh>
+                            <MudTh Style="text-align:right">Apertura</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Orden"><b>@context.Numero</b></MudTd>
+                            <MudTd DataLabel="Tipo de falla">
+                                <div class="mantia-celda-principal">
+                                    <strong>@context.TipoFalla</strong>
+                                    <span>@context.Descripcion</span>
+                                </div>
+                            </MudTd>
+                            <MudTd DataLabel="Mantenimiento">
+                                <StatusChip Texto="@context.TipoMantenimiento.ToString()"
+                                            ChipColor="@Ui.ColorDe(context.TipoMantenimiento)" Variante="Variant.Outlined" />
+                            </MudTd>
+                            <MudTd DataLabel="Responsable">@context.UsuarioAsignado</MudTd>
+                            <MudTd DataLabel="Estado">
+                                <StatusChip Texto="@Ui.TextoDe(context.Estado)" ChipColor="@Ui.ColorDe(context.Estado)" />
+                            </MudTd>
+                            <MudTd DataLabel="Apertura" Style="text-align:right">@Ui.Relativo(context.FechaApertura)</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </SectionCard>
+            }
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private MaquinaVm? _maquina;
+    private CatalogoMaquinaVm? _ficha;
+
+    private static readonly List<BreadcrumbItem> Migas =
+    [
+        new BreadcrumbItem("Máquinas", "/maquinas"),
+        new BreadcrumbItem("Ficha del activo", null, true)
+    ];
+
+    private List<OrdenTrabajoVm> Ordenes => DatosDemo.Ordenes
+        .Where(o => o.MaquinaId == Id)
+        .OrderByDescending(o => o.FechaApertura)
+        .ToList();
+
+    private List<RepuestoVm> Repuestos => DatosDemo.Repuestos
+        .Where(r => r.MaquinaIds.Contains(Id))
+        .OrderByDescending(r => r.Criticidad)
+        .ToList();
+
+    private double TiempoMedio
+    {
+        get
+        {
+            var cerradas = Ordenes.Where(o => o.HorasResolucion.HasValue).ToList();
+            return cerradas.Count == 0 ? 0 : cerradas.Average(o => o.HorasResolucion!.Value);
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        _maquina = DatosDemo.Maquinas.FirstOrDefault(m => m.Id == Id);
+        _ficha = _maquina is null
+            ? null
+            : DatosDemo.Catalogo.FirstOrDefault(c => c.Id == _maquina.CatalogoMaquinaId);
+    }
+
+    private void AbrirOrden(OrdenTrabajoVm? orden)
+    {
+        if (orden is not null) Nav.NavigateTo($"/ordenes/{orden.Id}");
+    }
+
+    private void AbrirRepuesto(RepuestoVm? repuesto)
+    {
+        if (repuesto is not null) Nav.NavigateTo($"/repuestos/{repuesto.Id}");
+    }
+
+    private async Task Desactivar()
+    {
+        if (_maquina is null) return;
+
+        var parametros = new DialogParameters
+        {
+            { "Mensaje", $"¿Confirmás la desactivación de {_maquina.Codigo} · {_maquina.Nombre}?" },
+            { "Detalle", "El activo pasa a estado Inactiva: deja de contarse en el parque operativo y no genera nuevas alertas de stock ni recomendaciones. Las órdenes de trabajo ya registradas se conservan." },
+            { "TextoConfirmar", "Desactivar máquina" },
+            { "ColorAccion", Color.Error },
+            { "Icono", Icons.Material.Filled.PowerSettingsNew }
+        };
+
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dialogo = await DialogService.ShowAsync<ConfirmDialog>("Desactivar máquina", parametros, opciones);
+        var resultado = await dialogo.Result;
+
+        if (resultado is null || resultado.Canceled) return;
+
+        _maquina.Estado = EstadoMaquina.Inactiva;
+        Snackbar.Add($"{_maquina.Codigo} quedó inactiva en el parque de equipos", Severity.Success);
+    }
+}

@@ -1,0 +1,403 @@
+@page "/plataforma/empresas/nueva"
+@page "/plataforma/empresas/{Id:guid}/editar"
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>@(EsAlta ? "Nueva empresa" : "Editar empresa") · MantIA</PageTitle>
+
+<PageHeader Titulo="@(EsAlta ? "Dar de alta una empresa cliente" : $"Editar {_empresa?.RazonSocial}")"
+            Bajada="@(EsAlta
+                        ? "El alta crea un tenant aislado dentro de MantIA. A partir de ese momento la empresa administra sus propias plantas, máquinas, repuestos y usuarios, sin ver ni compartir datos operativos con el resto de los clientes."
+                        : "Los cambios impactan en la facturación mensual, en el cupo de máquinas habilitadas y en el panel de plataforma. La modificación del dominio no reasigna las cuentas ya creadas en el proveedor de identidad.")"
+            Icono="@Icons.Material.Filled.Domain"
+            Migas="@Migas" />
+
+@if (!EsAlta && _empresa is null)
+{
+    <SectionCard>
+        <EmptyState Titulo="No encontramos la empresa"
+                    Descripcion="El tenant que intentás editar no existe o fue eliminado del padrón de clientes de la plataforma."
+                    Icono="@Icons.Material.Filled.SearchOff">
+            <Accion>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/plataforma/empresas">
+                    Volver al listado
+                </MudButton>
+            </Accion>
+        </EmptyState>
+    </SectionCard>
+}
+else
+{
+    <MudForm @ref="_formulario">
+        <MudGrid Spacing="3">
+            <MudItem xs="12" lg="7">
+                <SectionCard Titulo="Identificación de la empresa"
+                             Bajada="Datos con los que la organización se identifica en la plataforma y ante el proveedor de identidad">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="7">
+                            <MudTextField @bind-Value="_razonSocial" Label="Razón social"
+                                          Variant="Variant.Outlined" Immediate="true"
+                                          Placeholder="Alimentos Pampa S.A."
+                                          Required="true" RequiredError="Indicá la razón social tal como figura en el contrato" />
+                        </MudItem>
+                        <MudItem xs="12" md="5">
+                            <MudSelect T="string" @bind-Value="_rubro" Label="Rubro"
+                                       Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter"
+                                       Required="true" RequiredError="Seleccioná el rubro industrial de la empresa"
+                                       HelperText="Orienta el catálogo técnico y las reglas del motor de recomendaciones">
+                                @foreach (var rubro in Rubros)
+                                {
+                                    <MudSelectItem T="string" Value="@rubro">@rubro</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="7">
+                            <MudTextField @bind-Value="_dominio" Label="Dominio corporativo"
+                                          Variant="Variant.Outlined" Immediate="true"
+                                          Placeholder="alimentospampa.com.ar"
+                                          Error="@DominioDuplicado"
+                                          ErrorText="@($"Ya existe una empresa cliente registrada con el dominio {_dominio.Trim().ToLowerInvariant()}")"
+                                          Required="true" RequiredError="El dominio corporativo identifica al tenant y valida los correos de sus usuarios"
+                                          HelperText="Todos los usuarios de la empresa tienen que tener una casilla de este dominio" />
+                        </MudItem>
+                        <MudItem xs="12" md="5">
+                            <MudTextField @bind-Value="_tenantId" Label="Identificador de tenant"
+                                          Variant="Variant.Outlined" ReadOnly="true"
+                                          HelperText="@(EsAlta ? "Se genera al confirmar el alta con el formato org_<empresa>_<código>" : "El identificador de tenant no se modifica una vez creado")" />
+                        </MudItem>
+                    </MudGrid>
+                </SectionCard>
+
+                <SectionCard Titulo="Suscripción" Class="mt-4"
+                             Bajada="Determina el cupo de máquinas habilitadas y el importe de la facturación mensual">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" Value="_plan" ValueChanged="PlanCambiado" Label="Plan de suscripción"
+                                       Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter"
+                                       Required="true" RequiredError="Seleccioná el plan contratado">
+                                @foreach (var plan in DatosDemo.Planes)
+                                {
+                                    <MudSelectItem T="string" Value="@plan.Nombre">
+                                        @plan.Nombre — @Ui.Moneda(plan.Precio) por mes
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudNumericField T="int" @bind-Value="_maxMaquinas" Label="Máximo de máquinas habilitadas"
+                                             Variant="Variant.Outlined" Min="1" Max="500" Step="5"
+                                             HelperText="@HelperCupo" />
+                        </MudItem>
+                    </MudGrid>
+
+                    @if (PlanElegido is not null && _maxMaquinas != PlanElegido.MaxMaquinas)
+                    {
+                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mt-4"
+                                  Icon="@Icons.Material.Filled.Tune">
+                            El cupo de @_maxMaquinas máquinas no coincide con las @PlanElegido.MaxMaquinas incluidas
+                            en el plan @PlanElegido.Nombre. La excepción queda registrada en el contrato y se factura
+                            igual que el plan base.
+                        </MudAlert>
+                    }
+                </SectionCard>
+
+                <SectionCard Titulo="Administrador inicial" Class="mt-4"
+                             Bajada="Primera cuenta de la empresa, con permisos para dar de alta plantas, usuarios y máquinas">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="8">
+                            <MudTextField @bind-Value="_adminInicial" Label="Correo del administrador inicial"
+                                          Variant="Variant.Outlined" Immediate="true"
+                                          Placeholder="@($"admin{Sufijo}")"
+                                          Error="@CorreoFueraDeDominio"
+                                          ErrorText="@($"El correo del administrador tiene que pertenecer al dominio {_dominio.Trim().ToLowerInvariant()}")"
+                                          Required="true" RequiredError="Indicá el correo del administrador inicial"
+                                          HelperText="Recibe las credenciales de acceso apenas se confirma el alta" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField T="string" Value="@Roles.Etiqueta(Roles.AdminEmpresa)" Label="Rol asignado"
+                                          Variant="Variant.Outlined" ReadOnly="true"
+                                          HelperText="Nivel Sr, con acceso completo dentro de su empresa" />
+                        </MudItem>
+                    </MudGrid>
+                </SectionCard>
+
+                @if (EsAlta)
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4"
+                              Icon="@Icons.Material.Filled.PlaylistAddCheck">
+                        <MudText Typo="Typo.body2" Class="mb-2">
+                            Al confirmar el alta, MantIA ejecuta esta secuencia sin intervención manual:
+                        </MudText>
+                        <ol class="mantia-reco__evidencia">
+                            <li>Se crea el tenant en el proveedor de identidad con el identificador @TenantPrevisto.</li>
+                            <li>Se crea la planta por defecto con el nombre de la empresa, para que pueda registrar máquinas desde el primer día.</li>
+                            <li>Se crea el usuario administrador inicial con rol @Roles.Etiqueta(Roles.AdminEmpresa) y nivel Sr.</li>
+                            <li>Se le envía un correo con sus credenciales de acceso y el enlace para definir la contraseña.</li>
+                        </ol>
+                    </MudAlert>
+                }
+            </MudItem>
+
+            <MudItem xs="12" lg="5">
+                <SectionCard Titulo="Plan elegido"
+                             Bajada="Condiciones comerciales que se aplican al tenant desde el alta">
+                    @if (PlanElegido is null)
+                    {
+                        <EmptyState Titulo="Elegí un plan de suscripción"
+                                    Descripcion="Con el plan seleccionado podemos mostrarte el cupo de máquinas incluido, el importe mensual y cuántas empresas ya lo tienen contratado."
+                                    Icono="@Icons.Material.Filled.Sell" />
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-wrap align-center mb-4" style="gap:.5rem">
+                            <StatusChip Texto="@PlanElegido.Nombre" ChipColor="Color.Primary"
+                                        Icono="@Icons.Material.Filled.Sell" />
+                            <StatusChip Texto="@($"{EmpresasConElPlan} empresas lo tienen contratado")"
+                                        ChipColor="Color.Info" Variante="Variant.Outlined" />
+                        </div>
+
+                        <MudText Typo="Typo.h4">@Ui.Moneda(PlanElegido.Precio)</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+                            Por mes, facturado a la empresa cliente
+                        </MudText>
+
+                        <MudText Typo="Typo.body2" Class="mb-4">@PlanElegido.Descripcion</MudText>
+
+                        <div class="mantia-lista-datos">
+                            <DataPoint Etiqueta="Máquinas incluidas en el plan"
+                                       Valor="@($"{PlanElegido.MaxMaquinas} máquinas")" />
+                            <DataPoint Etiqueta="Cupo que se habilita a esta empresa"
+                                       Valor="@($"{_maxMaquinas} máquinas")" />
+                            <DataPoint Etiqueta="Empresas con este plan"
+                                       Valor="@($"{EmpresasConElPlan} de {DatosDemo.Empresas.Count}")" />
+                            <DataPoint Etiqueta="Ingreso mensual que aporta el plan"
+                                       Valor="@Ui.Moneda(IngresoDelPlan)" />
+                        </div>
+
+                        @if (PlanElegido.Precio == 0)
+                        {
+                            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-4">
+                                El plan Piloto no genera ingreso recurrente: vence a los 60 días y requiere migrar
+                                a un plan pago para conservar el acceso.
+                            </MudAlert>
+                        }
+                    }
+                </SectionCard>
+            </MudItem>
+
+            <MudItem xs="12">
+                <div class="d-flex flex-wrap justify-end align-center" style="gap:.75rem">
+                    <MudButton Variant="Variant.Text" OnClick="Cancelar">Cancelar</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Save" OnClick="Guardar">
+                        @(EsAlta ? "Confirmar alta de la empresa" : "Guardar cambios")
+                    </MudButton>
+                </div>
+            </MudItem>
+        </MudGrid>
+    </MudForm>
+}
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+
+    private MudForm _formulario = null!;
+    private EmpresaVm? _empresa;
+
+    private string _razonSocial = "";
+    private string _dominio = "";
+    private string _tenantId = "";
+    private string _rubro = "";
+    private string _plan = "";
+    private string _adminInicial = "";
+    private int _maxMaquinas;
+
+    private bool EsAlta => Id is null;
+
+    private List<BreadcrumbItem> Migas =>
+    [
+        new BreadcrumbItem("Plataforma MantIA", "/plataforma"),
+        new BreadcrumbItem("Empresas cliente", "/plataforma/empresas"),
+        new BreadcrumbItem(EsAlta ? "Nueva empresa" : "Edición", null, true)
+    ];
+
+    private static List<string> Rubros => DatosDemo.Empresas
+        .Select(e => e.Rubro)
+        .Concat(["Agroindustria", "Bebidas", "Cementera", "Farmacéutica", "Papelera", "Siderúrgica"])
+        .Distinct()
+        .OrderBy(r => r)
+        .ToList();
+
+    private PlanVm? PlanElegido => DatosDemo.Planes.FirstOrDefault(p => p.Nombre == _plan);
+
+    private int EmpresasConElPlan => PlanElegido is null
+        ? 0
+        : DatosDemo.Empresas.Count(e => e.Plan == PlanElegido.Nombre);
+
+    private decimal IngresoDelPlan => PlanElegido is null
+        ? 0
+        : PlanElegido.Precio * DatosDemo.Empresas.Count(e =>
+            e.Plan == PlanElegido.Nombre && e.Estado == EstadoGenerico.Activo);
+
+    private string DominioNormalizado => _dominio.Trim().ToLowerInvariant();
+
+    private string Sufijo => string.IsNullOrWhiteSpace(DominioNormalizado)
+        ? "@dominio-de-la-empresa"
+        : "@" + DominioNormalizado;
+
+    private bool DominioDuplicado => !string.IsNullOrWhiteSpace(DominioNormalizado)
+        && DatosDemo.Empresas.Any(e =>
+            e.Id != _empresa?.Id
+            && string.Equals(e.Dominio, DominioNormalizado, StringComparison.OrdinalIgnoreCase));
+
+    private bool CorreoFueraDeDominio => !string.IsNullOrWhiteSpace(_adminInicial)
+        && !string.IsNullOrWhiteSpace(DominioNormalizado)
+        && !_adminInicial.Trim().ToLowerInvariant().EndsWith(Sufijo, StringComparison.Ordinal);
+
+    private string HelperCupo => PlanElegido is null
+        ? "Se precarga con el máximo del plan elegido"
+        : $"El plan {PlanElegido.Nombre} incluye {PlanElegido.MaxMaquinas} máquinas. El valor se puede sobrescribir por excepción contractual.";
+
+    private string TenantPrevisto => EsAlta
+        ? $"org_{Slug(_razonSocial)}_<código>"
+        : _tenantId;
+
+    protected override void OnParametersSet()
+    {
+        if (EsAlta)
+        {
+            _empresa = null;
+            _tenantId = "Se genera al confirmar el alta";
+            if (string.IsNullOrEmpty(_plan))
+            {
+                _plan = DatosDemo.Planes[0].Nombre;
+                _maxMaquinas = DatosDemo.Planes[0].MaxMaquinas;
+            }
+            if (string.IsNullOrEmpty(_rubro)) _rubro = Rubros[0];
+            return;
+        }
+
+        _empresa = DatosDemo.Empresas.FirstOrDefault(e => e.Id == Id);
+        if (_empresa is null) return;
+
+        var actual = _empresa;
+
+        _razonSocial = actual.RazonSocial;
+        _dominio = actual.Dominio;
+        _tenantId = actual.TenantId;
+        _rubro = actual.Rubro;
+        _plan = actual.Plan;
+        _adminInicial = actual.AdminInicial;
+        _maxMaquinas = actual.MaxMaquinasHabilitadas;
+    }
+
+    private void PlanCambiado(string valor)
+    {
+        _plan = valor;
+        var plan = DatosDemo.Planes.FirstOrDefault(p => p.Nombre == valor);
+        if (plan is not null) _maxMaquinas = plan.MaxMaquinas;
+    }
+
+    private void Cancelar() =>
+        Nav.NavigateTo(EsAlta ? "/plataforma/empresas" : $"/plataforma/empresas/{Id}");
+
+    private async Task Guardar()
+    {
+        await _formulario.ValidateAsync();
+
+        if (!_formulario.IsValid)
+        {
+            Snackbar.Add("Revisá los campos obligatorios antes de guardar", Severity.Warning);
+            return;
+        }
+
+        if (DominioDuplicado)
+        {
+            Snackbar.Add($"El dominio {DominioNormalizado} ya está asignado a otra empresa cliente", Severity.Error);
+            return;
+        }
+
+        if (CorreoFueraDeDominio)
+        {
+            Snackbar.Add($"El correo del administrador tiene que pertenecer al dominio {DominioNormalizado}", Severity.Error);
+            return;
+        }
+
+        if (PlanElegido is null)
+        {
+            Snackbar.Add("Seleccioná un plan de suscripción antes de guardar", Severity.Warning);
+            return;
+        }
+
+        if (EsAlta)
+        {
+            var nueva = new EmpresaVm
+            {
+                RazonSocial = _razonSocial.Trim(),
+                Dominio = DominioNormalizado,
+                TenantId = NuevoTenantId(_razonSocial),
+                Plan = PlanElegido.Nombre,
+                MaxMaquinasHabilitadas = _maxMaquinas,
+                MaquinasRegistradas = 0,
+                UsuariosActivos = 1,
+                Rubro = _rubro,
+                Estado = EstadoGenerico.Activo,
+                FechaAlta = DateTime.Today,
+                AdminInicial = _adminInicial.Trim().ToLowerInvariant(),
+                OrdenesUltimoMes = 0,
+                RecomendacionesProcesadas = 0
+            };
+
+            DatosDemo.Empresas.Add(nueva);
+            SincronizarPlanes();
+
+            Snackbar.Add($"{nueva.RazonSocial} quedó dada de alta con el tenant {nueva.TenantId}. Se envió el correo con las credenciales a {nueva.AdminInicial}.", Severity.Success);
+            Nav.NavigateTo($"/plataforma/empresas/{nueva.Id}");
+            return;
+        }
+
+        if (_empresa is null) return;
+
+        var empresa = _empresa;
+
+        empresa.RazonSocial = _razonSocial.Trim();
+        empresa.Dominio = DominioNormalizado;
+        empresa.Rubro = _rubro;
+        empresa.Plan = PlanElegido.Nombre;
+        empresa.MaxMaquinasHabilitadas = _maxMaquinas;
+        empresa.AdminInicial = _adminInicial.Trim().ToLowerInvariant();
+
+        SincronizarPlanes();
+
+        Snackbar.Add($"Se actualizaron los datos de {empresa.RazonSocial}", Severity.Success);
+        Nav.NavigateTo($"/plataforma/empresas/{empresa.Id}");
+    }
+
+    private static string NuevoTenantId(string razonSocial) =>
+        $"org_{Slug(razonSocial)}_{Random.Shared.Next(0, 65536):x4}";
+
+    private static string Slug(string razonSocial)
+    {
+        var corte = razonSocial.IndexOf(" S.", StringComparison.Ordinal);
+        var baseTexto = corte > 0 ? razonSocial[..corte] : razonSocial;
+
+        var sinAcentos = new string(baseTexto
+            .Normalize(System.Text.NormalizationForm.FormD)
+            .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c)
+                        != System.Globalization.UnicodeCategory.NonSpacingMark)
+            .ToArray());
+
+        var letras = new string(sinAcentos.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+
+        if (letras.Length == 0) return "tenant";
+        return letras.Length <= 6 ? letras : letras[..6];
+    }
+
+    private static void SincronizarPlanes()
+    {
+        foreach (var plan in DatosDemo.Planes)
+        {
+            plan.EmpresasActivas = DatosDemo.Empresas.Count(e => e.Plan == plan.Nombre);
+        }
+    }
+}

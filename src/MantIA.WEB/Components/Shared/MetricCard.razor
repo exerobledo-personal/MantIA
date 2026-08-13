@@ -1,0 +1,61 @@
+<div class="@Clases" style="@Estilo" @onclick="Navegar">
+    <div class="mantia-metrica__cabecera">
+        <span class="mantia-metrica__etiqueta">@Etiqueta</span>
+        @if (!string.IsNullOrEmpty(Icono))
+        {
+            <span class="mantia-metrica__icono"><MudIcon Icon="@Icono" Size="Size.Small" /></span>
+        }
+    </div>
+    <div class="mantia-metrica__valor">
+        @Valor@if (!string.IsNullOrEmpty(Unidad))
+        {
+            <span class="mantia-metrica__unidad">@Unidad</span>
+        }
+    </div>
+    @if (!string.IsNullOrEmpty(Detalle))
+    {
+        <div class="mantia-metrica__pie">@Detalle</div>
+    }
+    @if (ContenidoExtra is not null)
+    {
+        <div class="mt-2">@ContenidoExtra</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Etiqueta { get; set; } = "";
+    [Parameter, EditorRequired] public string Valor { get; set; } = "";
+    [Parameter] public string? Unidad { get; set; }
+    [Parameter] public string? Detalle { get; set; }
+    [Parameter] public string? Icono { get; set; }
+    [Parameter] public Color Acento { get; set; } = Color.Primary;
+    [Parameter] public string? Href { get; set; }
+    [Parameter] public RenderFragment? ContenidoExtra { get; set; }
+
+    [Inject] private NavigationManager Nav { get; set; } = null!;
+
+    private string Clases => Href is null ? "mantia-metrica" : "mantia-metrica mantia-metrica--enlace";
+
+    private string Estilo
+    {
+        get
+        {
+            var color = Acento switch
+            {
+                Color.Error => "#D14343",
+                Color.Warning => "#DE9021",
+                Color.Success => "#1E9E62",
+                Color.Info => "#2E90C4",
+                Color.Tertiary => "#00909B",
+                Color.Secondary => "#EE7A22",
+                _ => "#0B6FA4"
+            };
+            return $"--mantia-acento:{color};--mantia-acento-suave:{color}1A;";
+        }
+    }
+
+    private void Navegar()
+    {
+        if (Href is not null) Nav.NavigateTo(Href);
+    }
+}

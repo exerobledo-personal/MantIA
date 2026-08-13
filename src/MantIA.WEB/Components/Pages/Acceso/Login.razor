@@ -1,0 +1,125 @@
+@page "/"
+@layout LoginLayout
+@inject NavigationManager Nav
+
+<PageTitle>Ingresar · MantIA</PageTitle>
+
+<div class="mantia-acceso">
+    <section class="mantia-acceso__relato">
+        <div class="mantia-acceso__marca">
+            <span class="mantia-acceso__logo">
+                <MudIcon Icon="@Icons.Material.Filled.Insights" Style="color:#fff" />
+            </span>
+            <span class="mantia-acceso__nombre">Mant<b>IA</b></span>
+        </div>
+
+        <div class="mantia-acceso__centro">
+            <h1 class="mantia-acceso__titular">El repuesto que falta no debería frenar la planta.</h1>
+            <p class="mantia-acceso__bajada">
+                MantIA cruza el historial de fallas de cada máquina con el stock disponible y el catálogo
+                técnico del fabricante para anticipar qué repuesto crítico va a faltar, antes de que falte.
+            </p>
+            <ul class="mantia-acceso__puntos">
+                <li>
+                    <MudIcon Icon="@Icons.Material.Filled.Bolt" Size="Size.Small" Style="color:#4FC3D9" />
+                    Alertas tempranas por umbral de stock configurable
+                </li>
+                <li>
+                    <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Small" Style="color:#4FC3D9" />
+                    Recomendaciones de reposición con la justificación a la vista
+                </li>
+                <li>
+                    <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Small" Style="color:#4FC3D9" />
+                    Catálogo técnico que se enriquece solo al registrar una máquina
+                </li>
+            </ul>
+        </div>
+
+        <p class="mantia-acceso__pie">
+            Trabajo Final de Ingeniería · Universidad Abierta Interamericana · 2026
+        </p>
+    </section>
+
+    <section class="mantia-acceso__panel">
+        <div class="mantia-acceso__form">
+            <MudText Typo="Typo.h5">Ingresar a la plataforma</MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary mt-1 mb-6">
+                Usá las credenciales corporativas que te asignó el administrador de tu empresa.
+            </MudText>
+
+            <MudTextField @bind-Value="_email"
+                          Label="Correo corporativo"
+                          Variant="Variant.Outlined"
+                          InputType="InputType.Email"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.MailOutline"
+                          Class="mb-4"
+                          Immediate="true" />
+
+            <MudTextField @bind-Value="_clave"
+                          Label="Contraseña"
+                          Variant="Variant.Outlined"
+                          InputType="@(_verClave ? InputType.Text : InputType.Password)"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@(_verClave ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                          OnAdornmentClick="@(() => _verClave = !_verClave)"
+                          AdornmentAriaLabel="Mostrar u ocultar la contraseña"
+                          Class="mb-2" />
+
+            <div class="mantia-acceso__fila mb-5">
+                <MudCheckBox T="bool" @bind-Value="_recordarme" Label="Mantener la sesión iniciada" Dense="true" />
+                <MudLink Href="/recuperar" Typo="Typo.body2" Class="mantia-acceso__olvide">
+                    ¿Olvidaste tu contraseña?
+                </MudLink>
+            </div>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Large"
+                       FullWidth="true"
+                       Disabled="_ingresando"
+                       OnClick="Ingresar">
+                @if (_ingresando)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Verificando credenciales…</span>
+                }
+                else
+                {
+                    <span>Ingresar</span>
+                }
+            </MudButton>
+
+            <div class="mantia-separador">o</div>
+
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Default"
+                       Size="Size.Large"
+                       FullWidth="true"
+                       StartIcon="@Icons.Custom.Brands.Google"
+                       Disabled="_ingresando"
+                       OnClick="Ingresar">
+                Continuar con Google corporativo
+            </MudButton>
+
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-6">
+                El acceso con Google está restringido al dominio corporativo registrado por cada empresa cliente.
+            </MudAlert>
+        </div>
+    </section>
+</div>
+
+@code {
+    private string _email = "exequiel.robledo@mantia.com.ar";
+    private string _clave = "MantIA2026";
+    private bool _verClave;
+    private bool _recordarme = true;
+    private bool _ingresando;
+
+    private async Task Ingresar()
+    {
+        _ingresando = true;
+        await Task.Delay(650);
+        Nav.NavigateTo("/dashboard");
+    }
+}

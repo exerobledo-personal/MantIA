@@ -1,0 +1,229 @@
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center" style="gap:.75rem">
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" />
+            <div>
+                <MudText Typo="Typo.h6">Cerrar @Orden.Numero</MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                    @Orden.Maquina · @Orden.TipoFalla
+                </MudText>
+            </div>
+        </div>
+    </TitleContent>
+
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+            Al confirmar, la orden pasa a estado Cerrada y el consumo declarado se descuenta del stock real
+            de cada repuesto. Ese movimiento alimenta el historial que usa el motor de recomendaciones.
+        </MudText>
+
+        <MudTextField T="string" @bind-Value="_resolucion" Label="Resolución aplicada"
+                      Variant="Variant.Outlined" Lines="3"
+                      Required="true" RequiredError="Describí qué se hizo sobre el equipo"
+                      HelperText="Qué se reemplazó, qué se ajustó y en qué estado quedó la máquina" />
+
+        <MudDivider Class="my-4" />
+
+        <div class="mantia-reco__bloque-titulo mb-2">Repuestos consumidos en la intervención</div>
+
+        <MudGrid Spacing="2" Class="align-center">
+            <MudItem xs="12" md="7">
+                <MudSelect T="string" @bind-Value="_repuestoElegido" Label="Repuesto"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                    @foreach (var repuesto in RepuestosDisponibles)
+                    {
+                        <MudSelectItem T="string" Value="@Etiqueta(repuesto)">
+                            @Etiqueta(repuesto) · stock @Ui.Numero(repuesto.StockActual) @(EsCompatible(repuesto) ? "· compatible con la máquina" : "")
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="8" md="3">
+                <MudNumericField T="decimal" @bind-Value="_cantidad" Label="Cantidad"
+                                 Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
+            </MudItem>
+            <MudItem xs="4" md="2">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.Add" OnClick="Agregar">
+                    Agregar
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+
+        @if (_lineas.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-4">
+                Todavía no cargaste repuestos. Si la intervención no consumió materiales, podés cerrar la orden igual.
+            </MudAlert>
+        }
+        else
+        {
+            <MudTable Items="@_lineas" Dense="true" Hover="true" Elevation="0"
+                      Class="mantia-tabla mt-4" Breakpoint="Breakpoint.Sm" Striped="false">
+                <HeaderContent>
+                    <MudTh>Repuesto</MudTh>
+                    <MudTh Style="text-align:right">Cantidad</MudTh>
+                    <MudTh Style="text-align:right">Stock actual</MudTh>
+                    <MudTh Style="text-align:right">Stock resultante</MudTh>
+                    <MudTh Style="text-align:right">Quitar</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Repuesto">
+                        <div class="mantia-celda-principal">
+                            <strong>@context.Repuesto.Nombre</strong>
+                            <span>@context.Repuesto.NumeroParte · mínimo @Ui.Numero(context.Repuesto.StockMinimo)</span>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Cantidad" Style="text-align:right">
+                        <b>@Ui.Numero(context.Cantidad)</b>
+                    </MudTd>
+                    <MudTd DataLabel="Stock actual" Style="text-align:right">
+                        @Ui.Numero(context.Repuesto.StockActual)
+                    </MudTd>
+                    <MudTd DataLabel="Stock resultante" Style="text-align:right">
+                        <MudText Typo="Typo.body2"
+                                 Color="@(context.Repuesto.StockActual - context.Cantidad < 0 ? Color.Error : Color.Default)">
+                            <b>@Ui.Numero(context.Repuesto.StockActual - context.Cantidad)</b>
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Quitar" Style="text-align:right">
+                        <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Color="Color.Error"
+                                       Size="Size.Small" aria-label="Quitar el repuesto de la lista"
+                                       OnClick="@(() => Quitar(context))" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+
+            @foreach (var linea in LineasEnDescubierto)
+            {
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+                    <b>@linea.Repuesto.Nombre</b>: estás declarando @Ui.Numero(linea.Cantidad) unidades
+                    sobre un stock de @Ui.Numero(linea.Repuesto.StockActual). El stock va a quedar en
+                    @Ui.Numero(linea.Repuesto.StockActual - linea.Cantidad) y se va a generar una alerta
+                    automática de reposición.
+                </MudAlert>
+            }
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton OnClick="Confirmar" Variant="Variant.Filled" Color="Color.Success"
+                   StartIcon="@Icons.Material.Filled.CheckCircle">
+            Confirmar el cierre
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialogo { get; set; } = null!;
+
+    [Parameter, EditorRequired] public OrdenTrabajoVm Orden { get; set; } = null!;
+
+    private readonly List<LineaConsumo> _lineas = [];
+    private string _resolucion = "";
+    private string? _repuestoElegido;
+    private decimal _cantidad = 1;
+
+    private sealed class LineaConsumo
+    {
+        public RepuestoVm Repuesto { get; init; } = null!;
+        public decimal Cantidad { get; set; }
+    }
+
+    private static string Etiqueta(RepuestoVm repuesto) => $"{repuesto.Nombre} · {repuesto.NumeroParte}";
+
+    private bool EsCompatible(RepuestoVm repuesto) => repuesto.MaquinaIds.Contains(Orden.MaquinaId);
+
+    private List<RepuestoVm> RepuestosDisponibles => DatosDemo.Repuestos
+        .Where(r => r.Estado == EstadoGenerico.Activo)
+        .OrderByDescending(EsCompatible)
+        .ThenBy(r => r.Nombre)
+        .ToList();
+
+    private List<LineaConsumo> LineasEnDescubierto =>
+        _lineas.Where(l => l.Cantidad > l.Repuesto.StockActual).ToList();
+
+    private void Agregar()
+    {
+        var repuesto = RepuestosDisponibles.FirstOrDefault(r => Etiqueta(r) == _repuestoElegido);
+
+        if (repuesto is null)
+        {
+            Snackbar.Add("Elegí un repuesto de la lista antes de agregarlo.", Severity.Info);
+            return;
+        }
+
+        if (_cantidad <= 0)
+        {
+            Snackbar.Add("La cantidad consumida tiene que ser mayor que cero.", Severity.Info);
+            return;
+        }
+
+        var existente = _lineas.FirstOrDefault(l => l.Repuesto.Id == repuesto.Id);
+        if (existente is null)
+            _lineas.Add(new LineaConsumo { Repuesto = repuesto, Cantidad = _cantidad });
+        else
+            existente.Cantidad += _cantidad;
+
+        _repuestoElegido = null;
+        _cantidad = 1;
+    }
+
+    private void Quitar(LineaConsumo linea) => _lineas.Remove(linea);
+
+    private void Cancelar() => Dialogo.Cancel();
+
+    private void Confirmar()
+    {
+        if (string.IsNullOrWhiteSpace(_resolucion))
+        {
+            Snackbar.Add("Indicá la resolución aplicada antes de cerrar la orden.", Severity.Warning);
+            return;
+        }
+
+        var quedaronBajoMinimo = new List<string>();
+
+        foreach (var linea in _lineas)
+        {
+            var repuesto = DatosDemo.Repuestos.FirstOrDefault(r => r.Id == linea.Repuesto.Id);
+            if (repuesto is null) continue;
+
+            var estabaBajoMinimo = repuesto.BajoMinimo;
+
+            Orden.Repuestos.Add(new ConsumoRepuestoVm
+            {
+                RepuestoId = repuesto.Id,
+                Repuesto = repuesto.Nombre,
+                NumeroParte = repuesto.NumeroParte,
+                Cantidad = linea.Cantidad,
+                StockAnterior = repuesto.StockActual
+            });
+
+            repuesto.StockActual -= linea.Cantidad;
+
+            if (repuesto.BajoMinimo && !estabaBajoMinimo)
+                quedaronBajoMinimo.Add(repuesto.Nombre);
+        }
+
+        Orden.Estado = EstadoOrden.Cerrada;
+        Orden.FechaCierre = DateTime.Now;
+        Orden.ResolucionAplicada = _resolucion.Trim();
+
+        Snackbar.Add(_lineas.Count == 0
+            ? $"{Orden.Numero} cerrada sin consumo de repuestos."
+            : $"{Orden.Numero} cerrada. Se {(_lineas.Count == 1 ? "descontó 1 repuesto" : $"descontaron {_lineas.Count} repuestos")} del stock.",
+            Severity.Success);
+
+        if (quedaronBajoMinimo.Count == 1)
+            Snackbar.Add($"{quedaronBajoMinimo[0]} quedó por debajo del stock mínimo. Se generó una alerta de stock.",
+                Severity.Warning);
+        else if (quedaronBajoMinimo.Count > 1)
+            Snackbar.Add($"{quedaronBajoMinimo.Count} repuestos quedaron por debajo del stock mínimo. Se generaron las alertas de stock correspondientes.",
+                Severity.Warning);
+
+        Dialogo.Close(DialogResult.Ok(true));
+    }
+}

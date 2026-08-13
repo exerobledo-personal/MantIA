@@ -1,0 +1,33 @@
+<MudPaper Elevation="0" Class="@($"mantia-superficie {Class}")">
+    @if (!string.IsNullOrEmpty(Titulo) || Acciones is not null)
+    {
+        <div class="d-flex flex-wrap align-center justify-space-between px-4 pt-4 pb-2" style="gap:.75rem">
+            <div>
+                <MudText Typo="Typo.subtitle1">@Titulo</MudText>
+                @if (!string.IsNullOrEmpty(Bajada))
+                {
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">@Bajada</MudText>
+                }
+            </div>
+            @if (Acciones is not null)
+            {
+                <div class="d-flex align-center" style="gap:.5rem">@Acciones</div>
+            }
+        </div>
+        <MudDivider />
+    }
+    <div class="@ClasePadding">
+        @ChildContent
+    </div>
+</MudPaper>
+
+@code {
+    [Parameter] public string? Titulo { get; set; }
+    [Parameter] public string? Bajada { get; set; }
+    [Parameter] public RenderFragment? Acciones { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public bool SinPadding { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private string ClasePadding => SinPadding ? "" : "pa-4";
+}

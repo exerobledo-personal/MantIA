@@ -1,0 +1,391 @@
+@page "/repuestos/nuevo"
+@page "/repuestos/{Id:guid}/editar"
+@using System.Globalization
+@using System.Text
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>@TituloPagina · MantIA</PageTitle>
+
+<PageHeader Titulo="@TituloPagina"
+            Bajada="@BajadaPagina"
+            Icono="@Icons.Material.Filled.Inventory2"
+            Migas="@Migas" />
+
+@if (!EsAlta && _repuesto is null)
+{
+    <EmptyState Titulo="No encontramos el repuesto"
+                Descripcion="Es posible que se haya dado de baja o que el enlace esté desactualizado."
+                Icono="@Icons.Material.Filled.SearchOff">
+        <Accion>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/repuestos">
+                Volver al inventario
+            </MudButton>
+        </Accion>
+    </EmptyState>
+}
+else
+{
+    <MudForm @ref="_formulario">
+        <MudGrid Spacing="3">
+            <MudItem xs="12" lg="8">
+                <SectionCard Titulo="Identificación del repuesto"
+                             Bajada="Datos con los que el repuesto se busca y se pide al proveedor">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudTextField T="string" @bind-Value="_nombre" Label="Nombre del repuesto"
+                                          Variant="Variant.Outlined" Immediate="true"
+                                          Required="true" RequiredError="Indicá el nombre del repuesto"
+                                          HelperText="Por ejemplo: Kit de mordazas de sellado" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField T="string" @bind-Value="_numeroParte" Label="Número de parte"
+                                          Variant="Variant.Outlined"
+                                          Required="true" RequiredError="Indicá el número de parte"
+                                          HelperText="Código del fabricante o del proveedor" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField T="string" @bind-Value="_proveedor" Label="Proveedor de referencia"
+                                          Variant="Variant.Outlined"
+                                          Required="true" RequiredError="Indicá el proveedor de referencia" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="_unidadMedida" Label="Unidad de medida"
+                                       Variant="Variant.Outlined">
+                                @foreach (var unidad in Unidades)
+                                {
+                                    <MudSelectItem T="string" Value="@unidad">@unidad</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudSelect T="string" MultiSelection="true" @bind-SelectedValues="_maquinasSeleccionadas"
+                                       Label="Máquinas asociadas" Variant="Variant.Outlined"
+                                       HelperText="El repuesto va a aparecer en la ficha de cada máquina seleccionada">
+                                @foreach (var maquina in DatosDemo.Maquinas)
+                                {
+                                    <MudSelectItem T="string" Value="@EtiquetaDe(maquina)">
+                                        @EtiquetaDe(maquina) · @maquina.Planta
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+                </SectionCard>
+
+                <SectionCard Titulo="Stock y reposición"
+                             Bajada="El umbral mínimo es la referencia que usa MantIA para avisar antes del quiebre"
+                             Class="mt-4">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudNumericField T="decimal" @bind-Value="_stockActual" Label="Stock actual"
+                                             Variant="Variant.Outlined" Min="0" Immediate="true"
+                                             Adornment="Adornment.End" AdornmentText="@_unidadMedida" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudNumericField T="decimal" @bind-Value="_stockMinimo" Label="Stock mínimo"
+                                             Variant="Variant.Outlined" Min="0" Immediate="true"
+                                             Adornment="Adornment.End" AdornmentText="@_unidadMedida"
+                                             HelperText="Cantidad por debajo de la cual se genera una alerta" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="Criticidad" @bind-Value="_criticidad" Label="Criticidad"
+                                       Variant="Variant.Outlined">
+                                @foreach (var nivel in Niveles)
+                                {
+                                    <MudSelectItem T="Criticidad" Value="@nivel">@Ui.TextoDe(nivel)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudNumericField T="int" @bind-Value="_plazoReposicion" Label="Plazo de reposición"
+                                             Variant="Variant.Outlined" Min="0"
+                                             Adornment="Adornment.End" AdornmentText="días"
+                                             HelperText="Días que tarda el proveedor en entregar" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudNumericField T="decimal" @bind-Value="_costoUnitario" Label="Costo unitario"
+                                             Variant="Variant.Outlined" Min="0"
+                                             Adornment="Adornment.Start" AdornmentText="$" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="EstadoGenerico" @bind-Value="_estado" Label="Estado"
+                                       Variant="Variant.Outlined">
+                                <MudSelectItem T="EstadoGenerico" Value="EstadoGenerico.Activo">Activo</MudSelectItem>
+                                <MudSelectItem T="EstadoGenerico" Value="EstadoGenerico.Inactivo">Inactivo</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+                </SectionCard>
+            </MudItem>
+
+            <MudItem xs="12" lg="4">
+                <SectionCard Titulo="Lo que MantIA detecta mientras cargás"
+                             Bajada="Sugerencias del catálogo técnico y consecuencias de lo que estás por confirmar">
+                    @if (Sugerencia is not null)
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-3"
+                                  Icon="@Icons.Material.Filled.Psychology">
+                            <MudText Typo="Typo.body2">
+                                El catálogo enriquecido de @Sugerencia.Ficha lista
+                                «@Sugerencia.RepuestoSugerido» como repuesto habitual de @Sugerencia.Maquina.
+                                Sobre esa ficha y la criticidad operativa del equipo, el sistema sugiere
+                                registrar este repuesto con criticidad <b>@Ui.TextoDe(Sugerencia.Criticidad)</b>.
+                            </MudText>
+                            @if (_criticidad != Sugerencia.Criticidad)
+                            {
+                                <MudButton Variant="Variant.Filled" Color="Color.Info" Size="Size.Small"
+                                           StartIcon="@Icons.Material.Filled.AutoFixHigh"
+                                           OnClick="AplicarSugerencia" Class="mt-3">
+                                    Aplicar criticidad @Ui.TextoDe(Sugerencia.Criticidad)
+                                </MudButton>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-2">
+                                    La criticidad cargada ya coincide con la sugerida.
+                                </MudText>
+                            }
+                        </MudAlert>
+                    }
+
+                    @if (GeneraAlerta)
+                    {
+                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-3"
+                                  Icon="@Icons.Material.Filled.WarningAmber">
+                            <MudText Typo="Typo.body2">
+                                Con @Ui.Numero(_stockActual) @_unidadMedida.ToLowerInvariant() de stock actual
+                                y un mínimo de @Ui.Numero(_stockMinimo), al confirmar se va a generar
+                                automáticamente una alerta de stock sobre este repuesto.
+                            </MudText>
+                            @if (_plazoReposicion > 0)
+                            {
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-2">
+                                    Considerá que la reposición del proveedor demora @_plazoReposicion días.
+                                </MudText>
+                            }
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Class="mb-3"
+                                  Icon="@Icons.Material.Filled.CheckCircle">
+                            <MudText Typo="Typo.body2">
+                                El stock cargado queda por encima del umbral mínimo. No se va a generar
+                                ninguna alerta al confirmar.
+                            </MudText>
+                        </MudAlert>
+                    }
+
+                    <div class="mantia-dato__label mb-1">Cobertura sobre el mínimo</div>
+                    <CoverageBar Actual="_stockActual" Minimo="_stockMinimo" Unidad="@_unidadMedida" />
+
+                    <div class="mantia-lista-datos mt-3">
+                        <DataPoint Etiqueta="Capital inmovilizado" Valor="@Ui.Moneda(_stockActual * _costoUnitario)" />
+                        <DataPoint Etiqueta="Costo de llegar al mínimo" Valor="@Ui.Moneda(FaltanteValorizado)" />
+                        <DataPoint Etiqueta="Máquinas asociadas" Valor="@MaquinasElegidas.Count.ToString()" />
+                    </div>
+                </SectionCard>
+            </MudItem>
+
+            <MudItem xs="12">
+                <div class="d-flex flex-wrap justify-end" style="gap:.75rem">
+                    <MudButton Variant="Variant.Text" OnClick="Cancelar">Cancelar</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Save" OnClick="Guardar">
+                        @(EsAlta ? "Registrar repuesto" : "Guardar cambios")
+                    </MudButton>
+                </div>
+            </MudItem>
+        </MudGrid>
+    </MudForm>
+}
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+
+    private MudForm _formulario = null!;
+    private RepuestoVm? _repuesto;
+
+    private string _nombre = "";
+    private string _numeroParte = "";
+    private string _proveedor = "";
+    private string _unidadMedida = "Unidad";
+    private decimal _stockActual;
+    private decimal _stockMinimo = 1;
+    private Criticidad _criticidad = Criticidad.Media;
+    private EstadoGenerico _estado = EstadoGenerico.Activo;
+    private int _plazoReposicion = 15;
+    private decimal _costoUnitario;
+    private IReadOnlyCollection<string?>? _maquinasSeleccionadas = new List<string?>();
+
+    private static readonly string[] Unidades = ["Unidad", "Kit", "Juego", "Litro", "Metro", "Kilogramo"];
+
+    private static readonly Criticidad[] Niveles =
+        [Criticidad.Critica, Criticidad.Alta, Criticidad.Media, Criticidad.Baja];
+
+    private bool EsAlta => Id is null;
+
+    private string TituloPagina => EsAlta
+        ? "Nuevo repuesto crítico"
+        : $"Editar {_nombre}";
+
+    private string BajadaPagina => EsAlta
+        ? "Registrá el repuesto, asociálo a las máquinas que lo consumen y definí el umbral mínimo que va a disparar las alertas de stock."
+        : "Modificá los datos del repuesto. El cambio de umbral mínimo impacta de inmediato en las alertas de stock y en el motor de recomendaciones.";
+
+    private List<BreadcrumbItem> Migas =>
+    [
+        new BreadcrumbItem("Panel principal", "/dashboard"),
+        new BreadcrumbItem("Repuestos críticos", "/repuestos"),
+        new BreadcrumbItem(EsAlta ? "Nuevo repuesto" : "Edición", null, true)
+    ];
+
+    protected override void OnParametersSet()
+    {
+        if (EsAlta) return;
+
+        _repuesto = DatosDemo.Repuestos.FirstOrDefault(r => r.Id == Id);
+        if (_repuesto is null) return;
+
+        _nombre = _repuesto.Nombre;
+        _numeroParte = _repuesto.NumeroParte;
+        _proveedor = _repuesto.ProveedorReferencia;
+        _unidadMedida = _repuesto.UnidadMedida;
+        _stockActual = _repuesto.StockActual;
+        _stockMinimo = _repuesto.StockMinimo;
+        _criticidad = _repuesto.Criticidad;
+        _estado = _repuesto.Estado;
+        _plazoReposicion = _repuesto.PlazoReposicionDias;
+        _costoUnitario = _repuesto.CostoUnitario;
+        _maquinasSeleccionadas = _repuesto.Maquinas.Select(m => (string?)m).ToList();
+    }
+
+    private static string EtiquetaDe(MaquinaVm maquina) => $"{maquina.Codigo} · {maquina.Nombre}";
+
+    private List<MaquinaVm> MaquinasElegidas
+    {
+        get
+        {
+            var elegidas = _maquinasSeleccionadas?
+                .Where(m => !string.IsNullOrWhiteSpace(m))
+                .Select(m => m!)
+                .ToList() ?? [];
+
+            return DatosDemo.Maquinas.Where(m => elegidas.Contains(EtiquetaDe(m))).ToList();
+        }
+    }
+
+    private bool GeneraAlerta => _estado == EstadoGenerico.Activo && _stockActual <= _stockMinimo;
+
+    private decimal FaltanteValorizado =>
+        Math.Max(0, _stockMinimo - _stockActual) * _costoUnitario;
+
+    private SugerenciaCatalogo? Sugerencia
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(_nombre) || _nombre.Trim().Length < 4) return null;
+
+            foreach (var maquina in MaquinasElegidas)
+            {
+                var ficha = DatosDemo.Catalogo.FirstOrDefault(c => c.Id == maquina.CatalogoMaquinaId);
+                if (ficha is null || ficha.Estado != EstadoEnriquecimiento.Completado) continue;
+
+                var coincidencia = ficha.RepuestosSugeridos.FirstOrDefault(s => Coincide(_nombre, s));
+                if (coincidencia is null) continue;
+
+                return new SugerenciaCatalogo(
+                    ficha.Descripcion,
+                    EtiquetaDe(maquina),
+                    coincidencia,
+                    maquina.CriticidadOperativa);
+            }
+
+            return null;
+        }
+    }
+
+    private void AplicarSugerencia()
+    {
+        var sugerencia = Sugerencia;
+        if (sugerencia is null) return;
+
+        _criticidad = sugerencia.Criticidad;
+        Snackbar.Add($"Se aplicó la criticidad {Ui.TextoDe(sugerencia.Criticidad)} sugerida por el catálogo técnico.", Severity.Info);
+    }
+
+    private async Task Guardar()
+    {
+        await _formulario.ValidateAsync();
+        if (!_formulario.IsValid)
+        {
+            Snackbar.Add("Revisá los campos obligatorios antes de guardar.", Severity.Warning);
+            return;
+        }
+
+        var maquinas = MaquinasElegidas;
+        var destino = _repuesto ?? new RepuestoVm { FechaAlta = DateTime.Today };
+
+        destino.Nombre = _nombre.Trim();
+        destino.NumeroParte = _numeroParte.Trim();
+        destino.ProveedorReferencia = _proveedor.Trim();
+        destino.UnidadMedida = _unidadMedida;
+        destino.StockActual = _stockActual;
+        destino.StockMinimo = _stockMinimo;
+        destino.Criticidad = _criticidad;
+        destino.Estado = _estado;
+        destino.PlazoReposicionDias = _plazoReposicion;
+        destino.CostoUnitario = _costoUnitario;
+        destino.MaquinaIds = maquinas.Select(m => m.Id).ToList();
+        destino.Maquinas = maquinas.Select(EtiquetaDe).ToList();
+
+        var generaAlerta = GeneraAlerta;
+
+        if (EsAlta)
+        {
+            DatosDemo.Repuestos.Add(destino);
+            Snackbar.Add($"Se registró el repuesto {destino.Nombre}.", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add($"Se actualizó el repuesto {destino.Nombre}.", Severity.Success);
+        }
+
+        if (generaAlerta)
+        {
+            Snackbar.Add($"Se generó una alerta de stock: {destino.Nombre} quedó en {Ui.Numero(destino.StockActual)} sobre un mínimo de {Ui.Numero(destino.StockMinimo)}.", Severity.Warning);
+        }
+
+        Nav.NavigateTo($"/repuestos/{destino.Id}");
+    }
+
+    private void Cancelar() =>
+        Nav.NavigateTo(EsAlta ? "/repuestos" : $"/repuestos/{Id}");
+
+    private static bool Coincide(string nombre, string sugerido)
+    {
+        var izquierda = Normalizar(nombre);
+        var derecha = Normalizar(sugerido);
+
+        if (izquierda.Length < 4 || derecha.Length < 4) return false;
+        if (izquierda.Contains(derecha) || derecha.Contains(izquierda)) return true;
+
+        return izquierda
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(palabra => palabra.Length >= 5)
+            .Any(palabra => derecha.Contains(palabra));
+    }
+
+    private static string Normalizar(string texto)
+    {
+        var descompuesto = texto.Trim().ToLowerInvariant().Normalize(NormalizationForm.FormD);
+        var limpio = descompuesto
+            .Where(caracter => CharUnicodeInfo.GetUnicodeCategory(caracter) != UnicodeCategory.NonSpacingMark)
+            .ToArray();
+
+        return new string(limpio).Normalize(NormalizationForm.FormC);
+    }
+
+    private sealed record SugerenciaCatalogo(string Ficha, string Maquina, string RepuestoSugerido, Criticidad Criticidad);
+}

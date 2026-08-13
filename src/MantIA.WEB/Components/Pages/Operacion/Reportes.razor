@@ -1,0 +1,279 @@
+@page "/reportes"
+@inject NavigationManager Nav
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Reportes · MantIA</PageTitle>
+
+<PageHeader Titulo="Reportes operativos"
+            Bajada="Reportes generados sobre el stock, las fallas y las órdenes de trabajo de la empresa. La eliminación de un reporte es lógica: el registro deja de listarse para el uso diario, pero se conserva junto con su historial de cambios para consulta de administración."
+            Icono="@Icons.Material.Filled.Analytics"
+            Migas="@Migas">
+    <Acciones>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add" Href="/reportes/nuevo">
+            Nuevo reporte
+        </MudButton>
+    </Acciones>
+</PageHeader>
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" sm="6" lg="3">
+        <MetricCard Etiqueta="Reportes activos" Valor="@Activos.Count.ToString()"
+                    Detalle="@($"Sobre {DatosDemo.Reportes.Count} registrados desde el alta de la empresa")"
+                    Icono="@Icons.Material.Filled.Analytics" Acento="Color.Primary" />
+    </MudItem>
+    <MudItem xs="12" sm="6" lg="3">
+        <MetricCard Etiqueta="Generados este mes" Valor="@GeneradosEsteMes.ToString()"
+                    Detalle="@($"Período {DateTime.Today:MM/yyyy}")"
+                    Icono="@Icons.Material.Filled.EventAvailable" Acento="Color.Info" />
+    </MudItem>
+    <MudItem xs="12" sm="6" lg="3">
+        <MetricCard Etiqueta="Exportaciones del mes" Valor="@ExportacionesEsteMes.ToString()"
+                    Detalle="Descargas registradas en el historial de cada reporte"
+                    Icono="@Icons.Material.Filled.FileDownload" Acento="Color.Tertiary" />
+    </MudItem>
+    <MudItem xs="12" sm="6" lg="3">
+        <MetricCard Etiqueta="Tipos de reporte en uso" Valor="@TiposEnUso.ToString()"
+                    Detalle="@($"Sobre {Tipos.Length} tipos disponibles en la plataforma")"
+                    Icono="@Icons.Material.Filled.Category" Acento="Color.Secondary" />
+    </MudItem>
+</MudGrid>
+
+<div class="mt-4">
+    <FilterBar>
+        <MudTextField T="string" @bind-Value="_busqueda" Immediate="true"
+                      Placeholder="Buscar por nombre del reporte o autor"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Class="mantia-filtros__buscador" Label="Búsqueda" />
+
+        <MudSelect T="string" @bind-Value="_tipo" Label="Tipo de reporte"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+            <MudSelectItem T="string" Value="@Todos">Todos los tipos</MudSelectItem>
+            @foreach (var tipo in Tipos)
+            {
+                <MudSelectItem T="string" Value="@tipo">@tipo</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSelect T="string" @bind-Value="_planta" Label="Planta"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+            <MudSelectItem T="string" Value="@Todos">Todas las plantas</MudSelectItem>
+            <MudSelectItem T="string" Value="@Consolidado">Sólo los consolidados</MudSelectItem>
+            @foreach (var planta in DatosDemo.Plantas)
+            {
+                <MudSelectItem T="string" Value="@planta.Nombre">@planta.Nombre</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSwitch T="bool" @bind-Value="_incluirEliminados" Color="Color.Default"
+                   Label="Incluir los eliminados" />
+
+        <MudSpacer />
+
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            @Filtrados.Count de @Visibles.Count reportes
+        </MudText>
+    </FilterBar>
+</div>
+
+<SectionCard Titulo="Reportes generados"
+             Bajada="Cada fila conserva quién lo generó, con qué parámetros y cuántas filas trajo en el momento de la generación"
+             SinPadding="true" Class="mt-4">
+    <ChildContent>
+        @if (Filtrados.Count == 0)
+        {
+            <EmptyState Titulo="No hay reportes que coincidan con el filtro"
+                        Descripcion="Probá ampliar la búsqueda, quitar el filtro de tipo o de planta, o activar el interruptor para incluir los reportes eliminados."
+                        Icono="@Icons.Material.Filled.SearchOff">
+                <Accion>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.FilterAltOff" OnClick="LimpiarFiltros">
+                        Limpiar filtros
+                    </MudButton>
+                </Accion>
+            </EmptyState>
+        }
+        else
+        {
+            <MudTable Items="@Filtrados" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                      Breakpoint="Breakpoint.Sm" Striped="false"
+                      OnRowClick="@((TableRowClickEventArgs<ReporteVm> e) => Abrir(e.Item))"
+                      RowStyle="cursor:pointer" RowStyleFunc="@EstiloFila">
+                <HeaderContent>
+                    <MudTh>Reporte</MudTh>
+                    <MudTh>Período</MudTh>
+                    <MudTh>Planta</MudTh>
+                    <MudTh>Autor</MudTh>
+                    <MudTh Style="text-align:right">Filas</MudTh>
+                    <MudTh Style="text-align:right">Generado</MudTh>
+                    <MudTh>Estado</MudTh>
+                    <MudTh Style="text-align:right">Acciones</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Reporte">
+                        <div class="mantia-celda-principal">
+                            <strong>@context.Nombre</strong>
+                            <span>@context.TipoReporte · @context.Parametros</span>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Período">@context.Periodo</MudTd>
+                    <MudTd DataLabel="Planta">@context.Planta</MudTd>
+                    <MudTd DataLabel="Autor">@context.UsuarioCreador</MudTd>
+                    <MudTd DataLabel="Filas" Style="text-align:right"><b>@context.Filas</b></MudTd>
+                    <MudTd DataLabel="Generado" Style="text-align:right">@Ui.Fecha(context.FechaGeneracion)</MudTd>
+                    <MudTd DataLabel="Estado">
+                        <StatusChip Texto="@TextoEstado(context.Estado)"
+                                    ChipColor="@Ui.ColorDe(context.Estado)"
+                                    Variante="Variant.Outlined" />
+                    </MudTd>
+                    <MudTd DataLabel="Acciones" Style="text-align:right">
+                        <div class="d-flex justify-end" style="gap:.25rem" @onclick:stopPropagation="true">
+                            <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Visibility"
+                                       Href="@($"/reportes/{context.Id}")">
+                                Ver
+                            </MudButton>
+                            <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.FileDownload"
+                                       OnClick="@(() => Exportar(context))">
+                                Exportar
+                            </MudButton>
+                            <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error"
+                                       StartIcon="@Icons.Material.Filled.DeleteOutline"
+                                       Disabled="@(context.Estado == EstadoGenerico.Inactivo)"
+                                       OnClick="@(() => Eliminar(context))">
+                                Eliminar
+                            </MudButton>
+                        </div>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager RowsPerPageString="Reportes por página"
+                                   InfoFormat="{first_item}-{last_item} de {all_items}" />
+                </PagerContent>
+            </MudTable>
+        }
+    </ChildContent>
+</SectionCard>
+
+@code {
+    private const string Todos = "Todos";
+    private const string Consolidado = "Todas";
+
+    private string _busqueda = "";
+    private string _tipo = Todos;
+    private string _planta = Todos;
+    private bool _incluirEliminados;
+
+    private static readonly string[] Tipos =
+        ["Estado de stock", "Historial de fallas", "Consumo de repuestos", "Órdenes de trabajo"];
+
+    private static readonly List<BreadcrumbItem> Migas =
+    [
+        new BreadcrumbItem("Panel principal", "/dashboard"),
+        new BreadcrumbItem("Reportes", null, true)
+    ];
+
+    private List<ReporteVm> Activos =>
+        DatosDemo.Reportes.Where(r => r.Estado == EstadoGenerico.Activo).ToList();
+
+    private List<ReporteVm> Visibles => _incluirEliminados
+        ? DatosDemo.Reportes
+        : Activos;
+
+    private int GeneradosEsteMes => DatosDemo.Reportes
+        .Count(r => r.FechaGeneracion.Year == DateTime.Today.Year
+                    && r.FechaGeneracion.Month == DateTime.Today.Month);
+
+    private int ExportacionesEsteMes => DatosDemo.Reportes
+        .SelectMany(r => r.Historial)
+        .Count(h => h.Accion == "Exportación"
+                    && h.Fecha.Year == DateTime.Today.Year
+                    && h.Fecha.Month == DateTime.Today.Month);
+
+    private int TiposEnUso => Activos.Select(r => r.TipoReporte).Distinct().Count();
+
+    private List<ReporteVm> Filtrados
+    {
+        get
+        {
+            var texto = _busqueda.Trim();
+
+            return Visibles
+                .Where(r => texto.Length == 0
+                            || r.Nombre.Contains(texto, StringComparison.OrdinalIgnoreCase)
+                            || r.UsuarioCreador.Contains(texto, StringComparison.OrdinalIgnoreCase))
+                .Where(r => _tipo == Todos || r.TipoReporte == _tipo)
+                .Where(r => _planta == Todos || r.Planta == _planta)
+                .OrderByDescending(r => r.FechaGeneracion)
+                .ToList();
+        }
+    }
+
+    private static string TextoEstado(EstadoGenerico estado) =>
+        estado == EstadoGenerico.Activo ? "Activo" : "Eliminado";
+
+    private static string EstiloFila(ReporteVm reporte, int indice) =>
+        reporte.Estado == EstadoGenerico.Inactivo ? "opacity:.6" : "";
+
+    private void LimpiarFiltros()
+    {
+        _busqueda = "";
+        _tipo = Todos;
+        _planta = Todos;
+        _incluirEliminados = false;
+    }
+
+    private void Abrir(ReporteVm? reporte)
+    {
+        if (reporte is not null) Nav.NavigateTo($"/reportes/{reporte.Id}");
+    }
+
+    private void Exportar(ReporteVm reporte)
+    {
+        reporte.Historial.Add(new ReporteHistorialVm
+        {
+            Usuario = DatosDemo.UsuarioActual.NombreCompleto,
+            Accion = "Exportación",
+            Fecha = DateTime.Now,
+            Detalle = "Exportado a PDF desde el listado de reportes"
+        });
+
+        Snackbar.Add($"Se registró la exportación a PDF de {reporte.Nombre}. La descarga del archivo queda para la etapa de integración.",
+            Severity.Success);
+    }
+
+    private async Task Eliminar(ReporteVm reporte)
+    {
+        var parametros = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Mensaje, $"¿Eliminar el reporte {reporte.Nombre}?" },
+            { x => x.Detalle, "La baja es lógica: el reporte deja de aparecer en el listado habitual, pero se conserva con todo su historial de cambios y puede volver a verse activando el interruptor de eliminados." },
+            { x => x.TextoConfirmar, "Eliminar reporte" },
+            { x => x.ColorAccion, Color.Error },
+            { x => x.Icono, Icons.Material.Filled.DeleteOutline }
+        };
+
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialogo = await DialogService.ShowAsync<ConfirmDialog>("Eliminar reporte", parametros, opciones);
+        var resultado = await dialogo.Result;
+
+        if (resultado is null || resultado.Canceled) return;
+
+        reporte.Estado = EstadoGenerico.Inactivo;
+        reporte.Historial.Add(new ReporteHistorialVm
+        {
+            Usuario = DatosDemo.UsuarioActual.NombreCompleto,
+            Accion = "Eliminación lógica",
+            Fecha = DateTime.Now,
+            Detalle = "Reporte dado de baja desde el listado de reportes"
+        });
+
+        Snackbar.Add($"{reporte.Nombre} quedó marcado como eliminado. El historial sigue disponible para administración.",
+            Severity.Success);
+        StateHasChanged();
+    }
+}

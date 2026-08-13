@@ -1,0 +1,463 @@
+@page "/maquinas/nueva"
+@page "/maquinas/{Id:guid}/editar"
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>@(EsAlta ? "Nueva máquina" : "Editar máquina") · MantIA</PageTitle>
+
+<PageHeader Titulo="@(EsAlta ? "Registrar una máquina" : $"Editar {_nombre}")"
+            Bajada="@(EsAlta
+                        ? "El alta del activo vincula el equipo con una ficha del catálogo técnico compartido. Si la combinación de marca y modelo ya está documentada, la ficha se aplica en el momento; si no, el enriquecimiento queda encolado."
+                        : "Los cambios se reflejan en el panel operativo, en las órdenes de trabajo y en el cálculo de recomendaciones de repuestos.")"
+            Icono="@Icons.Material.Filled.PrecisionManufacturing"
+            Migas="@Migas" />
+
+@if (!EsAlta && _maquina is null)
+{
+    <SectionCard>
+        <EmptyState Titulo="No encontramos la máquina"
+                    Descripcion="El activo que intentás editar no existe o fue dado de baja del parque de equipos."
+                    Icono="@Icons.Material.Filled.SearchOff">
+            <Accion>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/maquinas">
+                    Volver al listado
+                </MudButton>
+            </Accion>
+        </EmptyState>
+    </SectionCard>
+}
+else
+{
+    <MudForm @ref="_formulario">
+        <MudGrid Spacing="3">
+            <MudItem xs="12" lg="7">
+                <SectionCard Titulo="Identificación del activo"
+                             Bajada="Datos con los que el equipo se reconoce en planta y en las órdenes de trabajo">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="8">
+                            <MudTextField @bind-Value="_nombre" Label="Nombre de la máquina"
+                                          Variant="Variant.Outlined"
+                                          Placeholder="Llenadora Aséptica L1"
+                                          Required="true" RequiredError="Indicá con qué nombre se conoce el equipo en planta" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField @bind-Value="_codigo" Label="Código interno"
+                                          Variant="Variant.Outlined" ReadOnly="true"
+                                          HelperText="@(EsAlta ? "Se asigna automáticamente al confirmar el alta" : "El código no se modifica una vez asignado")" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_numeroSerie" Label="Número de serie del fabricante"
+                                          Variant="Variant.Outlined"
+                                          Placeholder="TP-A3S-88421"
+                                          Required="true" RequiredError="El número de serie identifica al equipo ante el fabricante" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudNumericField T="int" @bind-Value="_horasOperacion" Label="Horas de operación acumuladas"
+                                             Variant="Variant.Outlined" Min="0" Step="100"
+                                             HelperText="Base para los intervalos de mantenimiento del catálogo" />
+                        </MudItem>
+                    </MudGrid>
+                </SectionCard>
+
+                <SectionCard Titulo="Marca y modelo" Class="mt-4"
+                             Bajada="La combinación determina qué ficha del catálogo técnico se aplica al activo">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" Value="_marca" ValueChanged="MarcaCambiada" Label="Marca"
+                                       Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter"
+                                       Required="true" RequiredError="Seleccioná la marca del equipo">
+                                @foreach (var marca in Marcas)
+                                {
+                                    <MudSelectItem T="string" Value="@marca">@marca</MudSelectItem>
+                                }
+                                <MudSelectItem T="string" Value="@OtraMarca">@OtraMarca</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            @if (_marca == OtraMarca)
+                            {
+                                <MudTextField @bind-Value="_marcaManual" Label="Marca del fabricante"
+                                              Variant="Variant.Outlined" Immediate="true"
+                                              Placeholder="Fabricante del equipo"
+                                              Required="true" RequiredError="Escribí la marca del fabricante" />
+                            }
+                            else
+                            {
+                                <MudSelect T="string" Value="_modelo" ValueChanged="ModeloCambiado" Label="Modelo"
+                                           Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter"
+                                           Disabled="@(string.IsNullOrEmpty(_marca))"
+                                           Required="true" RequiredError="Seleccioná el modelo del equipo">
+                                    @foreach (var modelo in Modelos)
+                                    {
+                                        <MudSelectItem T="string" Value="@modelo">@modelo</MudSelectItem>
+                                    }
+                                    <MudSelectItem T="string" Value="@OtroModelo">@OtroModelo</MudSelectItem>
+                                </MudSelect>
+                            }
+                        </MudItem>
+                        @if (_marca == OtraMarca || _modelo == OtroModelo)
+                        {
+                            <MudItem xs="12" md="6">
+                                <MudTextField @bind-Value="_modeloManual" Label="Modelo del fabricante"
+                                              Variant="Variant.Outlined" Immediate="true"
+                                              Placeholder="Denominación exacta del modelo"
+                                              Required="true" RequiredError="Escribí el modelo tal como figura en la placa del equipo" />
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </SectionCard>
+
+                <SectionCard Titulo="Ubicación y criticidad" Class="mt-4"
+                             Bajada="Determinan el alcance de las alertas de stock y la prioridad de las recomendaciones">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="_planta" Label="Planta"
+                                       Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter"
+                                       HelperText="@PlantaSeleccionada?.Localidad">
+                                @foreach (var planta in DatosDemo.Plantas)
+                                {
+                                    <MudSelectItem T="string" Value="@planta.Nombre">@planta.Nombre</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_linea" Label="Línea o sector"
+                                          Variant="Variant.Outlined"
+                                          Placeholder="Línea 1 · UHT"
+                                          Required="true" RequiredError="Indicá en qué línea o sector opera el equipo" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="_criticidad" Label="Criticidad operativa"
+                                       Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter"
+                                       HelperText="Crítica: su parada detiene una línea completa">
+                                @foreach (var criticidad in Enum.GetValues<Criticidad>())
+                                {
+                                    <MudSelectItem T="string" Value="@Ui.TextoDe(criticidad)">@Ui.TextoDe(criticidad)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            @if (EsAlta)
+                            {
+                                <MudTextField T="string" Value="@Ui.TextoDe(EstadoMaquina.Operativa)" Label="Estado inicial"
+                                              Variant="Variant.Outlined" ReadOnly="true"
+                                              HelperText="Toda máquina se registra operativa y cambia de estado con las órdenes de trabajo" />
+                            }
+                            else
+                            {
+                                <MudSelect T="string" @bind-Value="_estado" Label="Estado actual"
+                                           Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                                    @foreach (var estado in Enum.GetValues<EstadoMaquina>())
+                                    {
+                                        <MudSelectItem T="string" Value="@Ui.TextoDe(estado)">@Ui.TextoDe(estado)</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            }
+                        </MudItem>
+                    </MudGrid>
+                </SectionCard>
+            </MudItem>
+
+            <MudItem xs="12" lg="5">
+                <SectionCard Titulo="Ficha técnica del catálogo"
+                             Bajada="Resultado de cruzar la marca y el modelo contra el catálogo compartido de la plataforma">
+                    @if (Ficha is not null)
+                    {
+                        <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Class="mb-4">
+                            La ficha técnica de @Ficha.Marca @Ficha.Modelo ya está enriquecida en el catálogo compartido.
+                            El activo hereda las fallas comunes y los repuestos sugeridos apenas se confirme el alta,
+                            sin esperar al pipeline de enriquecimiento.
+                        </MudAlert>
+
+                        <div class="d-flex flex-wrap align-center mb-4" style="gap:.5rem">
+                            <StatusChip Texto="@Ui.TextoDe(Ficha.Estado)" ChipColor="@Ui.ColorDe(Ficha.Estado)"
+                                        Icono="@Icons.Material.Filled.MenuBook" />
+                            <StatusChip Texto="@Ficha.Categoria" ChipColor="Color.Default" Variante="Variant.Outlined" />
+                            <StatusChip Texto="@($"{Ficha.TenantsQueLoUsan} empresas la utilizan")"
+                                        ChipColor="Color.Info" Variante="Variant.Outlined" />
+                        </div>
+
+                        <div class="mantia-reco__bloque mb-3">
+                            <div class="mantia-reco__bloque-titulo">Fallas comunes documentadas</div>
+                            <ul class="mantia-reco__evidencia">
+                                @foreach (var falla in Ficha.FallasComunes)
+                                {
+                                    <li>@falla</li>
+                                }
+                            </ul>
+                        </div>
+
+                        <div class="mantia-reco__bloque mb-3">
+                            <div class="mantia-reco__bloque-titulo">Repuestos sugeridos</div>
+                            <ul class="mantia-reco__evidencia">
+                                @foreach (var repuesto in Ficha.RepuestosSugeridos)
+                                {
+                                    <li>@repuesto</li>
+                                }
+                            </ul>
+                        </div>
+
+                        <div class="mantia-lista-datos">
+                            <DataPoint Etiqueta="Intervalos de mantenimiento" Valor="@Ficha.IntervalosMantenimiento" />
+                            <DataPoint Etiqueta="Último enriquecimiento" Valor="@Ui.Fecha(Ficha.FechaUltimoEnriquecimiento)" />
+                        </div>
+                    }
+                    else if (HayCombinacion)
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-4">
+                            La combinación @MarcaElegida @ModeloElegido todavía no existe en el catálogo técnico.
+                            Al confirmar el alta se encola el enriquecimiento automático y la ficha queda en estado Pendiente
+                            hasta que el pipeline complete las fallas comunes, los repuestos sugeridos y los intervalos
+                            de mantenimiento. Mientras tanto, el activo se puede operar con normalidad.
+                        </MudAlert>
+
+                        <div class="mantia-lista-datos">
+                            <DataPoint Etiqueta="Marca a documentar" Valor="@MarcaElegida" />
+                            <DataPoint Etiqueta="Modelo a documentar" Valor="@ModeloElegido" />
+                            <DataPoint Etiqueta="Estado inicial de la ficha">
+                                <StatusChip Texto="@Ui.TextoDe(EstadoEnriquecimiento.Pendiente)"
+                                            ChipColor="@Ui.ColorDe(EstadoEnriquecimiento.Pendiente)" />
+                            </DataPoint>
+                            <DataPoint Etiqueta="Beneficio para la plataforma"
+                                       Valor="Una vez completada, la ficha queda disponible para el resto de las empresas que registren el mismo modelo" />
+                        </div>
+                    }
+                    else
+                    {
+                        <EmptyState Titulo="Elegí la marca y el modelo"
+                                    Descripcion="Con la combinación seleccionada podemos indicarte si la ficha técnica ya está documentada en el catálogo compartido o si hay que enriquecerla."
+                                    Icono="@Icons.Material.Filled.MenuBook" />
+                    }
+                </SectionCard>
+            </MudItem>
+
+            <MudItem xs="12">
+                <div class="d-flex flex-wrap justify-end align-center" style="gap:.75rem">
+                    <MudButton Variant="Variant.Text" OnClick="Cancelar">Cancelar</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Save" OnClick="Guardar">
+                        @(EsAlta ? "Confirmar alta de la máquina" : "Guardar cambios")
+                    </MudButton>
+                </div>
+            </MudItem>
+        </MudGrid>
+    </MudForm>
+}
+
+@code {
+    private const string OtraMarca = "Otra marca que no figura en el catálogo";
+    private const string OtroModelo = "Otro modelo que no figura en el catálogo";
+
+    [Parameter] public Guid? Id { get; set; }
+
+    private MudForm _formulario = null!;
+    private MaquinaVm? _maquina;
+
+    private string _nombre = "";
+    private string _codigo = "";
+    private string _numeroSerie = "";
+    private string _marca = "";
+    private string _marcaManual = "";
+    private string _modelo = "";
+    private string _modeloManual = "";
+    private string _linea = "";
+    private string _planta = "";
+    private string _criticidad = Ui.TextoDe(Criticidad.Media);
+    private string _estado = Ui.TextoDe(EstadoMaquina.Operativa);
+    private int _horasOperacion;
+
+    private bool EsAlta => Id is null;
+
+    private PlantaVm? PlantaSeleccionada => DatosDemo.Plantas.FirstOrDefault(p => p.Nombre == _planta);
+
+    private List<BreadcrumbItem> Migas =>
+    [
+        new BreadcrumbItem("Máquinas", "/maquinas"),
+        new BreadcrumbItem(EsAlta ? "Nueva máquina" : "Edición", null, true)
+    ];
+
+    private static List<string> Marcas => DatosDemo.Catalogo
+        .Select(c => c.Marca)
+        .Distinct()
+        .OrderBy(m => m)
+        .ToList();
+
+    private List<string> Modelos => DatosDemo.Catalogo
+        .Where(c => c.Marca == _marca)
+        .Select(c => c.Modelo)
+        .Distinct()
+        .OrderBy(m => m)
+        .ToList();
+
+    private string MarcaElegida => (_marca == OtraMarca ? _marcaManual : _marca).Trim();
+
+    private string ModeloElegido => (_marca == OtraMarca || _modelo == OtroModelo ? _modeloManual : _modelo).Trim();
+
+    private bool HayCombinacion => !string.IsNullOrWhiteSpace(MarcaElegida) && !string.IsNullOrWhiteSpace(ModeloElegido);
+
+    private Criticidad CriticidadElegida =>
+        Enum.GetValues<Criticidad>().FirstOrDefault(c => Ui.TextoDe(c) == _criticidad);
+
+    private EstadoMaquina EstadoElegido =>
+        Enum.GetValues<EstadoMaquina>().FirstOrDefault(e => Ui.TextoDe(e) == _estado);
+
+    private CatalogoMaquinaVm? Ficha => !HayCombinacion
+        ? null
+        : DatosDemo.Catalogo.FirstOrDefault(c =>
+            string.Equals(c.Marca, MarcaElegida, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(c.Modelo, ModeloElegido, StringComparison.OrdinalIgnoreCase));
+
+    protected override void OnParametersSet()
+    {
+        if (EsAlta)
+        {
+            _maquina = null;
+            _codigo = DatosDemo.SiguienteCodigoMaquina();
+            if (string.IsNullOrEmpty(_planta)) _planta = DatosDemo.Plantas[0].Nombre;
+            return;
+        }
+
+        _maquina = DatosDemo.Maquinas.FirstOrDefault(m => m.Id == Id);
+        if (_maquina is null) return;
+
+        var actual = _maquina;
+
+        _nombre = actual.Nombre;
+        _codigo = actual.Codigo;
+        _numeroSerie = actual.NumeroSerie;
+        _linea = actual.Linea;
+        _planta = actual.Planta;
+        _criticidad = Ui.TextoDe(actual.CriticidadOperativa);
+        _estado = Ui.TextoDe(actual.Estado);
+        _horasOperacion = actual.HorasOperacion;
+
+        if (Marcas.Contains(actual.Marca))
+        {
+            _marca = actual.Marca;
+            var modelos = DatosDemo.Catalogo.Where(c => c.Marca == actual.Marca).Select(c => c.Modelo).ToList();
+            if (modelos.Contains(actual.Modelo))
+            {
+                _modelo = actual.Modelo;
+            }
+            else
+            {
+                _modelo = OtroModelo;
+                _modeloManual = actual.Modelo;
+            }
+        }
+        else
+        {
+            _marca = OtraMarca;
+            _marcaManual = actual.Marca;
+            _modeloManual = actual.Modelo;
+        }
+    }
+
+    private void MarcaCambiada(string valor)
+    {
+        _marca = valor;
+        _modelo = "";
+        _modeloManual = "";
+        if (valor != OtraMarca) _marcaManual = "";
+    }
+
+    private void ModeloCambiado(string valor)
+    {
+        _modelo = valor;
+        if (valor != OtroModelo) _modeloManual = "";
+    }
+
+    private void Cancelar() => Nav.NavigateTo(EsAlta ? "/maquinas" : $"/maquinas/{Id}");
+
+    private async Task Guardar()
+    {
+        await _formulario.ValidateAsync();
+
+        var planta = PlantaSeleccionada;
+
+        if (!_formulario.IsValid || !HayCombinacion || planta is null)
+        {
+            Snackbar.Add("Revisá los campos obligatorios antes de guardar", Severity.Warning);
+            return;
+        }
+
+        var ficha = Ficha ?? CrearFichaPendiente();
+
+        if (EsAlta)
+        {
+            var nueva = new MaquinaVm
+            {
+                Codigo = DatosDemo.SiguienteCodigoMaquina(),
+                Nombre = _nombre.Trim(),
+                NumeroSerie = _numeroSerie.Trim(),
+                PlantaId = planta.Id,
+                Planta = planta.Nombre,
+                CatalogoMaquinaId = ficha.Id,
+                Marca = ficha.Marca,
+                Modelo = ficha.Modelo,
+                Linea = _linea.Trim(),
+                Estado = EstadoMaquina.Operativa,
+                CriticidadOperativa = CriticidadElegida,
+                FechaAlta = DateTime.Today,
+                UltimaIntervencion = null,
+                HorasOperacion = _horasOperacion,
+                Enriquecimiento = ficha.Estado
+            };
+
+            DatosDemo.Maquinas.Add(nueva);
+            ActualizarContador(planta);
+
+            Snackbar.Add(ficha.Estado == EstadoEnriquecimiento.Pendiente
+                ? $"{nueva.Codigo} registrada. El enriquecimiento del catálogo quedó encolado para {ficha.Marca} {ficha.Modelo}."
+                : $"{nueva.Codigo} registrada con la ficha técnica de {ficha.Marca} {ficha.Modelo} ya aplicada.",
+                Severity.Success);
+
+            Nav.NavigateTo($"/maquinas/{nueva.Id}");
+            return;
+        }
+
+        if (_maquina is null) return;
+
+        var maquina = _maquina;
+        var plantaAnterior = DatosDemo.Plantas.FirstOrDefault(p => p.Id == maquina.PlantaId);
+
+        maquina.Nombre = _nombre.Trim();
+        maquina.NumeroSerie = _numeroSerie.Trim();
+        maquina.PlantaId = planta.Id;
+        maquina.Planta = planta.Nombre;
+        maquina.CatalogoMaquinaId = ficha.Id;
+        maquina.Marca = ficha.Marca;
+        maquina.Modelo = ficha.Modelo;
+        maquina.Linea = _linea.Trim();
+        maquina.Estado = EstadoElegido;
+        maquina.CriticidadOperativa = CriticidadElegida;
+        maquina.HorasOperacion = _horasOperacion;
+        maquina.Enriquecimiento = ficha.Estado;
+
+        if (plantaAnterior is not null) ActualizarContador(plantaAnterior);
+        ActualizarContador(planta);
+
+        Snackbar.Add($"Se actualizaron los datos de {maquina.Codigo} · {maquina.Nombre}", Severity.Success);
+        Nav.NavigateTo($"/maquinas/{maquina.Id}");
+    }
+
+    private CatalogoMaquinaVm CrearFichaPendiente()
+    {
+        var ficha = new CatalogoMaquinaVm
+        {
+            Marca = MarcaElegida,
+            Modelo = ModeloElegido,
+            Categoria = "Pendiente de clasificación",
+            IntervalosMantenimiento = "A determinar por el pipeline de enriquecimiento",
+            Estado = EstadoEnriquecimiento.Pendiente,
+            FechaUltimoEnriquecimiento = null,
+            TenantsQueLoUsan = 1
+        };
+
+        DatosDemo.Catalogo.Add(ficha);
+        return ficha;
+    }
+
+    private static void ActualizarContador(PlantaVm planta) =>
+        planta.Maquinas = DatosDemo.Maquinas.Count(m => m.PlantaId == planta.Id);
+}

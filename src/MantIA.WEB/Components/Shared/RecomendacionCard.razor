@@ -1,0 +1,129 @@
+<div class="mantia-reco" style="@Estilo">
+    <div class="mantia-reco__cabecera">
+        <div style="flex:1 1 320px;min-width:260px">
+            <div class="d-flex flex-wrap align-center mb-2" style="gap:.5rem">
+                <StatusChip Texto="@Ui.TextoDe(Recomendacion.Origen)"
+                            ChipColor="@Ui.ColorDe(Recomendacion.Origen)"
+                            Icono="@Ui.IconoDe(Recomendacion.Origen)" />
+                <StatusChip Texto="@($"Prioridad {Recomendacion.Prioridad}")"
+                            ChipColor="@Ui.ColorDe(Recomendacion.Prioridad)"
+                            Variante="Variant.Outlined" />
+                @if (Recomendacion.Estado != EstadoRecomendacion.Activa)
+                {
+                    <StatusChip Texto="@Recomendacion.Estado.ToString()"
+                                ChipColor="@Ui.ColorDe(Recomendacion.Estado)"
+                                Icono="@(Recomendacion.Estado == EstadoRecomendacion.Aceptada ? Icons.Material.Filled.Check : Icons.Material.Filled.Close)" />
+                }
+            </div>
+            <MudText Typo="Typo.h6">@Recomendacion.Repuesto</MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                Parte @Recomendacion.NumeroParte · @Recomendacion.Maquina · @Recomendacion.Planta
+            </MudText>
+        </div>
+
+        <div class="d-flex" style="gap:1.75rem">
+            <div>
+                <div class="mantia-dato__label">Stock actual</div>
+                <MudText Typo="Typo.h5">@Ui.Numero(Recomendacion.StockActual)</MudText>
+            </div>
+            <div>
+                <div class="mantia-dato__label">Sugerido</div>
+                <MudText Typo="Typo.h5" Color="Color.Primary">+@Ui.Numero(Recomendacion.CantidadSugerida)</MudText>
+            </div>
+            <div>
+                <div class="mantia-dato__label">Confianza</div>
+                <MudText Typo="Typo.h5">@Recomendacion.Confianza%</MudText>
+            </div>
+        </div>
+    </div>
+
+    <div class="mantia-reco__cuerpo">
+        <MudText Typo="Typo.body2" Class="mb-3">@Recomendacion.Justificacion</MudText>
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" md="6">
+                <div class="mantia-reco__bloque">
+                    <div class="mantia-reco__bloque-titulo">
+                        @(Recomendacion.Origen == OrigenRecomendacion.Regla ? "Regla de negocio aplicada" : "Señal del modelo")
+                    </div>
+                    <MudText Typo="Typo.body2">@Recomendacion.ReglaAplicada</MudText>
+                    @if (Recomendacion.Origen == OrigenRecomendacion.Modelo)
+                    {
+                        <MudProgressLinear Value="Recomendacion.Confianza" Color="Color.Tertiary"
+                                           Rounded="true" Class="mt-3" Size="Size.Small" />
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                            Confianza del modelo sobre el historial disponible
+                        </MudText>
+                    }
+                </div>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <div class="mantia-reco__bloque">
+                    <div class="mantia-reco__bloque-titulo">Evidencia utilizada</div>
+                    <ul class="mantia-reco__evidencia">
+                        @foreach (var item in Recomendacion.Evidencia)
+                        {
+                            <li>@item</li>
+                        }
+                    </ul>
+                </div>
+            </MudItem>
+        </MudGrid>
+
+        @if (Recomendacion.Estado == EstadoRecomendacion.Rechazada && !string.IsNullOrEmpty(Recomendacion.ComentarioRechazo))
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+                Rechazada por @Recomendacion.UsuarioValidacion: @Recomendacion.ComentarioRechazo
+            </MudAlert>
+        }
+        else if (Recomendacion.Estado == EstadoRecomendacion.Aceptada)
+        {
+            <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+                Aceptada por @Recomendacion.UsuarioValidacion el @Ui.FechaHora(Recomendacion.FechaValidacion)
+                por @Ui.Numero(Recomendacion.CantidadSugerida) unidades.
+            </MudAlert>
+        }
+    </div>
+
+    <div class="mantia-reco__acciones">
+        <MudText Typo="Typo.caption" Class="mud-text-secondary align-self-center">
+            Generada @Ui.Relativo(Recomendacion.FechaGeneracion) · Capital en riesgo estimado @Ui.Moneda(Recomendacion.ImpactoEstimado)
+        </MudText>
+        <MudSpacer />
+        @if (Recomendacion.Estado == EstadoRecomendacion.Activa && MostrarAcciones)
+        {
+            <MudButton Variant="Variant.Text" Color="Color.Error"
+                       StartIcon="@Icons.Material.Filled.Close"
+                       OnClick="@(() => AlRechazar.InvokeAsync(Recomendacion))">
+                Rechazar
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Check"
+                       OnClick="@(() => AlAceptar.InvokeAsync(Recomendacion))">
+                Aceptar y reponer
+            </MudButton>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RecomendacionVm Recomendacion { get; set; } = null!;
+    [Parameter] public bool MostrarAcciones { get; set; } = true;
+    [Parameter] public EventCallback<RecomendacionVm> AlAceptar { get; set; }
+    [Parameter] public EventCallback<RecomendacionVm> AlRechazar { get; set; }
+
+    private string Estilo
+    {
+        get
+        {
+            var color = Recomendacion.Prioridad switch
+            {
+                Prioridad.Urgente => "#D14343",
+                Prioridad.Alta => "#DE9021",
+                Prioridad.Media => "#2E90C4",
+                _ => "#8FA8BC"
+            };
+            return $"--mantia-acento:{color};";
+        }
+    }
+}

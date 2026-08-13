@@ -1,0 +1,97 @@
+@page "/recuperar"
+@layout LoginLayout
+
+<PageTitle>Recuperar acceso · MantIA</PageTitle>
+
+<div class="mantia-acceso">
+    <section class="mantia-acceso__relato">
+        <div class="mantia-acceso__marca">
+            <span class="mantia-acceso__logo">
+                <MudIcon Icon="@Icons.Material.Filled.Insights" Style="color:#fff" />
+            </span>
+            <span class="mantia-acceso__nombre">Mant<b>IA</b></span>
+        </div>
+
+        <div class="mantia-acceso__centro">
+            <h1 class="mantia-acceso__titular">Recuperá tu acceso en un paso.</h1>
+            <p class="mantia-acceso__bajada">
+                El restablecimiento de contraseña lo gestiona el proveedor de identidad. Vas a recibir un
+                enlace de un solo uso en tu correo corporativo.
+            </p>
+        </div>
+
+        <p class="mantia-acceso__pie">
+            Si tu cuenta fue dada de baja, el enlace no va a llegar. Contactá al administrador de tu empresa.
+        </p>
+    </section>
+
+    <section class="mantia-acceso__panel">
+        <div class="mantia-acceso__form">
+            @if (!_enviado)
+            {
+                <MudText Typo="Typo.h5">Recuperar contraseña</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mt-1 mb-6">
+                    Indicá tu correo corporativo y te enviamos un enlace para definir una nueva contraseña.
+                </MudText>
+
+                <MudTextField @bind-Value="_email"
+                              Label="Correo corporativo"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Email"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.MailOutline"
+                              Class="mb-5"
+                              Immediate="true" />
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Size="Size.Large"
+                           FullWidth="true"
+                           Disabled="_enviando"
+                           OnClick="Enviar">
+                    @if (_enviando)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Enviando…</span>
+                    }
+                    else
+                    {
+                        <span>Enviar enlace de recuperación</span>
+                    }
+                </MudButton>
+            }
+            else
+            {
+                <div class="text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.MarkEmailRead" Color="Color.Success" Style="font-size:4rem" />
+                    <MudText Typo="Typo.h5" Class="mt-3">Revisá tu correo</MudText>
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary mt-2">
+                        Si <b>@_email</b> corresponde a una cuenta activa, vas a recibir un enlace de
+                        restablecimiento válido por 60 minutos.
+                    </MudText>
+                </div>
+            }
+
+            <div class="text-center mt-6">
+                <MudLink Href="/" Typo="Typo.body2">
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" Class="mr-1" />
+                    Volver al inicio de sesión
+                </MudLink>
+            </div>
+        </div>
+    </section>
+</div>
+
+@code {
+    private string _email = "";
+    private bool _enviando;
+    private bool _enviado;
+
+    private async Task Enviar()
+    {
+        _enviando = true;
+        await Task.Delay(700);
+        _enviando = false;
+        _enviado = true;
+    }
+}

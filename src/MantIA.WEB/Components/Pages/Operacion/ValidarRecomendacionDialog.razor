@@ -1,0 +1,135 @@
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center" style="gap:.75rem">
+            <MudIcon Icon="@(ModoRechazo ? Icons.Material.Filled.Close : Icons.Material.Filled.Check)"
+                     Color="@(ModoRechazo ? Color.Error : Color.Success)" />
+            <div>
+                <MudText Typo="Typo.h6">@Titulo</MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                    @Recomendacion.Repuesto · @Recomendacion.NumeroParte · @Recomendacion.Maquina
+                </MudText>
+            </div>
+        </div>
+    </TitleContent>
+
+    <DialogContent>
+        <div class="d-flex flex-wrap align-center mb-3" style="gap:.5rem">
+            <StatusChip Texto="@Ui.TextoDe(Recomendacion.Origen)"
+                        ChipColor="@Ui.ColorDe(Recomendacion.Origen)"
+                        Icono="@Ui.IconoDe(Recomendacion.Origen)" />
+            <StatusChip Texto="@($"Prioridad {Recomendacion.Prioridad}")"
+                        ChipColor="@Ui.ColorDe(Recomendacion.Prioridad)" Variante="Variant.Outlined" />
+            <StatusChip Texto="@($"Confianza {Recomendacion.Confianza}%")" ChipColor="Color.Default"
+                        Variante="Variant.Outlined" />
+        </div>
+
+        <div class="mantia-reco__bloque mb-4">
+            <div class="mantia-reco__bloque-titulo">
+                @(Recomendacion.Origen == OrigenRecomendacion.Regla ? "Regla de negocio aplicada" : "Señal del modelo")
+            </div>
+            <MudText Typo="Typo.body2">@Recomendacion.ReglaAplicada</MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary mt-2">@Recomendacion.Justificacion</MudText>
+        </div>
+
+        @if (ModoRechazo)
+        {
+            <MudTextField T="string" @bind-Value="_comentario" Label="Motivo del rechazo"
+                          Variant="Variant.Outlined" Lines="3"
+                          Required="true" RequiredError="Explicá por qué la sugerencia no aplica"
+                          HelperText="Por ejemplo: la compra ya está en curso, el repuesto se discontinuó o la máquina va a salir de servicio" />
+
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+                El comentario se guarda como señal negativa: el motor lo usa para ajustar el peso de esta regla
+                y de este patrón de consumo en los próximos análisis. Rechazar sin comentario no aporta aprendizaje.
+            </MudAlert>
+        }
+        else
+        {
+            <MudNumericField T="decimal" @bind-Value="_cantidad" Label="Cantidad a reponer"
+                             Variant="Variant.Outlined" Min="0"
+                             HelperText="Viene precargada con la cantidad sugerida por el motor. Podés ajustarla antes de confirmar." />
+
+            <div class="mantia-lista-datos mt-4">
+                <DataPoint Etiqueta="Stock actual" Valor="@Ui.Numero(Recomendacion.StockActual)" />
+                <DataPoint Etiqueta="Cantidad sugerida por el motor"
+                           Valor="@Ui.Numero(Recomendacion.CantidadSugerida)" />
+                <DataPoint Etiqueta="Stock proyectado con la reposición"
+                           Valor="@Ui.Numero(Recomendacion.StockActual + _cantidad)" />
+                <DataPoint Etiqueta="Capital en riesgo estimado"
+                           Valor="@Ui.Moneda(Recomendacion.ImpactoEstimado)" />
+            </div>
+
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-4">
+                Aceptar registra la validación a nombre de @DatosDemo.UsuarioActual.NombreCompleto y deja la
+                sugerencia como caso positivo para el reentrenamiento. El stock se actualiza cuando el repuesto
+                ingresa físicamente, no en este paso.
+            </MudAlert>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton OnClick="Confirmar" Variant="Variant.Filled"
+                   Color="@(ModoRechazo ? Color.Error : Color.Primary)"
+                   StartIcon="@(ModoRechazo ? Icons.Material.Filled.Close : Icons.Material.Filled.Check)">
+            @(ModoRechazo ? "Confirmar el rechazo" : "Confirmar la reposición")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialogo { get; set; } = null!;
+
+    [Parameter, EditorRequired] public RecomendacionVm Recomendacion { get; set; } = null!;
+    [Parameter] public bool ModoRechazo { get; set; }
+
+    private decimal _cantidad;
+    private string _comentario = "";
+
+    private string Titulo => ModoRechazo ? "Rechazar la recomendación" : "Aceptar y reponer";
+
+    protected override void OnInitialized() => _cantidad = Recomendacion.CantidadSugerida;
+
+    private void Cancelar() => Dialogo.Cancel();
+
+    private void Confirmar()
+    {
+        if (ModoRechazo)
+        {
+            if (string.IsNullOrWhiteSpace(_comentario))
+            {
+                Snackbar.Add("Escribí el motivo del rechazo: es la señal que usa el motor para ajustarse.",
+                    Severity.Warning);
+                return;
+            }
+
+            Recomendacion.Estado = EstadoRecomendacion.Rechazada;
+            Recomendacion.ComentarioRechazo = _comentario.Trim();
+            Recomendacion.UsuarioValidacion = DatosDemo.UsuarioActual.NombreCompleto;
+            Recomendacion.FechaValidacion = DateTime.Now;
+
+            Snackbar.Add($"Recomendación de {Recomendacion.Repuesto} rechazada. El comentario queda registrado como señal negativa.",
+                Severity.Info);
+        }
+        else
+        {
+            if (_cantidad <= 0)
+            {
+                Snackbar.Add("La cantidad a reponer tiene que ser mayor que cero.", Severity.Warning);
+                return;
+            }
+
+            Recomendacion.CantidadSugerida = _cantidad;
+            Recomendacion.Estado = EstadoRecomendacion.Aceptada;
+            Recomendacion.UsuarioValidacion = DatosDemo.UsuarioActual.NombreCompleto;
+            Recomendacion.FechaValidacion = DateTime.Now;
+
+            Snackbar.Add($"Reposición aceptada: {Ui.Numero(_cantidad)} unidades de {Recomendacion.Repuesto}.",
+                Severity.Success);
+        }
+
+        Dialogo.Close(DialogResult.Ok(true));
+    }
+}

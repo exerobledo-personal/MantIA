@@ -1,0 +1,362 @@
+@page "/ordenes/nueva"
+@page "/ordenes/{Id:guid}/editar"
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>@TituloPagina · MantIA</PageTitle>
+
+<PageHeader Titulo="@TituloPagina"
+            Bajada="@BajadaPagina"
+            Icono="@Icons.Material.Filled.Assignment"
+            Migas="@_migas" />
+
+@if (!EsAlta && _orden is null)
+{
+    <EmptyState Titulo="No encontramos la orden"
+                Descripcion="La orden que intentás editar no existe o fue dada de baja del listado."
+                Icono="@Icons.Material.Filled.SearchOff">
+        <Accion>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/ordenes">
+                Volver al listado
+            </MudButton>
+        </Accion>
+    </EmptyState>
+}
+else
+{
+    <MudForm @ref="_formulario">
+        <MudGrid Spacing="3">
+            <MudItem xs="12" lg="8">
+                <SectionCard Titulo="Datos de la intervención"
+                             Bajada="Todo lo que necesita el técnico para entender qué hay que hacer y sobre qué equipo">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudTextField T="string" Value="@_numero" Label="Número de orden"
+                                          Variant="Variant.Outlined" ReadOnly="true"
+                                          HelperText="Se asigna automáticamente al registrar la orden" />
+                        </MudItem>
+
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="_maquina" Label="Máquina afectada"
+                                       Variant="Variant.Outlined" Required="true"
+                                       RequiredError="Elegí la máquina sobre la que se hace la intervención"
+                                       HelperText="El contexto del activo se muestra a la derecha">
+                                @foreach (var maquina in DatosDemo.Maquinas.OrderBy(m => m.Codigo))
+                                {
+                                    <MudSelectItem T="string" Value="@Etiqueta(maquina)">
+                                        @Etiqueta(maquina) · @maquina.Planta
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="TipoMantenimiento" @bind-Value="_tipoMantenimiento"
+                                       Label="Tipo de mantenimiento" Variant="Variant.Outlined">
+                                @foreach (var tipo in Enum.GetValues<TipoMantenimiento>())
+                                {
+                                    <MudSelectItem T="TipoMantenimiento" Value="@tipo">@tipo.ToString()</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="12" md="6">
+                            <MudAutocomplete T="string" @bind-Value="_tipoFalla" Label="Tipo de falla"
+                                             Variant="Variant.Outlined"
+                                             SearchFunc="@BuscarFallas"
+                                             CoerceValue="true" CoerceText="true"
+                                             ResetValueOnEmptyText="false"
+                                             Required="true" RequiredError="Indicá el tipo de falla o el trabajo a realizar"
+                                             HelperText="@TextoAyudaFalla" />
+                        </MudItem>
+
+                        <MudItem xs="12">
+                            <MudTextField T="string" @bind-Value="_descripcion" Label="Descripción del problema"
+                                          Variant="Variant.Outlined" Lines="4"
+                                          Required="true" RequiredError="Describí qué está pasando con el equipo"
+                                          HelperText="Qué se observa, desde cuándo y qué parte del proceso quedó comprometida" />
+                        </MudItem>
+
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="Prioridad" @bind-Value="_prioridad" Label="Prioridad"
+                                       Variant="Variant.Outlined">
+                                @foreach (var prioridad in Enum.GetValues<Prioridad>())
+                                {
+                                    <MudSelectItem T="Prioridad" Value="@prioridad">@prioridad.ToString()</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="_tecnico" Label="Técnico asignado"
+                                       Variant="Variant.Outlined" Required="true"
+                                       RequiredError="Asigná un responsable de la intervención">
+                                @foreach (var usuario in DatosDemo.Usuarios.Where(u => u.Estado == EstadoGenerico.Activo))
+                                {
+                                    <MudSelectItem T="string" Value="@usuario.NombreCompleto">
+                                        @usuario.NombreCompleto · @Roles.Etiqueta(usuario.Rol)
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+                </SectionCard>
+            </MudItem>
+
+            <MudItem xs="12" lg="4">
+                @if (MaquinaElegida is null)
+                {
+                    <SectionCard Titulo="Contexto del activo"
+                                 Bajada="Se completa al elegir la máquina afectada">
+                        <EmptyState Titulo="Todavía no elegiste la máquina"
+                                    Descripcion="Al seleccionarla vas a ver su criticidad operativa, la última intervención registrada, cuántas órdenes previas tiene y qué repuestos suyos están bajo el stock mínimo."
+                                    Icono="@Icons.Material.Filled.PrecisionManufacturing" />
+                    </SectionCard>
+                }
+                else
+                {
+                    var maquina = MaquinaElegida;
+                    var ficha = FichaElegida;
+                    var alertas = AlertasDeLaMaquina;
+
+                    <SectionCard Titulo="Contexto del activo"
+                                 Bajada="@($"{maquina.Codigo} · {maquina.Descripcion}")">
+                        <div class="mantia-lista-datos">
+                            <DataPoint Etiqueta="Planta" Valor="@maquina.Planta" />
+                            <DataPoint Etiqueta="Línea de producción" Valor="@maquina.Linea" />
+                            <DataPoint Etiqueta="Criticidad operativa">
+                                <StatusChip Texto="@Ui.TextoDe(maquina.CriticidadOperativa)"
+                                            ChipColor="@Ui.ColorDe(maquina.CriticidadOperativa)" />
+                            </DataPoint>
+                            <DataPoint Etiqueta="Estado actual">
+                                <StatusChip Texto="@Ui.TextoDe(maquina.Estado)"
+                                            ChipColor="@Ui.ColorDe(maquina.Estado)"
+                                            Icono="@Ui.IconoDe(maquina.Estado)" />
+                            </DataPoint>
+                            <DataPoint Etiqueta="Última intervención"
+                                       Valor="@Ui.Fecha(maquina.UltimaIntervencion)" />
+                            <DataPoint Etiqueta="Órdenes previas"
+                                       Valor="@($"{OrdenesPrevias} registradas · {OrdenesPreviasAbiertas} sin cerrar")" />
+                            @if (ficha is not null && !string.IsNullOrEmpty(ficha.IntervalosMantenimiento))
+                            {
+                                <DataPoint Etiqueta="Intervalos del catálogo técnico"
+                                           Valor="@ficha.IntervalosMantenimiento" />
+                            }
+                        </div>
+
+                        <MudDivider Class="my-4" />
+
+                        <div class="mantia-reco__bloque-titulo">Alertas de stock que afectan a esta máquina</div>
+                        @if (alertas.Count == 0)
+                        {
+                            <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true" Class="mt-2">
+                                Todos los repuestos asociados a esta máquina están por encima de su umbral mínimo.
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary mt-1 mb-2">
+                                Tenelas en cuenta antes de asignar la intervención: puede que el repuesto necesario no esté disponible.
+                            </MudText>
+                            @foreach (var alerta in alertas)
+                            {
+                                <MudAlert Severity="@(alerta.StockActual <= 0 ? Severity.Error : Severity.Warning)"
+                                          Variant="Variant.Outlined" Dense="true" Class="mb-2">
+                                    <b>@alerta.Repuesto</b> (@alerta.NumeroParte): @Ui.Numero(alerta.StockActual)
+                                    en stock sobre un mínimo de @Ui.Numero(alerta.StockMinimo).
+                                </MudAlert>
+                            }
+                        }
+                    </SectionCard>
+                }
+            </MudItem>
+
+            <MudItem xs="12">
+                <div class="d-flex flex-wrap justify-end" style="gap:.75rem">
+                    <MudButton Variant="Variant.Text" OnClick="Cancelar">Cancelar</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Save" OnClick="Guardar">
+                        @(EsAlta ? "Registrar la orden" : "Guardar los cambios")
+                    </MudButton>
+                </div>
+            </MudItem>
+        </MudGrid>
+    </MudForm>
+}
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+
+    private MudForm _formulario = null!;
+    private OrdenTrabajoVm? _orden;
+
+    private string _numero = "";
+    private string? _maquina;
+    private string? _tipoFalla;
+    private string _descripcion = "";
+    private string? _tecnico;
+    private TipoMantenimiento _tipoMantenimiento = TipoMantenimiento.Correctivo;
+    private Prioridad _prioridad = Prioridad.Media;
+
+    private readonly List<BreadcrumbItem> _migas =
+    [
+        new("Operación", href: null, disabled: true),
+        new("Órdenes de trabajo", href: "/ordenes"),
+        new("Formulario", href: null, disabled: true)
+    ];
+
+    private bool EsAlta => Id is null;
+
+    private string TituloPagina => EsAlta ? "Nueva orden de trabajo" : $"Editar {_numero}";
+
+    private string BajadaPagina => EsAlta
+        ? "Registrá la intervención sobre el equipo afectado. El número se asigna automáticamente y la orden queda en estado Abierta hasta que un técnico la tome."
+        : "Modificá los datos de la intervención. El número de orden y el historial de consumo de repuestos no se alteran.";
+
+    protected override void OnInitialized()
+    {
+        if (Id is null)
+        {
+            _numero = DatosDemo.SiguienteNumeroOrden();
+            return;
+        }
+
+        _orden = DatosDemo.Ordenes.FirstOrDefault(o => o.Id == Id);
+        if (_orden is null) return;
+
+        _numero = _orden.Numero;
+        _maquina = _orden.Maquina;
+        _tipoMantenimiento = _orden.TipoMantenimiento;
+        _tipoFalla = _orden.TipoFalla;
+        _descripcion = _orden.Descripcion;
+        _prioridad = _orden.Prioridad;
+        _tecnico = _orden.UsuarioAsignado;
+    }
+
+    private static string Etiqueta(MaquinaVm maquina) => $"{maquina.Codigo} · {maquina.Nombre}";
+
+    private MaquinaVm? MaquinaElegida => string.IsNullOrEmpty(_maquina)
+        ? null
+        : DatosDemo.Maquinas.FirstOrDefault(m => Etiqueta(m) == _maquina);
+
+    private CatalogoMaquinaVm? FichaElegida
+    {
+        get
+        {
+            var maquina = MaquinaElegida;
+            return maquina is null
+                ? null
+                : DatosDemo.Catalogo.FirstOrDefault(c => c.Id == maquina.CatalogoMaquinaId);
+        }
+    }
+
+    private List<string> FallasSugeridas => FichaElegida?.FallasComunes ?? [];
+
+    private string TextoAyudaFalla
+    {
+        get
+        {
+            var ficha = FichaElegida;
+            return ficha is null
+                ? "Elegí primero la máquina para ver las fallas típicas de su modelo"
+                : $"Sugerencias tomadas del catálogo técnico de {ficha.Descripcion}. Podés escribir un texto propio.";
+        }
+    }
+
+    private int OrdenesPrevias
+    {
+        get
+        {
+            var maquina = MaquinaElegida;
+            return maquina is null
+                ? 0
+                : DatosDemo.Ordenes.Count(o => o.MaquinaId == maquina.Id && o.Id != _orden?.Id);
+        }
+    }
+
+    private int OrdenesPreviasAbiertas
+    {
+        get
+        {
+            var maquina = MaquinaElegida;
+            return maquina is null
+                ? 0
+                : DatosDemo.Ordenes.Count(o => o.MaquinaId == maquina.Id
+                                               && o.Id != _orden?.Id
+                                               && o.Estado != EstadoOrden.Cerrada);
+        }
+    }
+
+    private List<AlertaStockVm> AlertasDeLaMaquina
+    {
+        get
+        {
+            var maquina = MaquinaElegida;
+            if (maquina is null) return [];
+
+            return DatosDemo.Alertas()
+                .Where(a => DatosDemo.Repuestos.Any(r => r.Id == a.RepuestoId && r.MaquinaIds.Contains(maquina.Id)))
+                .ToList();
+        }
+    }
+
+    private Task<IEnumerable<string>> BuscarFallas(string valor, CancellationToken token)
+    {
+        IEnumerable<string> opciones = FallasSugeridas;
+
+        if (!string.IsNullOrWhiteSpace(valor))
+            opciones = opciones.Where(f => f.Contains(valor, StringComparison.OrdinalIgnoreCase));
+
+        return Task.FromResult(opciones);
+    }
+
+    private void Cancelar() => Nav.NavigateTo(_orden is null ? "/ordenes" : $"/ordenes/{_orden.Id}");
+
+    private async Task Guardar()
+    {
+        await _formulario.ValidateAsync();
+
+        var maquina = MaquinaElegida;
+        if (!_formulario.IsValid || maquina is null)
+        {
+            Snackbar.Add("Revisá los campos obligatorios antes de guardar la orden.", Severity.Warning);
+            return;
+        }
+
+        if (_orden is null)
+        {
+            var nueva = new OrdenTrabajoVm
+            {
+                Numero = _numero,
+                MaquinaId = maquina.Id,
+                Maquina = Etiqueta(maquina),
+                Planta = maquina.Planta,
+                UsuarioAsignado = _tecnico ?? "",
+                TipoMantenimiento = _tipoMantenimiento,
+                TipoFalla = _tipoFalla ?? "",
+                Descripcion = _descripcion,
+                Prioridad = _prioridad,
+                Estado = EstadoOrden.Abierta,
+                FechaApertura = DateTime.Now
+            };
+
+            DatosDemo.Ordenes.Add(nueva);
+            Snackbar.Add($"Orden {nueva.Numero} registrada sobre {maquina.Codigo} y asignada a {nueva.UsuarioAsignado}.",
+                Severity.Success);
+            Nav.NavigateTo($"/ordenes/{nueva.Id}");
+            return;
+        }
+
+        _orden.MaquinaId = maquina.Id;
+        _orden.Maquina = Etiqueta(maquina);
+        _orden.Planta = maquina.Planta;
+        _orden.UsuarioAsignado = _tecnico ?? "";
+        _orden.TipoMantenimiento = _tipoMantenimiento;
+        _orden.TipoFalla = _tipoFalla ?? "";
+        _orden.Descripcion = _descripcion;
+        _orden.Prioridad = _prioridad;
+
+        Snackbar.Add($"Orden {_orden.Numero} actualizada.", Severity.Success);
+        Nav.NavigateTo($"/ordenes/{_orden.Id}");
+    }
+}

@@ -1,0 +1,470 @@
+@page "/plataforma/empresas/{Id:guid}"
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>@(_empresa?.RazonSocial ?? "Empresa cliente") · MantIA</PageTitle>
+
+@if (_empresa is null)
+{
+    <PageHeader Titulo="Empresa no encontrada"
+                Bajada="El tenant que estás buscando no figura en el padrón de clientes de la plataforma."
+                Icono="@Icons.Material.Filled.SearchOff"
+                Migas="@Migas" />
+
+    <EmptyState Titulo="No encontramos la empresa"
+                Descripcion="Es posible que se haya eliminado del padrón o que el enlace esté desactualizado."
+                Icono="@Icons.Material.Filled.SearchOff">
+        <Accion>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/plataforma/empresas">
+                Volver al listado
+            </MudButton>
+        </Accion>
+    </EmptyState>
+}
+else
+{
+    var empresa = _empresa!;
+
+    <PageHeader Titulo="@empresa.RazonSocial"
+                Bajada="@($"Dominio corporativo {empresa.Dominio} · Tenant {empresa.TenantId} · Cliente desde {Ui.Fecha(empresa.FechaAlta)}")"
+                Icono="@Icons.Material.Filled.Domain"
+                Migas="@Migas">
+        <EtiquetaExtra>
+            <StatusChip Texto="@empresa.Plan" ChipColor="Color.Primary" Icono="@Icons.Material.Filled.Sell" />
+            <StatusChip Texto="@empresa.Rubro" ChipColor="Color.Default" Variante="Variant.Outlined" />
+            <StatusChip Texto="@empresa.Estado.ToString()" ChipColor="@Ui.ColorDe(empresa.Estado)" />
+        </EtiquetaExtra>
+        <Acciones>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.SwapHoriz" OnClick="OperarComoEmpresa">
+                Operar como esta empresa
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Edit"
+                       Href="@($"/plataforma/empresas/{empresa.Id}/editar")">
+                Editar
+            </MudButton>
+            @if (empresa.Estado == EstadoGenerico.Activo)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Error"
+                           StartIcon="@Icons.Material.Filled.Block" OnClick="Desactivar">
+                    Desactivar
+                </MudButton>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Success"
+                           StartIcon="@Icons.Material.Filled.PlayArrow" OnClick="Reactivar">
+                    Reactivar
+                </MudButton>
+            }
+        </Acciones>
+    </PageHeader>
+
+    @if (empresa.Estado == EstadoGenerico.Inactivo)
+    {
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4"
+                  Icon="@Icons.Material.Filled.Block">
+            La empresa está desactivada: sus usuarios no pueden iniciar sesión y el tenant no genera órdenes de
+            trabajo ni recomendaciones. Los datos operativos se conservan durante el período de retención contractual.
+        </MudAlert>
+    }
+
+    <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pt-4" Class="mantia-superficie pa-2">
+        <MudTabPanel Text="Resumen" Icon="@Icons.Material.Filled.Info">
+            <MudGrid Spacing="3">
+                <MudItem xs="12" sm="6" lg="3">
+                    <MetricCard Etiqueta="Uso del plan" Valor="@($"{Uso(empresa)} %")"
+                                Detalle="@($"{empresa.MaquinasRegistradas} de {empresa.MaxMaquinasHabilitadas} máquinas habilitadas")"
+                                Icono="@Icons.Material.Filled.PrecisionManufacturing"
+                                Acento="@ColorUso(Uso(empresa))" />
+                </MudItem>
+                <MudItem xs="12" sm="6" lg="3">
+                    <MetricCard Etiqueta="Usuarios activos" Valor="@empresa.UsuariosActivos.ToString()"
+                                Detalle="Cuentas habilitadas en el proveedor de identidad"
+                                Icono="@Icons.Material.Filled.Group" Acento="Color.Tertiary" />
+                </MudItem>
+                <MudItem xs="12" sm="6" lg="3">
+                    <MetricCard Etiqueta="Órdenes del último mes" Valor="@empresa.OrdenesUltimoMes.ToString()"
+                                Detalle="Indicador de uso real del servicio"
+                                Icono="@Icons.Material.Filled.Assignment" Acento="Color.Info" />
+                </MudItem>
+                <MudItem xs="12" sm="6" lg="3">
+                    <MetricCard Etiqueta="Recomendaciones procesadas" Valor="@empresa.RecomendacionesProcesadas.ToString()"
+                                Detalle="Sugerencias de reposición emitidas desde el alta"
+                                Icono="@Icons.Material.Filled.Psychology" Acento="Color.Warning" />
+                </MudItem>
+
+                <MudItem xs="12" lg="7">
+                    <SectionCard Titulo="Datos del tenant"
+                                 Bajada="Información de registro de la empresa cliente en la plataforma">
+                        <MudGrid Spacing="3">
+                            <MudItem xs="12" md="6">
+                                <div class="mantia-lista-datos">
+                                    <DataPoint Etiqueta="Razón social" Valor="@empresa.RazonSocial" />
+                                    <DataPoint Etiqueta="Dominio corporativo" Valor="@empresa.Dominio" />
+                                    <DataPoint Etiqueta="Identificador de tenant" Valor="@empresa.TenantId" />
+                                    <DataPoint Etiqueta="Rubro industrial" Valor="@empresa.Rubro" />
+                                    <DataPoint Etiqueta="Administrador inicial" Valor="@empresa.AdminInicial" />
+                                </div>
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <div class="mantia-lista-datos">
+                                    <DataPoint Etiqueta="Plan contratado" Valor="@empresa.Plan" />
+                                    <DataPoint Etiqueta="Máquinas habilitadas"
+                                               Valor="@($"{empresa.MaxMaquinasHabilitadas} máquinas")" />
+                                    <DataPoint Etiqueta="Fecha de alta" Valor="@Ui.Fecha(empresa.FechaAlta)" />
+                                    <DataPoint Etiqueta="Antigüedad como cliente" Valor="@Antiguedad(empresa)" />
+                                    <DataPoint Etiqueta="Estado">
+                                        <StatusChip Texto="@empresa.Estado.ToString()"
+                                                    ChipColor="@Ui.ColorDe(empresa.Estado)" />
+                                    </DataPoint>
+                                </div>
+                            </MudItem>
+                        </MudGrid>
+
+                        <MudDivider Class="my-4" />
+
+                        <div class="mantia-dato__label mb-2">Consumo del cupo de máquinas del plan</div>
+                        <div class="d-flex justify-space-between mb-1" style="font-size:.78rem">
+                            <span><b>@empresa.MaquinasRegistradas</b> registradas de @empresa.MaxMaquinasHabilitadas habilitadas</span>
+                            <span>@Uso(empresa) %</span>
+                        </div>
+                        <MudProgressLinear Value="@((double)Uso(empresa))" Color="@ColorUso(Uso(empresa))"
+                                           Rounded="true" Size="Size.Medium" />
+                    </SectionCard>
+                </MudItem>
+
+                <MudItem xs="12" lg="5">
+                    <SectionCard Titulo="Alcance de este panel"
+                                 Bajada="Qué puede ver y hacer el superadministrador sobre una empresa cliente">
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-4"
+                                  Icon="@Icons.Material.Filled.Security">
+                            Desde la plataforma se administra el contrato del tenant, no su operación. Las máquinas,
+                            los repuestos y las órdenes de trabajo de @empresa.RazonSocial pertenecen a su propio
+                            espacio de datos y sólo se consultan cambiando el contexto de empresa.
+                        </MudAlert>
+
+                        <div class="mantia-lista-datos">
+                            <DataPoint Etiqueta="Datos administrativos"
+                                       Valor="Razón social, dominio, plan, cupo de máquinas y estado del contrato" />
+                            <DataPoint Etiqueta="Indicadores de uso"
+                                       Valor="Contadores agregados de máquinas, usuarios, órdenes y recomendaciones" />
+                            <DataPoint Etiqueta="Datos operativos"
+                                       Valor="Accesibles únicamente con la acción Operar como esta empresa, que deja constancia en la bitácora" />
+                        </div>
+
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-4"
+                                   StartIcon="@Icons.Material.Filled.SwapHoriz" OnClick="OperarComoEmpresa" FullWidth="true">
+                            Operar como @empresa.RazonSocial
+                        </MudButton>
+                    </SectionCard>
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Suscripción" Icon="@Icons.Material.Filled.Sell">
+            <MudGrid Spacing="3">
+                <MudItem xs="12" lg="7">
+                    <SectionCard Titulo="Plan contratado"
+                                 Bajada="Condiciones comerciales vigentes para este tenant">
+                        @if (PlanContratado is null)
+                        {
+                            <EmptyState Titulo="El plan contratado ya no existe"
+                                        Descripcion="El plan asignado a esta empresa fue dado de baja del catálogo de suscripciones. Asigná uno vigente para regularizar la facturación."
+                                        Icono="@Icons.Material.Filled.Sell" />
+                        }
+                        else
+                        {
+                            <div class="d-flex flex-wrap align-center mb-4" style="gap:.5rem">
+                                <StatusChip Texto="@PlanContratado.Nombre" ChipColor="Color.Primary"
+                                            Icono="@Icons.Material.Filled.Sell" />
+                                <StatusChip Texto="@($"{DatosDemo.Empresas.Count(e => e.Plan == PlanContratado.Nombre)} empresas con este plan")"
+                                            ChipColor="Color.Info" Variante="Variant.Outlined" />
+                            </div>
+
+                            <MudText Typo="Typo.h4">@Ui.Moneda(PlanContratado.Precio)</MudText>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+                                Por mes @(empresa.Estado == EstadoGenerico.Activo
+                                            ? "· en facturación"
+                                            : "· sin facturar mientras la empresa esté desactivada")
+                            </MudText>
+
+                            <MudText Typo="Typo.body2" Class="mb-4">@PlanContratado.Descripcion</MudText>
+
+                            <div class="mantia-lista-datos">
+                                <DataPoint Etiqueta="Máquinas incluidas en el plan"
+                                           Valor="@($"{PlanContratado.MaxMaquinas} máquinas")" />
+                                <DataPoint Etiqueta="Cupo habilitado a esta empresa"
+                                           Valor="@($"{empresa.MaxMaquinasHabilitadas} máquinas")" />
+                                <DataPoint Etiqueta="Máquinas registradas"
+                                           Valor="@($"{empresa.MaquinasRegistradas} máquinas")" />
+                                <DataPoint Etiqueta="Antigüedad como cliente" Valor="@Antiguedad(empresa)" />
+                                <DataPoint Etiqueta="Aporte anual estimado"
+                                           Valor="@Ui.Moneda(PlanContratado.Precio * 12)" />
+                            </div>
+
+                            <MudDivider Class="my-4" />
+
+                            <div class="mantia-dato__label mb-2">Uso del cupo contratado</div>
+                            <div class="d-flex justify-space-between mb-1" style="font-size:.78rem">
+                                <span><b>@empresa.MaquinasRegistradas</b> de @empresa.MaxMaquinasHabilitadas máquinas</span>
+                                <span>@Uso(empresa) %</span>
+                            </div>
+                            <MudProgressLinear Value="@((double)Uso(empresa))" Color="@ColorUso(Uso(empresa))"
+                                               Rounded="true" Size="Size.Medium" />
+
+                            @if (Uso(empresa) >= 80)
+                            {
+                                <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mt-4"
+                                          Icon="@Icons.Material.Filled.TrendingUp">
+                                    La empresa ocupa el @Uso(empresa) % de su cupo. Conviene ofrecer una ampliación
+                                    de plan antes de que el alta de máquinas quede bloqueada.
+                                </MudAlert>
+                            }
+                        }
+                    </SectionCard>
+                </MudItem>
+
+                <MudItem xs="12" lg="5">
+                    <SectionCard Titulo="Cambiar de plan"
+                                 Bajada="El cambio se aplica sobre la facturación del próximo período">
+                        <MudSelect T="string" @bind-Value="_planElegido" Label="Plan de suscripción"
+                                   Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                            @foreach (var plan in DatosDemo.Planes)
+                            {
+                                <MudSelectItem T="string" Value="@plan.Nombre">
+                                    @plan.Nombre — @Ui.Moneda(plan.Precio) por mes
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        @if (PlanNuevo is not null)
+                        {
+                            <div class="mantia-lista-datos mt-4">
+                                <DataPoint Etiqueta="Precio mensual del plan seleccionado"
+                                           Valor="@Ui.Moneda(PlanNuevo.Precio)" />
+                                <DataPoint Etiqueta="Máquinas incluidas"
+                                           Valor="@($"{PlanNuevo.MaxMaquinas} máquinas")" />
+                                <DataPoint Etiqueta="Diferencia mensual" Valor="@DiferenciaMensual" />
+                            </div>
+
+                            @if (PlanNuevo.MaxMaquinas < empresa.MaquinasRegistradas)
+                            {
+                                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mt-4"
+                                          Icon="@Icons.Material.Filled.ReportProblem">
+                                    El plan @PlanNuevo.Nombre habilita @PlanNuevo.MaxMaquinas máquinas y la empresa
+                                    ya tiene @empresa.MaquinasRegistradas registradas. Antes de bajar de plan hay que
+                                    dar de baja los activos excedentes.
+                                </MudAlert>
+                            }
+                            else if (PlanNuevo.Nombre != empresa.Plan)
+                            {
+                                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4">
+                                    Al aplicar el cambio, el cupo de máquinas habilitadas pasa de
+                                    @empresa.MaxMaquinasHabilitadas a @PlanNuevo.MaxMaquinas y la facturación del
+                                    próximo período se emite por @Ui.Moneda(PlanNuevo.Precio).
+                                </MudAlert>
+                            }
+                        }
+
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-4"
+                                   StartIcon="@Icons.Material.Filled.Save" OnClick="AplicarPlan"
+                                   Disabled="@(PlanNuevo is null || PlanNuevo.Nombre == empresa.Plan)"
+                                   FullWidth="true">
+                            Aplicar cambio de plan
+                        </MudButton>
+                    </SectionCard>
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+
+        <MudTabPanel Text="@($"Actividad ({Actividad.Count})")" Icon="@Icons.Material.Filled.History">
+            <SectionCard Titulo="Actividad registrada en la bitácora"
+                         Bajada="@($"Eventos de auditoría del tenant {empresa.TenantId}. La bitácora es de sólo lectura.")"
+                         SinPadding="true">
+                <ChildContent>
+                    @if (Actividad.Count == 0)
+                    {
+                        <EmptyState Titulo="Sin actividad registrada"
+                                    Descripcion="Todavía no hay eventos de auditoría asociados a esta empresa. Los primeros se registran cuando el administrador inicial da de alta su planta y sus máquinas."
+                                    Icono="@Icons.Material.Filled.History" />
+                    }
+                    else
+                    {
+                        <MudTable Items="@Actividad" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                                  Breakpoint="Breakpoint.Sm" Striped="false">
+                            <HeaderContent>
+                                <MudTh>Fecha y hora</MudTh>
+                                <MudTh>Usuario</MudTh>
+                                <MudTh>Acción</MudTh>
+                                <MudTh>Recurso</MudTh>
+                                <MudTh>Detalle</MudTh>
+                                <MudTh>Nivel</MudTh>
+                                <MudTh>Origen</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Fecha y hora">
+                                    <div class="mantia-celda-principal">
+                                        <strong>@Ui.FechaHora(context.Fecha)</strong>
+                                        <span>@Ui.Relativo(context.Fecha)</span>
+                                    </div>
+                                </MudTd>
+                                <MudTd DataLabel="Usuario">@context.Usuario</MudTd>
+                                <MudTd DataLabel="Acción">@context.Accion</MudTd>
+                                <MudTd DataLabel="Recurso">@context.Recurso</MudTd>
+                                <MudTd DataLabel="Detalle">@context.Detalle</MudTd>
+                                <MudTd DataLabel="Nivel">
+                                    <StatusChip Texto="@context.Nivel.ToString()" ChipColor="@Ui.ColorDe(context.Nivel)"
+                                                Variante="Variant.Outlined" />
+                                </MudTd>
+                                <MudTd DataLabel="Origen">@context.Origen</MudTd>
+                            </RowTemplate>
+                            <PagerContent>
+                                <MudTablePager RowsPerPageString="Filas por página"
+                                   InfoFormat="{first_item}-{last_item} de {all_items}"
+                                   AllItemsText="Todas" />
+                            </PagerContent>
+                        </MudTable>
+                    }
+                </ChildContent>
+            </SectionCard>
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private EmpresaVm? _empresa;
+    private string _planElegido = "";
+
+    private static readonly List<BreadcrumbItem> Migas =
+    [
+        new BreadcrumbItem("Plataforma MantIA", "/plataforma"),
+        new BreadcrumbItem("Empresas cliente", "/plataforma/empresas"),
+        new BreadcrumbItem("Ficha de la empresa", null, true)
+    ];
+
+    protected override void OnParametersSet()
+    {
+        _empresa = DatosDemo.Empresas.FirstOrDefault(e => e.Id == Id);
+        _planElegido = _empresa?.Plan ?? "";
+    }
+
+    private PlanVm? PlanContratado => DatosDemo.Planes.FirstOrDefault(p => p.Nombre == _empresa?.Plan);
+
+    private PlanVm? PlanNuevo => DatosDemo.Planes.FirstOrDefault(p => p.Nombre == _planElegido);
+
+    private List<EventoBitacoraVm> Actividad => _empresa is null
+        ? []
+        : DatosDemo.Bitacora
+            .Where(b => b.Empresa == _empresa.RazonSocial)
+            .OrderByDescending(b => b.Fecha)
+            .ToList();
+
+    private string DiferenciaMensual
+    {
+        get
+        {
+            var actual = PlanContratado?.Precio ?? 0;
+            var nuevo = PlanNuevo?.Precio ?? 0;
+            var diferencia = nuevo - actual;
+
+            if (diferencia == 0) return "Sin cambios en la facturación mensual";
+            return diferencia > 0
+                ? $"{Ui.Moneda(diferencia)} más por mes"
+                : $"{Ui.Moneda(Math.Abs(diferencia))} menos por mes";
+        }
+    }
+
+    private static int Uso(EmpresaVm empresa) => empresa.MaxMaquinasHabilitadas <= 0
+        ? 0
+        : (int)Math.Round(empresa.MaquinasRegistradas * 100d / empresa.MaxMaquinasHabilitadas);
+
+    private static Color ColorUso(int uso) => uso switch
+    {
+        >= 90 => Color.Error,
+        >= 80 => Color.Warning,
+        _ => Color.Primary
+    };
+
+    private static string Antiguedad(EmpresaVm empresa)
+    {
+        var dias = (int)(DateTime.Today - empresa.FechaAlta).TotalDays;
+        if (dias < 60) return $"{dias} días";
+
+        var meses = dias / 30;
+        if (meses < 24) return $"{meses} meses";
+
+        return $"{meses / 12} años y {meses % 12} meses";
+    }
+
+    private void OperarComoEmpresa()
+    {
+        if (_empresa is null) return;
+
+        Snackbar.Add($"El contexto de empresa cambió a {_empresa.RazonSocial} ({_empresa.TenantId}). El cambio queda registrado en la bitácora de auditoría.", Severity.Info);
+        Nav.NavigateTo("/dashboard");
+    }
+
+    private void AplicarPlan()
+    {
+        if (_empresa is null || PlanNuevo is null) return;
+
+        var anterior = _empresa.Plan;
+        if (PlanNuevo.Nombre == anterior)
+        {
+            Snackbar.Add("La empresa ya tiene contratado ese plan.", Severity.Info);
+            return;
+        }
+
+        _empresa.Plan = PlanNuevo.Nombre;
+        _empresa.MaxMaquinasHabilitadas = PlanNuevo.MaxMaquinas;
+        SincronizarPlanes();
+
+        Snackbar.Add($"{_empresa.RazonSocial} pasó del plan {anterior} al plan {PlanNuevo.Nombre}. El cupo quedó en {PlanNuevo.MaxMaquinas} máquinas.", Severity.Success);
+    }
+
+    private async Task Desactivar()
+    {
+        if (_empresa is null) return;
+
+        var parametros = new DialogParameters
+        {
+            { "Mensaje", $"¿Confirmás la desactivación de {_empresa.RazonSocial}?" },
+            { "Detalle", $"Se desactivan los {_empresa.UsuariosActivos} usuarios del tenant {_empresa.TenantId} en el proveedor de identidad, por lo que nadie de la empresa va a poder iniciar sesión. Los datos operativos se conservan durante el período de retención contractual." },
+            { "TextoConfirmar", "Desactivar empresa" },
+            { "ColorAccion", Color.Error },
+            { "Icono", Icons.Material.Filled.Block }
+        };
+
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialogo = await DialogService.ShowAsync<ConfirmDialog>("Desactivar empresa", parametros, opciones);
+        var resultado = await dialogo.Result;
+
+        if (resultado is null || resultado.Canceled) return;
+
+        _empresa.Estado = EstadoGenerico.Inactivo;
+        _empresa.OrdenesUltimoMes = 0;
+
+        Snackbar.Add($"{_empresa.RazonSocial} quedó desactivada. Se revocó el acceso de sus usuarios en el proveedor de identidad.", Severity.Success);
+    }
+
+    private void Reactivar()
+    {
+        if (_empresa is null) return;
+
+        _empresa.Estado = EstadoGenerico.Activo;
+        Snackbar.Add($"{_empresa.RazonSocial} volvió a estar activa. Sus usuarios recuperan el acceso con las credenciales vigentes.", Severity.Success);
+    }
+
+    private static void SincronizarPlanes()
+    {
+        foreach (var plan in DatosDemo.Planes)
+        {
+            plan.EmpresasActivas = DatosDemo.Empresas.Count(e => e.Plan == plan.Nombre);
+        }
+    }
+}

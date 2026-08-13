@@ -1,0 +1,284 @@
+@page "/recomendaciones"
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Recomendaciones de reposición · MantIA</PageTitle>
+
+<PageHeader Titulo="Motor de recomendaciones"
+            Bajada="Sugerencias de reposición de repuestos críticos generadas a partir del historial de fallas, del stock disponible y del catálogo técnico enriquecido. Cada sugerencia se acepta o se rechaza con un responsable y queda registrada."
+            Icono="@Icons.Material.Filled.Psychology"
+            Migas="@_migas">
+    <EtiquetaExtra>
+        <StatusChip Texto="CU-005-001" ChipColor="Color.Default" Variante="Variant.Outlined" />
+    </EtiquetaExtra>
+</PageHeader>
+
+<SectionCard Titulo="Cómo trabaja el motor"
+             Bajada="Dos mecanismos distintos, con evidencia visible en cada tarjeta">
+    <Acciones>
+        <div class="text-right d-none d-sm-block">
+            <div class="mantia-dato__label">Último análisis</div>
+            <div class="mantia-dato__valor">@Ui.FechaHora(_ultimoAnalisis)</div>
+        </div>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Refresh"
+                   Disabled="_analizando" OnClick="VolverAEjecutar">
+            Volver a ejecutar el análisis
+        </MudButton>
+    </Acciones>
+    <ChildContent>
+        <MudText Typo="Typo.body2">
+            El motor cruza cuatro fuentes: el historial de fallas y de órdenes de trabajo cerradas, el stock
+            disponible de cada repuesto, los umbrales mínimos configurados por la empresa y el catálogo técnico
+            enriquecido del modelo de cada máquina.
+        </MudText>
+        <MudText Typo="Typo.body2" Class="mt-2">
+            Sobre esa base trabajan dos mecanismos separados: las reglas de negocio disparan cuando un umbral
+            queda cruzado, y el modelo proyecta el consumo futuro sobre la frecuencia histórica de consumo y las
+            horas de operación acumuladas.
+        </MudText>
+
+        @if (_analizando)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Rounded="true" Class="mt-4" />
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                Recalculando umbrales, frecuencias de consumo y proyecciones de cobertura.
+            </MudText>
+        }
+
+        <MudGrid Spacing="3" Class="mt-1">
+            <MudItem xs="12" md="6">
+                <div class="mantia-reco__bloque">
+                    <div class="mantia-reco__bloque-titulo">Qué resuelve la regla de negocio</div>
+                    <MudText Typo="Typo.body2">
+                        Es determinística y auditable. Dispara cuando el stock actual queda por debajo o al filo
+                        del umbral mínimo, cuando hay una orden abierta que requiere el repuesto o cuando el
+                        plazo de reposición del proveedor supera la cobertura disponible. Siempre se puede
+                        explicar con una condición concreta y verificable.
+                    </MudText>
+                </div>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <div class="mantia-reco__bloque">
+                    <div class="mantia-reco__bloque-titulo">Qué aporta el modelo</div>
+                    <MudText Typo="Typo.body2">
+                        Proyecta consumo futuro donde la regla todavía no dispara. Estima la próxima intervención
+                        a partir de la frecuencia histórica de consumo, las horas de operación acumuladas y los
+                        intervalos del catálogo técnico. Cada sugerencia sale con un nivel de confianza y se
+                        recalibra con las aceptaciones y los rechazos del equipo.
+                    </MudText>
+                </div>
+            </MudItem>
+        </MudGrid>
+    </ChildContent>
+</SectionCard>
+
+<MudGrid Spacing="3" Class="mt-1">
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Recomendaciones activas"
+                    Valor="@Activas.ToString()"
+                    Detalle="Esperan que alguien las valide"
+                    Icono="@Icons.Material.Filled.PendingActions"
+                    Acento="Color.Primary" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Generadas por regla de negocio"
+                    Valor="@PorRegla.ToString()"
+                    Detalle="Umbral de stock mínimo cruzado"
+                    Icono="@Icons.Material.Filled.Rule"
+                    Acento="Color.Info" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Generadas por el modelo"
+                    Valor="@PorModelo.ToString()"
+                    Detalle="@($"Confianza promedio {ConfianzaPromedio:0}%")"
+                    Icono="@Icons.Material.Filled.Psychology"
+                    Acento="Color.Tertiary" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Capital en riesgo total"
+                    Valor="@Ui.Moneda(CapitalEnRiesgo)"
+                    Detalle="Impacto estimado de no reponer a tiempo"
+                    Icono="@Icons.Material.Filled.PriceCheck"
+                    Acento="Color.Secondary" />
+    </MudItem>
+</MudGrid>
+
+<MudTabs Elevation="0" Rounded="true" Class="mt-6"
+         ActivePanelIndex="_tab" ActivePanelIndexChanged="CambiarTab">
+    <MudTabPanel Text="@($"Activas ({ConteoActivas})")" Icon="@Icons.Material.Filled.PendingActions" />
+    <MudTabPanel Text="@($"Aceptadas ({ConteoAceptadas})")" Icon="@Icons.Material.Filled.Check" />
+    <MudTabPanel Text="@($"Rechazadas ({ConteoRechazadas})")" Icon="@Icons.Material.Filled.Close" />
+    <MudTabPanel Text="@($"Todas ({ConteoTotal})")" Icon="@Icons.Material.Filled.ListAlt" />
+</MudTabs>
+
+<FilterBar>
+    <MudSelect T="string" @bind-Value="_origen" Label="Origen" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@Todos">Todos los orígenes</MudSelectItem>
+        <MudSelectItem T="string" Value="@(nameof(OrigenRecomendacion.Regla))">Regla de negocio</MudSelectItem>
+        <MudSelectItem T="string" Value="@(nameof(OrigenRecomendacion.Modelo))">Modelo de IA</MudSelectItem>
+    </MudSelect>
+
+    <MudSelect T="string" @bind-Value="_prioridad" Label="Prioridad" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@Todos">Todas las prioridades</MudSelectItem>
+        @foreach (var prioridad in Enum.GetValues<Prioridad>())
+        {
+            <MudSelectItem T="string" Value="@prioridad.ToString()">@prioridad.ToString()</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="string" @bind-Value="_planta" Label="Planta" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@Todos">Todas las plantas</MudSelectItem>
+        @foreach (var planta in DatosDemo.Plantas)
+        {
+            <MudSelectItem T="string" Value="@planta.Nombre">@planta.Nombre</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSpacer />
+
+    <MudText Typo="Typo.body2" Class="mud-text-secondary">
+        @Filtradas.Count de @DatosDemo.Recomendaciones.Count recomendaciones
+    </MudText>
+</FilterBar>
+
+@if (Filtradas.Count == 0)
+{
+    <EmptyState Titulo="No hay recomendaciones con esos criterios"
+                Descripcion="Probá cambiando la solapa de estado o quitando algún filtro. También podés volver a ejecutar el análisis para recalcular las sugerencias sobre el stock actual."
+                Icono="@Icons.Material.Filled.Psychology">
+        <Accion>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Disabled="_analizando" OnClick="VolverAEjecutar">
+                Volver a ejecutar el análisis
+            </MudButton>
+        </Accion>
+    </EmptyState>
+}
+else
+{
+    <MudStack Spacing="4">
+        @foreach (var recomendacion in Filtradas)
+        {
+            <RecomendacionCard Recomendacion="@recomendacion"
+                               AlAceptar="Aceptar"
+                               AlRechazar="Rechazar" />
+        }
+    </MudStack>
+}
+
+@code {
+    private const string Todos = "Todos";
+
+    private int _tab;
+    private string _origen = Todos;
+    private string _prioridad = Todos;
+    private string _planta = Todos;
+    private bool _analizando;
+    private DateTime _ultimoAnalisis;
+
+    private readonly List<BreadcrumbItem> _migas =
+    [
+        new("Operación", href: null, disabled: true),
+        new("Recomendaciones", href: "/recomendaciones")
+    ];
+
+    protected override void OnInitialized()
+    {
+        _ultimoAnalisis = DatosDemo.Recomendaciones.Count == 0
+            ? DateTime.Now
+            : DatosDemo.Recomendaciones.Max(r => r.FechaGeneracion);
+    }
+
+    private int Activas => DatosDemo.Recomendaciones.Count(r => r.Estado == EstadoRecomendacion.Activa);
+
+    private int PorRegla => DatosDemo.Recomendaciones
+        .Count(r => r.Origen == OrigenRecomendacion.Regla && r.Estado == EstadoRecomendacion.Activa);
+
+    private int PorModelo => DatosDemo.Recomendaciones
+        .Count(r => r.Origen == OrigenRecomendacion.Modelo && r.Estado == EstadoRecomendacion.Activa);
+
+    private double ConfianzaPromedio
+    {
+        get
+        {
+            var delModelo = DatosDemo.Recomendaciones
+                .Where(r => r.Origen == OrigenRecomendacion.Modelo && r.Estado == EstadoRecomendacion.Activa)
+                .ToList();
+            return delModelo.Count == 0 ? 0 : delModelo.Average(r => r.Confianza);
+        }
+    }
+
+    private decimal CapitalEnRiesgo => DatosDemo.Recomendaciones
+        .Where(r => r.Estado == EstadoRecomendacion.Activa)
+        .Sum(r => r.ImpactoEstimado);
+
+    private List<RecomendacionVm> SinFiltroDeEstado => DatosDemo.Recomendaciones
+        .Where(r => _origen == Todos || r.Origen.ToString() == _origen)
+        .Where(r => _prioridad == Todos || r.Prioridad.ToString() == _prioridad)
+        .Where(r => _planta == Todos || r.Planta == _planta)
+        .ToList();
+
+    private List<RecomendacionVm> Filtradas => SinFiltroDeEstado
+        .Where(CoincideEstado)
+        .OrderByDescending(r => r.Prioridad)
+        .ThenByDescending(r => r.ImpactoEstimado)
+        .ToList();
+
+    private bool CoincideEstado(RecomendacionVm recomendacion) => _tab switch
+    {
+        0 => recomendacion.Estado == EstadoRecomendacion.Activa,
+        1 => recomendacion.Estado == EstadoRecomendacion.Aceptada,
+        2 => recomendacion.Estado == EstadoRecomendacion.Rechazada,
+        _ => true
+    };
+
+    private int ConteoActivas => SinFiltroDeEstado.Count(r => r.Estado == EstadoRecomendacion.Activa);
+
+    private int ConteoAceptadas => SinFiltroDeEstado.Count(r => r.Estado == EstadoRecomendacion.Aceptada);
+
+    private int ConteoRechazadas => SinFiltroDeEstado.Count(r => r.Estado == EstadoRecomendacion.Rechazada);
+
+    private int ConteoTotal => SinFiltroDeEstado.Count;
+
+    private void CambiarTab(int indice) => _tab = indice;
+
+    private async Task VolverAEjecutar()
+    {
+        _analizando = true;
+        StateHasChanged();
+
+        await Task.Delay(1400);
+
+        _analizando = false;
+        _ultimoAnalisis = DateTime.Now;
+
+        Snackbar.Add($"Análisis completado sobre {DatosDemo.Repuestos.Count} repuestos y {DatosDemo.Ordenes.Count} órdenes. Quedan {Activas} recomendaciones activas.",
+            Severity.Success);
+    }
+
+    private Task Aceptar(RecomendacionVm recomendacion) => Validar(recomendacion, false);
+
+    private Task Rechazar(RecomendacionVm recomendacion) => Validar(recomendacion, true);
+
+    private async Task Validar(RecomendacionVm recomendacion, bool rechazo)
+    {
+        var parametros = new DialogParameters<ValidarRecomendacionDialog>
+        {
+            { x => x.Recomendacion, recomendacion },
+            { x => x.ModoRechazo, rechazo }
+        };
+
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var titulo = rechazo ? "Rechazar la recomendación" : "Aceptar y reponer";
+
+        var dialogo = await DialogService.ShowAsync<ValidarRecomendacionDialog>(titulo, parametros, opciones);
+        await dialogo.Result;
+
+        StateHasChanged();
+    }
+}

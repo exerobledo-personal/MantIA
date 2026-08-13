@@ -1,0 +1,25 @@
+<div>
+    <div class="d-flex justify-space-between mb-1">
+        <span style="font-size:.78rem;font-weight:600">@Ui.Numero(Actual) / @Ui.Numero(Minimo) @Unidad</span>
+        <span style="font-size:.78rem;color:var(--mud-palette-text-secondary)">@Porcentaje%</span>
+    </div>
+    <div class="mantia-barra">
+        <div class="mantia-barra__relleno" style="@($"width:{Math.Min(Porcentaje, 100)}%;background:{ColorHex};")"></div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public decimal Actual { get; set; }
+    [Parameter] public decimal Minimo { get; set; }
+    [Parameter] public string Unidad { get; set; } = "";
+
+    private int Porcentaje => Minimo <= 0 ? 100 : (int)Math.Round(Actual / Minimo * 100);
+
+    private string ColorHex => Porcentaje switch
+    {
+        <= 50 => "#D14343",
+        <= 100 => "#DE9021",
+        <= 160 => "#1E9E62",
+        _ => "#2E90C4"
+    };
+}

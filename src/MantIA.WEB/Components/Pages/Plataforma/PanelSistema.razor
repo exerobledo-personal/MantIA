@@ -1,0 +1,470 @@
+@page "/plataforma/sistema"
+@inject ISnackbar Snackbar
+
+<PageTitle>Panel de sistema · MantIA</PageTitle>
+
+<PageHeader Titulo="Panel de sistema"
+            Bajada="Centro de control de la infraestructura de MantIA: estado de los servicios, bitácora de auditoría y bitácora de excepciones. Las bitácoras son de sólo lectura y no se pueden modificar ni eliminar desde este panel; lo único configurable acá es el nivel de log que registra la plataforma."
+            Icono="@Icons.Material.Filled.MonitorHeart"
+            Migas="@Migas">
+    <Acciones>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Hub" Href="/plataforma">
+            Panel de plataforma
+        </MudButton>
+    </Acciones>
+</PageHeader>
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Servicios operativos" Valor="@Operativos.ToString()"
+                    Unidad="@($"/ {DatosDemo.Servicios.Count}")"
+                    Detalle="@DetalleServicios"
+                    Icono="@Icons.Material.Filled.Dns"
+                    Acento="@(Operativos == DatosDemo.Servicios.Count ? Color.Success : Color.Warning)" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Disponibilidad promedio" Valor="@DisponibilidadPromedio.ToString("0.00")" Unidad="%"
+                    Detalle="Promedio simple de los componentes monitoreados"
+                    Icono="@Icons.Material.Filled.CheckCircle" Acento="Color.Success" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Errores en las últimas 24 horas" Valor="@ErroresRecientes.ToString()"
+                    Detalle="@($"{AdvertenciasRecientes} advertencias en el mismo período")"
+                    Icono="@Icons.Material.Filled.ErrorOutline"
+                    Acento="@(ErroresRecientes > 0 ? Color.Error : Color.Success)" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Latencia promedio" Valor="@Ui.Numero((decimal)LatenciaPromedio)" Unidad="ms"
+                    Detalle="@($"El componente más lento responde en {Ui.Numero((decimal)LatenciaMaxima)} ms")"
+                    Icono="@Icons.Material.Filled.Speed"
+                    Acento="@(LatenciaPromedio > 500 ? Color.Warning : Color.Info)" />
+    </MudItem>
+</MudGrid>
+
+<MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pt-4"
+         Class="mantia-superficie pa-2 mt-4">
+    <MudTabPanel Text="Salud de servicios" Icon="@Icons.Material.Filled.Dns">
+        @if (Comprometidos.Count == 0)
+        {
+            <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Class="mb-4"
+                      Icon="@Icons.Material.Filled.CheckCircle">
+                Todos los componentes de la plataforma responden dentro de los parámetros esperados.
+            </MudAlert>
+        }
+        else
+        {
+            <div class="mb-4">
+                @foreach (var servicio in Comprometidos)
+                {
+                    <MudAlert Severity="@(servicio.Estado == EstadoServicio.Caido ? Severity.Error : Severity.Warning)"
+                              Variant="Variant.Outlined" Class="mb-2"
+                              Icon="@Icons.Material.Filled.WarningAmber">
+                        <MudText Typo="Typo.body2">
+                            <b>@servicio.Nombre</b> (@servicio.Tecnologia) está en estado
+                            @TextoServicio(servicio.Estado), con una latencia de
+                            @Ui.Numero((decimal)servicio.LatenciaMs) ms y una disponibilidad de
+                            @servicio.Disponibilidad.ToString("0.00") %. Último incidente: @servicio.UltimoIncidente.
+                        </MudText>
+                    </MudAlert>
+                }
+            </div>
+        }
+
+        <SectionCard Titulo="Componentes monitoreados"
+                     Bajada="Estado, latencia y disponibilidad de cada servicio de la arquitectura"
+                     SinPadding="true">
+            <MudTable Items="@DatosDemo.Servicios" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                      Breakpoint="Breakpoint.Sm" Striped="false">
+                <HeaderContent>
+                    <MudTh>Servicio</MudTh>
+                    <MudTh>Tecnología</MudTh>
+                    <MudTh>Estado</MudTh>
+                    <MudTh Style="text-align:right">Latencia</MudTh>
+                    <MudTh Style="text-align:right">Disponibilidad</MudTh>
+                    <MudTh>Último incidente</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Servicio">
+                        <div class="d-flex align-center" style="gap:.5rem">
+                            <MudIcon Icon="@Icons.Material.Filled.FiberManualRecord"
+                                     Color="@Ui.ColorDe(context.Estado)" Size="Size.Small" />
+                            <strong>@context.Nombre</strong>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Tecnología">@context.Tecnologia</MudTd>
+                    <MudTd DataLabel="Estado">
+                        <StatusChip Texto="@TextoServicio(context.Estado)" ChipColor="@Ui.ColorDe(context.Estado)" />
+                    </MudTd>
+                    <MudTd DataLabel="Latencia" Style="text-align:right">
+                        <MudText Typo="Typo.body2" Color="@(context.LatenciaMs > 1000 ? Color.Warning : Color.Default)">
+                            @Ui.Numero((decimal)context.LatenciaMs) ms
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Disponibilidad" Style="text-align:right">
+                        <MudText Typo="Typo.body2" Color="@(context.Disponibilidad < 99 ? Color.Warning : Color.Default)">
+                            @context.Disponibilidad.ToString("0.00") %
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Último incidente">@context.UltimoIncidente</MudTd>
+                </RowTemplate>
+            </MudTable>
+        </SectionCard>
+    </MudTabPanel>
+
+    <MudTabPanel Text="@($"Bitácora de auditoría ({Auditoria.Count})")" Icon="@Icons.Material.Filled.History">
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-4"
+                  Icon="@Icons.Material.Filled.Lock">
+            La bitácora de auditoría registra toda operación de alta, baja, modificación y consulta sobre los datos
+            de las empresas cliente. Es de sólo lectura: no se puede modificar ni eliminar ninguna entrada desde
+            este panel.
+        </MudAlert>
+
+        <FilterBar>
+            <MudTextField @bind-Value="_busqueda" Immediate="true"
+                          Placeholder="Buscar por usuario, recurso, detalle u origen"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"
+                          Class="mantia-filtros__buscador" />
+
+            <MudSelect T="string" @bind-Value="_empresa" Label="Empresa" Dense="true"
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+                <MudSelectItem T="string" Value="@TodasLasEmpresas">@TodasLasEmpresas</MudSelectItem>
+                <MudSelectItem T="string" Value="@SoloPlataforma">@SoloPlataforma</MudSelectItem>
+                @foreach (var empresa in EmpresasConEventos)
+                {
+                    <MudSelectItem T="string" Value="@empresa">@empresa</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSelect T="string" @bind-Value="_accion" Label="Acción" Dense="true"
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+                <MudSelectItem T="string" Value="@TodasLasAcciones">@TodasLasAcciones</MudSelectItem>
+                @foreach (var accion in AccionesAuditadas)
+                {
+                    <MudSelectItem T="string" Value="@accion">@accion</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSelect T="string" @bind-Value="_periodo" Label="Período" Dense="true"
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+                @foreach (var periodo in Periodos)
+                {
+                    <MudSelectItem T="string" Value="@periodo">@periodo</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSpacer />
+
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                @Auditoria.Count de @TotalAuditoria eventos
+            </MudText>
+        </FilterBar>
+
+        @if (Auditoria.Count == 0)
+        {
+            <SectionCard>
+                <EmptyState Titulo="No hay eventos que coincidan con el filtro"
+                            Descripcion="Probá con otro texto de búsqueda o ampliá el alcance a todas las empresas, acciones y períodos."
+                            Icono="@Icons.Material.Filled.SearchOff">
+                    <Accion>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LimpiarFiltros">
+                            Limpiar filtros
+                        </MudButton>
+                    </Accion>
+                </EmptyState>
+            </SectionCard>
+        }
+        else
+        {
+            <SectionCard Titulo="Eventos de auditoría"
+                         Bajada="Ordenados del más reciente al más antiguo"
+                         SinPadding="true">
+                <MudTable Items="@Auditoria" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                          Breakpoint="Breakpoint.Sm" Striped="false">
+                    <HeaderContent>
+                        <MudTh>Fecha y hora</MudTh>
+                        <MudTh>Empresa</MudTh>
+                        <MudTh>Usuario</MudTh>
+                        <MudTh>Acción</MudTh>
+                        <MudTh>Recurso</MudTh>
+                        <MudTh>Detalle</MudTh>
+                        <MudTh>Origen</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Fecha y hora">
+                            <div class="mantia-celda-principal">
+                                <strong>@Ui.FechaHora(context.Fecha)</strong>
+                                <span>@Ui.Relativo(context.Fecha)</span>
+                            </div>
+                        </MudTd>
+                        <MudTd DataLabel="Empresa">@NombreEmpresa(context)</MudTd>
+                        <MudTd DataLabel="Usuario">@context.Usuario</MudTd>
+                        <MudTd DataLabel="Acción">
+                            <StatusChip Texto="@context.Accion" ChipColor="@Ui.ColorDe(context.Nivel)"
+                                        Variante="Variant.Outlined" />
+                        </MudTd>
+                        <MudTd DataLabel="Recurso">@context.Recurso</MudTd>
+                        <MudTd DataLabel="Detalle">@context.Detalle</MudTd>
+                        <MudTd DataLabel="Origen">@context.Origen</MudTd>
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager RowsPerPageString="Filas por página"
+                                   InfoFormat="{first_item}-{last_item} de {all_items}"
+                                   AllItemsText="Todas" />
+                    </PagerContent>
+                </MudTable>
+            </SectionCard>
+        }
+    </MudTabPanel>
+
+    <MudTabPanel Text="@($"Bitácora de excepciones ({Excepciones.Count})")" Icon="@Icons.Material.Filled.BugReport">
+        <SectionCard Titulo="Nivel de log de la plataforma"
+                     Bajada="Determina qué eventos se persisten en la bitácora de excepciones">
+            <div class="d-flex flex-wrap align-end" style="gap:1rem">
+                <MudSelect T="NivelLog" @bind-Value="_nivelLog" Label="Nivel de log"
+                           Variant="Variant.Outlined" Margin="Margin.Dense"
+                           AnchorOrigin="Origin.BottomCenter" Style="min-width:220px"
+                           HelperText="@HelperNivel">
+                    @foreach (var nivel in Enum.GetValues<NivelLog>())
+                    {
+                        <MudSelectItem T="NivelLog" Value="@nivel">@nivel.ToString()</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Save" OnClick="AplicarNivelLog">
+                    Aplicar nivel de log
+                </MudButton>
+
+                <MudSpacer />
+
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                    Nivel vigente: <b>@_nivelAplicado.ToString()</b>
+                </MudText>
+            </div>
+
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4"
+                      Icon="@Icons.Material.Filled.Settings">
+                El ajuste es global a la plataforma: alcanza a todos los tenants y a todos los servicios, y se
+                persiste en la configuración del sistema. Los eventos ya registrados no se reprocesan ni se
+                eliminan al cambiar el nivel.
+            </MudAlert>
+        </SectionCard>
+
+        <SectionCard Titulo="Excepciones y advertencias registradas" Class="mt-4"
+                     Bajada="Errores de integración, advertencias de los servicios y accesos denegados. La bitácora es de sólo lectura."
+                     SinPadding="true">
+            <ChildContent>
+                @if (Excepciones.Count == 0)
+                {
+                    <EmptyState Titulo="Sin excepciones registradas"
+                                Descripcion="No hay errores ni advertencias en la bitácora de la plataforma para el nivel de log vigente."
+                                Icono="@Icons.Material.Filled.CheckCircle" />
+                }
+                else
+                {
+                    <MudTable Items="@Excepciones" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                              Breakpoint="Breakpoint.Sm" Striped="false">
+                        <HeaderContent>
+                            <MudTh>Fecha y hora</MudTh>
+                            <MudTh>Nivel</MudTh>
+                            <MudTh>Componente</MudTh>
+                            <MudTh>Recurso</MudTh>
+                            <MudTh>Ámbito</MudTh>
+                            <MudTh>Detalle técnico</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Fecha y hora">
+                                <div class="mantia-celda-principal">
+                                    <strong>@Ui.FechaHora(context.Fecha)</strong>
+                                    <span>@Ui.Relativo(context.Fecha)</span>
+                                </div>
+                            </MudTd>
+                            <MudTd DataLabel="Nivel">
+                                <StatusChip Texto="@context.Nivel.ToString()" ChipColor="@Ui.ColorDe(context.Nivel)"
+                                            Icono="@(context.Nivel == NivelLog.Error ? Icons.Material.Filled.ErrorOutline : Icons.Material.Filled.WarningAmber)" />
+                            </MudTd>
+                            <MudTd DataLabel="Componente">
+                                <div class="mantia-celda-principal">
+                                    <strong>@context.Origen</strong>
+                                    <span>@context.Accion</span>
+                                </div>
+                            </MudTd>
+                            <MudTd DataLabel="Recurso">@context.Recurso</MudTd>
+                            <MudTd DataLabel="Ámbito">@NombreEmpresa(context)</MudTd>
+                            <MudTd DataLabel="Detalle técnico">
+                                <div class="mantia-celda-principal">
+                                    <strong>@context.Detalle</strong>
+                                    <span>Registrado por @context.Usuario</span>
+                                </div>
+                            </MudTd>
+                        </RowTemplate>
+                        <PagerContent>
+                            <MudTablePager RowsPerPageString="Filas por página"
+                                   InfoFormat="{first_item}-{last_item} de {all_items}"
+                                   AllItemsText="Todas" />
+                        </PagerContent>
+                    </MudTable>
+                }
+            </ChildContent>
+        </SectionCard>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private const string TodasLasEmpresas = "Todas las empresas";
+    private const string SoloPlataforma = "Plataforma MantIA";
+    private const string TodasLasAcciones = "Todas las acciones";
+    private const string Ultimas24 = "Últimas 24 horas";
+    private const string Ultimos7 = "Últimos 7 días";
+    private const string Ultimos30 = "Últimos 30 días";
+    private const string TodoElPeriodo = "Todo el período";
+
+    private string _busqueda = "";
+    private string _empresa = TodasLasEmpresas;
+    private string _accion = TodasLasAcciones;
+    private string _periodo = TodoElPeriodo;
+
+    private NivelLog _nivelLog = NivelLog.Warning;
+    private NivelLog _nivelAplicado = NivelLog.Warning;
+
+    private static readonly List<BreadcrumbItem> Migas =
+    [
+        new BreadcrumbItem("Plataforma MantIA", "/plataforma"),
+        new BreadcrumbItem("Panel de sistema", "/plataforma/sistema")
+    ];
+
+    private static readonly string[] Periodos = [Ultimas24, Ultimos7, Ultimos30, TodoElPeriodo];
+
+    private static int Operativos => DatosDemo.Servicios.Count(s => s.Estado == EstadoServicio.Operativo);
+
+    private static List<ServicioVm> Comprometidos => DatosDemo.Servicios
+        .Where(s => s.Estado != EstadoServicio.Operativo)
+        .OrderByDescending(s => s.Estado)
+        .ToList();
+
+    private static string DetalleServicios => Comprometidos.Count == 0
+        ? "Toda la infraestructura responde con normalidad"
+        : $"Con incidencia: {string.Join(", ", Comprometidos.Select(s => s.Nombre))}";
+
+    private static double DisponibilidadPromedio => DatosDemo.Servicios.Count == 0
+        ? 0
+        : DatosDemo.Servicios.Average(s => s.Disponibilidad);
+
+    private static double LatenciaPromedio => DatosDemo.Servicios.Count == 0
+        ? 0
+        : Math.Round(DatosDemo.Servicios.Average(s => s.LatenciaMs));
+
+    private static double LatenciaMaxima => DatosDemo.Servicios.Count == 0
+        ? 0
+        : DatosDemo.Servicios.Max(s => s.LatenciaMs);
+
+    private static int ErroresRecientes => DatosDemo.Bitacora
+        .Count(e => e.Nivel == NivelLog.Error && e.Fecha >= DateTime.Now.AddHours(-24));
+
+    private static int AdvertenciasRecientes => DatosDemo.Bitacora
+        .Count(e => e.Nivel == NivelLog.Warning && e.Fecha >= DateTime.Now.AddHours(-24));
+
+    private static List<EventoBitacoraVm> TodosLosDeAuditoria => DatosDemo.Bitacora
+        .Where(e => e.Accion != "Excepción")
+        .ToList();
+
+    private static int TotalAuditoria => TodosLosDeAuditoria.Count;
+
+    private static List<string> EmpresasConEventos => DatosDemo.Bitacora
+        .Select(e => e.Empresa)
+        .Where(e => !string.IsNullOrWhiteSpace(e) && e != "—")
+        .Distinct()
+        .OrderBy(e => e)
+        .ToList();
+
+    private static List<string> AccionesAuditadas => TodosLosDeAuditoria
+        .Select(e => e.Accion)
+        .Distinct()
+        .OrderBy(a => a)
+        .ToList();
+
+    private List<EventoBitacoraVm> Auditoria => TodosLosDeAuditoria
+        .Where(CoincideEmpresa)
+        .Where(e => _accion == TodasLasAcciones || e.Accion == _accion)
+        .Where(CoincidePeriodo)
+        .Where(Coincide)
+        .OrderByDescending(e => e.Fecha)
+        .ToList();
+
+    private List<EventoBitacoraVm> Excepciones => DatosDemo.Bitacora
+        .Where(e => e.Accion == "Excepción" || e.Nivel is NivelLog.Warning or NivelLog.Error)
+        .OrderByDescending(e => e.Fecha)
+        .ToList();
+
+    private bool CoincideEmpresa(EventoBitacoraVm evento)
+    {
+        if (_empresa == TodasLasEmpresas) return true;
+        if (_empresa == SoloPlataforma) return EsDePlataforma(evento);
+        return evento.Empresa == _empresa;
+    }
+
+    private bool CoincidePeriodo(EventoBitacoraVm evento) => _periodo switch
+    {
+        Ultimas24 => evento.Fecha >= DateTime.Now.AddHours(-24),
+        Ultimos7 => evento.Fecha >= DateTime.Now.AddDays(-7),
+        Ultimos30 => evento.Fecha >= DateTime.Now.AddDays(-30),
+        _ => true
+    };
+
+    private bool Coincide(EventoBitacoraVm evento)
+    {
+        if (string.IsNullOrWhiteSpace(_busqueda)) return true;
+
+        var texto = _busqueda.Trim();
+        return evento.Usuario.Contains(texto, StringComparison.OrdinalIgnoreCase)
+               || evento.Recurso.Contains(texto, StringComparison.OrdinalIgnoreCase)
+               || evento.Detalle.Contains(texto, StringComparison.OrdinalIgnoreCase)
+               || evento.Origen.Contains(texto, StringComparison.OrdinalIgnoreCase)
+               || evento.Accion.Contains(texto, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string HelperNivel => _nivelLog switch
+    {
+        NivelLog.Debug => "Registra todo, incluida la traza de consultas. Sólo para diagnóstico puntual.",
+        NivelLog.Info => "Registra la operación normal además de advertencias y errores.",
+        NivelLog.Warning => "Registra advertencias y errores. Es el nivel recomendado en producción.",
+        _ => "Registra únicamente errores. Reduce el volumen pero oculta las advertencias tempranas."
+    };
+
+    private static bool EsDePlataforma(EventoBitacoraVm evento) =>
+        string.IsNullOrWhiteSpace(evento.Empresa) || evento.Empresa == "—";
+
+    private static string NombreEmpresa(EventoBitacoraVm evento) =>
+        EsDePlataforma(evento) ? SoloPlataforma : evento.Empresa;
+
+    private static string TextoServicio(EstadoServicio estado) => estado switch
+    {
+        EstadoServicio.Operativo => "Operativo",
+        EstadoServicio.Degradado => "Degradado",
+        _ => "Caído"
+    };
+
+    private void LimpiarFiltros()
+    {
+        _busqueda = "";
+        _empresa = TodasLasEmpresas;
+        _accion = TodasLasAcciones;
+        _periodo = TodoElPeriodo;
+    }
+
+    private void AplicarNivelLog()
+    {
+        if (_nivelLog == _nivelAplicado)
+        {
+            Snackbar.Add($"El nivel de log ya estaba en {_nivelAplicado}.", Severity.Info);
+            return;
+        }
+
+        var anterior = _nivelAplicado;
+        _nivelAplicado = _nivelLog;
+
+        Snackbar.Add($"El nivel de log pasó de {anterior} a {_nivelAplicado}. El ajuste es global a la plataforma y quedó persistido en la configuración del sistema.", Severity.Success);
+    }
+}

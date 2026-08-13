@@ -1,0 +1,250 @@
+@page "/alertas"
+@inject NavigationManager Nav
+
+<PageTitle>Alertas de stock · MantIA</PageTitle>
+
+<PageHeader Titulo="Alertas de stock"
+            Bajada="Repuestos que quedaron en o por debajo de su umbral mínimo. Cada alerta se genera y se resuelve sola con el movimiento de stock o con el ajuste del umbral, y es la entrada directa del motor de recomendaciones."
+            Icono="@Icons.Material.Filled.WarningAmber"
+            Migas="@Migas">
+    <Acciones>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Inventory2" Href="/repuestos">
+            Ir al inventario
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Psychology" Href="/recomendaciones">
+            Ver recomendaciones
+        </MudButton>
+    </Acciones>
+</PageHeader>
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" sm="6" lg="3">
+        <MetricCard Etiqueta="Alertas activas" Valor="@Filtradas.Count.ToString()"
+                    Detalle="@($"Sobre {Todas.Count} alertas generadas en total")"
+                    Icono="@Icons.Material.Filled.NotificationsActive"
+                    Acento="@(Filtradas.Count == 0 ? Color.Success : Color.Warning)" />
+    </MudItem>
+    <MudItem xs="12" sm="6" lg="3">
+        <MetricCard Etiqueta="Sobre repuestos críticos"
+                    Valor="@Filtradas.Count(a => a.Criticidad == Criticidad.Critica).ToString()"
+                    Detalle="Detienen la línea si el equipo falla"
+                    Icono="@Icons.Material.Filled.PriorityHigh"
+                    Acento="@(Filtradas.Any(a => a.Criticidad == Criticidad.Critica) ? Color.Error : Color.Success)" />
+    </MudItem>
+    <MudItem xs="12" sm="6" lg="3">
+        <MetricCard Etiqueta="Con menos de 30 días de cobertura"
+                    Valor="@Filtradas.Count(a => a.DiasCobertura < 30).ToString()"
+                    Detalle="Según el consumo de los últimos seis meses"
+                    Icono="@Icons.Material.Filled.HourglassBottom" Acento="Color.Info" />
+    </MudItem>
+    <MudItem xs="12" sm="6" lg="3">
+        <MetricCard Etiqueta="Capital necesario para regularizar" Valor="@Ui.Moneda(CapitalNecesario)"
+                    Detalle="Costo de reponer todo hasta el umbral mínimo"
+                    Icono="@Icons.Material.Filled.PriceCheck" Acento="Color.Secondary" />
+    </MudItem>
+</MudGrid>
+
+<div class="mt-4">
+    <FilterBar>
+        <MudSelect T="string" @bind-Value="Planta" Label="Planta"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+            <MudSelectItem T="string" Value="@Sin">Todas las plantas</MudSelectItem>
+            @foreach (var planta in DatosDemo.Plantas)
+            {
+                <MudSelectItem T="string" Value="@planta.Nombre">@planta.Nombre</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSelect T="string" @bind-Value="_maquina" Label="Máquina"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+            <MudSelectItem T="string" Value="@Sin">Todas las máquinas</MudSelectItem>
+            @foreach (var maquina in MaquinasDisponibles)
+            {
+                <MudSelectItem T="string" Value="@Etiqueta(maquina)">@Etiqueta(maquina)</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSelect T="string" @bind-Value="_criticidad" Label="Criticidad"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+            <MudSelectItem T="string" Value="@Sin">Todas las criticidades</MudSelectItem>
+            @foreach (var nivel in Niveles)
+            {
+                <MudSelectItem T="string" Value="@Ui.TextoDe(nivel)">@Ui.TextoDe(nivel)</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSpacer />
+
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            @Filtradas.Count de @Todas.Count alertas activas
+        </MudText>
+    </FilterBar>
+</div>
+
+<div class="mt-4">
+    @if (Filtradas.Count == 0)
+    {
+        <SectionCard>
+            <EmptyState Titulo="@(Todas.Count == 0 ? "Todo el stock crítico está cubierto" : "No hay alertas para este filtro")"
+                        Descripcion="@(Todas.Count == 0
+                                        ? "Ningún repuesto activo quedó por debajo de su umbral mínimo. El parque está cubierto y no hay reposiciones urgentes pendientes."
+                                        : "Probá ampliar el alcance quitando el filtro de planta, de máquina o de criticidad.")"
+                        Icono="@Icons.Material.Filled.CheckCircle">
+                <Accion>
+                    @if (Todas.Count == 0)
+                    {
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Inventory2" Href="/repuestos">
+                            Revisar el inventario
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.FilterAltOff" OnClick="LimpiarFiltros">
+                            Limpiar filtros
+                        </MudButton>
+                    }
+                </Accion>
+            </EmptyState>
+        </SectionCard>
+    }
+    else
+    {
+        <MudExpansionPanels MultiExpansion="true" Elevation="0" Outlined="false" Class="mantia-superficie">
+            @foreach (var nivel in NivelesPresentes)
+            {
+                var alertas = Filtradas.Where(a => a.Criticidad == nivel).ToList();
+                <MudExpansionPanel Text="@TituloPanel(nivel, alertas.Count)"
+                                   Icon="@Icons.Material.Filled.ExpandMore"
+                                   @bind-Expanded="_abiertos[nivel]">
+                    <MudTable Items="@alertas" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                              Breakpoint="Breakpoint.Sm" Striped="false">
+                        <HeaderContent>
+                            <MudTh>Repuesto</MudTh>
+                            <MudTh>Máquina y planta</MudTh>
+                            <MudTh>Cobertura de stock</MudTh>
+                            <MudTh Style="text-align:right">Cobertura restante</MudTh>
+                            <MudTh Style="text-align:right">Acciones</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Repuesto">
+                                <div class="mantia-celda-principal">
+                                    <strong>@context.Repuesto</strong>
+                                    <span>Parte @context.NumeroParte · alerta generada @Ui.Relativo(context.FechaGeneracion)</span>
+                                </div>
+                            </MudTd>
+                            <MudTd DataLabel="Máquina y planta">
+                                <div class="mantia-celda-principal">
+                                    <strong>@context.Maquina</strong>
+                                    <span>@context.Planta</span>
+                                </div>
+                            </MudTd>
+                            <MudTd DataLabel="Cobertura de stock" Style="min-width:170px">
+                                <CoverageBar Actual="context.StockActual" Minimo="context.StockMinimo" />
+                            </MudTd>
+                            <MudTd DataLabel="Cobertura restante" Style="text-align:right">
+                                @if (context.DiasCobertura >= 999)
+                                {
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Sin consumo registrado</MudText>
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.body2" Color="@(context.DiasCobertura < 30 ? Color.Error : Color.Default)">
+                                        <b>@context.DiasCobertura</b> días
+                                    </MudText>
+                                }
+                            </MudTd>
+                            <MudTd DataLabel="Acciones" Style="text-align:right">
+                                <div class="d-flex justify-end flex-wrap" style="gap:.25rem">
+                                    <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.Tune"
+                                               Href="@($"/repuestos/{context.RepuestoId}")">
+                                        Ajustar umbral
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Tertiary"
+                                               StartIcon="@Icons.Material.Filled.Psychology"
+                                               Href="/recomendaciones">
+                                        Ver recomendación
+                                    </MudButton>
+                                </div>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudExpansionPanel>
+            }
+        </MudExpansionPanels>
+    }
+</div>
+
+@code {
+    private const string Sin = "Todas";
+
+    private string _planta = Sin;
+    private string _maquina = Sin;
+    private string _criticidad = Sin;
+
+    private readonly Dictionary<Criticidad, bool> _abiertos = new()
+    {
+        [Criticidad.Critica] = true,
+        [Criticidad.Alta] = false,
+        [Criticidad.Media] = false,
+        [Criticidad.Baja] = false
+    };
+
+    private static readonly Criticidad[] Niveles =
+        [Criticidad.Critica, Criticidad.Alta, Criticidad.Media, Criticidad.Baja];
+
+    private static readonly List<BreadcrumbItem> Migas =
+    [
+        new BreadcrumbItem("Panel principal", "/dashboard"),
+        new BreadcrumbItem("Alertas de stock", null, true)
+    ];
+
+    private static string Etiqueta(MaquinaVm maquina) => $"{maquina.Codigo} · {maquina.Nombre}";
+
+    private string Planta
+    {
+        get => _planta;
+        set
+        {
+            if (_planta == value) return;
+            _planta = value;
+            _maquina = Sin;
+        }
+    }
+
+    private List<AlertaStockVm> Todas => DatosDemo.Alertas();
+
+    private List<MaquinaVm> MaquinasDisponibles => _planta == Sin
+        ? DatosDemo.Maquinas
+        : DatosDemo.Maquinas.Where(m => m.Planta == _planta).ToList();
+
+    private List<AlertaStockVm> Filtradas => Todas
+        .Where(a => _planta == Sin || a.Planta == _planta)
+        .Where(a => _maquina == Sin || a.Maquina == _maquina)
+        .Where(a => _criticidad == Sin || Ui.TextoDe(a.Criticidad) == _criticidad)
+        .ToList();
+
+    private List<Criticidad> NivelesPresentes => Niveles
+        .Where(nivel => Filtradas.Any(a => a.Criticidad == nivel))
+        .ToList();
+
+    private decimal CapitalNecesario => Filtradas
+        .Sum(a => (a.StockMinimo - a.StockActual) * CostoUnitarioDe(a.RepuestoId));
+
+    private static decimal CostoUnitarioDe(Guid repuestoId) =>
+        DatosDemo.Repuestos.FirstOrDefault(r => r.Id == repuestoId)?.CostoUnitario ?? 0;
+
+    private static string TituloPanel(Criticidad nivel, int cantidad) =>
+        $"Criticidad {Ui.TextoDe(nivel).ToLowerInvariant()} · {cantidad} {(cantidad == 1 ? "alerta" : "alertas")}";
+
+    private void LimpiarFiltros()
+    {
+        _planta = Sin;
+        _maquina = Sin;
+        _criticidad = Sin;
+    }
+}

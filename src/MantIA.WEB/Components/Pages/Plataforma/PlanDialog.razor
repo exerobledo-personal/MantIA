@@ -1,0 +1,122 @@
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center" style="gap:.5rem">
+            <MudIcon Icon="@Icons.Material.Filled.Sell" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Editar el plan @Plan.Nombre</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+            Los cambios se aplican al catálogo comercial de la plataforma. Las empresas que ya tienen el plan
+            contratado conservan el cupo de máquinas habilitado en su contrato hasta que se les reasigne el plan
+            desde su ficha.
+        </MudText>
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_nombre" Label="Nombre del plan"
+                              Variant="Variant.Outlined" Immediate="true"
+                              Required="true" RequiredError="El plan necesita un nombre comercial" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudNumericField T="decimal" @bind-Value="_precio" Label="Precio mensual"
+                                 Variant="Variant.Outlined" Min="0" Step="10000" Immediate="true"
+                                 Adornment="Adornment.Start" AdornmentText="$"
+                                 HelperText="Importe que se factura por mes a cada empresa cliente" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudNumericField T="int" @bind-Value="_maxMaquinas" Label="Máximo de máquinas"
+                                 Variant="Variant.Outlined" Min="1" Max="500" Step="5" Immediate="true"
+                                 HelperText="Cupo de activos que se habilita por defecto al contratar el plan" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField T="string" Value="@EmpresasConElPlan.ToString()" Label="Empresas con el plan contratado"
+                              Variant="Variant.Outlined" ReadOnly="true"
+                              HelperText="El cambio de precio impacta en su próxima facturación" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_descripcion" Label="Descripción comercial"
+                              Variant="Variant.Outlined" Lines="3" Immediate="true"
+                              Required="true" RequiredError="Describí qué incluye el plan" />
+            </MudItem>
+        </MudGrid>
+
+        @if (_precio != Plan.Precio && EmpresasConElPlan > 0)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mt-4"
+                      Icon="@Icons.Material.Filled.PriceCheck">
+                El ingreso mensual recurrente aportado por este plan pasa de @Ui.Moneda(IngresoActual)
+                a @Ui.Moneda(IngresoNuevo) sobre las @EmpresasActivasConElPlan empresas activas que lo tienen contratado.
+            </MudAlert>
+        }
+
+        @if (_maxMaquinas < Plan.MaxMaquinas)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4">
+                El cupo baja de @Plan.MaxMaquinas a @_maxMaquinas máquinas. Las empresas que ya superen ese número
+                no pierden activos: la restricción se aplica recién cuando se les reasigna el plan.
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton OnClick="Confirmar" Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Save"
+                   Disabled="@(string.IsNullOrWhiteSpace(_nombre) || string.IsNullOrWhiteSpace(_descripcion))">
+            Guardar el plan
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialogo { get; set; } = null!;
+
+    [Parameter, EditorRequired] public PlanVm Plan { get; set; } = null!;
+
+    private string _nombre = "";
+    private string _descripcion = "";
+    private decimal _precio;
+    private int _maxMaquinas;
+
+    protected override void OnInitialized()
+    {
+        _nombre = Plan.Nombre;
+        _descripcion = Plan.Descripcion;
+        _precio = Plan.Precio;
+        _maxMaquinas = Plan.MaxMaquinas;
+    }
+
+    private int EmpresasConElPlan => DatosDemo.Empresas.Count(e => e.Plan == Plan.Nombre);
+
+    private int EmpresasActivasConElPlan =>
+        DatosDemo.Empresas.Count(e => e.Plan == Plan.Nombre && e.Estado == EstadoGenerico.Activo);
+
+    private decimal IngresoActual => Plan.Precio * EmpresasActivasConElPlan;
+
+    private decimal IngresoNuevo => _precio * EmpresasActivasConElPlan;
+
+    private void Cancelar() => Dialogo.Cancel();
+
+    private void Confirmar()
+    {
+        var nombreAnterior = Plan.Nombre;
+        var nombreNuevo = _nombre.Trim();
+
+        Plan.Nombre = nombreNuevo;
+        Plan.Descripcion = _descripcion.Trim();
+        Plan.Precio = _precio;
+        Plan.MaxMaquinas = _maxMaquinas;
+
+        if (nombreNuevo != nombreAnterior)
+        {
+            foreach (var empresa in DatosDemo.Empresas.Where(e => e.Plan == nombreAnterior).ToList())
+            {
+                empresa.Plan = nombreNuevo;
+            }
+        }
+
+        Plan.EmpresasActivas = DatosDemo.Empresas.Count(e => e.Plan == nombreNuevo);
+
+        Dialogo.Close(DialogResult.Ok(true));
+    }
+}

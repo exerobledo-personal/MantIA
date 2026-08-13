@@ -1,0 +1,319 @@
+@page "/empresa"
+
+<PageTitle>Panel de empresa · MantIA</PageTitle>
+
+<PageHeader Titulo="@DatosDemo.EmpresaActual.RazonSocial"
+            Bajada="@($"Administración de la cuenta de {DatosDemo.EmpresaActual.RazonSocial}: usuarios habilitados, niveles de permiso, plantas registradas y consumo del plan contratado. La operación diaria de mantenimiento se sigue desde el panel operativo.")"
+            Icono="@Icons.Material.Filled.Business"
+            Migas="@Migas">
+    <EtiquetaExtra>
+        <StatusChip Texto="@($"Plan {DatosDemo.EmpresaActual.Plan}")"
+                    ChipColor="Color.Primary" Icono="@Icons.Material.Filled.Sell" />
+        <StatusChip Texto="@DatosDemo.EmpresaActual.Dominio" ChipColor="Color.Default"
+                    Variante="Variant.Outlined" Icono="@Icons.Material.Filled.Language" />
+    </EtiquetaExtra>
+    <Acciones>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.AdminPanelSettings" Href="/empresa/permisos">
+            Matriz de permisos
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.PersonAdd" Href="/empresa/usuarios/nuevo">
+            Nuevo usuario
+        </MudButton>
+    </Acciones>
+</PageHeader>
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Usuarios activos" Valor="@UsuariosActivos.ToString()"
+                    Detalle="@($"{UsuariosInactivos} usuarios desactivados conservan su historial")"
+                    Icono="@Icons.Material.Filled.Group" Acento="Color.Primary" Href="/empresa/usuarios" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Plantas activas" Valor="@PlantasActivas.ToString()"
+                    Detalle="@($"{DatosDemo.Plantas.Count} plantas registradas en total")"
+                    Icono="@Icons.Material.Filled.Factory" Acento="Color.Info" Href="/empresa/plantas" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Máquinas registradas" Valor="@MaquinasRegistradas.ToString()"
+                    Unidad="@($"/ {DatosDemo.EmpresaActual.MaxMaquinasHabilitadas}")"
+                    Detalle="@($"Máximo habilitado por el plan {DatosDemo.EmpresaActual.Plan}")"
+                    Icono="@Icons.Material.Filled.PrecisionManufacturing" Acento="Color.Tertiary" Href="/maquinas" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Consumo del plan" Valor="@ConsumoPlan.ToString()" Unidad="%"
+                    Detalle="@($"Quedan {CupoDisponible} altas de máquina disponibles")"
+                    Icono="@Icons.Material.Filled.DataUsage"
+                    Acento="@(ConsumoPlan >= 80 ? Color.Warning : Color.Success)">
+            <ContenidoExtra>
+                <MudProgressLinear Value="@ConsumoPlan" Rounded="true" Size="Size.Small"
+                                   Color="@(ConsumoPlan >= 80 ? Color.Warning : Color.Success)" />
+            </ContenidoExtra>
+        </MetricCard>
+    </MudItem>
+</MudGrid>
+
+<MudGrid Spacing="3" Class="mt-1">
+    <MudItem xs="12" lg="8">
+        <SectionCard Titulo="Instalaciones de la empresa"
+                     Bajada="Cada pin resume el estado de una planta. El color depende de las alertas de stock activas en sus máquinas.">
+            <Acciones>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/empresa/plantas"
+                           EndIcon="@Icons.Material.Filled.ArrowForward" Size="Size.Small">
+                    Gestionar plantas
+                </MudButton>
+            </Acciones>
+            <ChildContent>
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" md="7">
+                        <MapaPlantas Plantas="@DatosDemo.Plantas" @bind-PlantaSeleccionada="_plantaSeleccionada" />
+                    </MudItem>
+                    <MudItem xs="12" md="5">
+                        @if (_plantaSeleccionada is null)
+                        {
+                            <EmptyState Titulo="Elegí una planta en el mapa"
+                                        Descripcion="Al seleccionar un pin se muestra el resumen de esa instalación: alertas activas, máquinas registradas y órdenes de trabajo abiertas."
+                                        Icono="@Icons.Material.Filled.Map" />
+                        }
+                        else
+                        {
+                            <div class="d-flex flex-wrap align-center mb-2" style="gap:.5rem">
+                                <MudText Typo="Typo.h6">@_plantaSeleccionada.Nombre</MudText>
+                                <StatusChip Texto="@_plantaSeleccionada.Estado.ToString()"
+                                            ChipColor="@Ui.ColorDe(_plantaSeleccionada.Estado)" />
+                            </div>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+                                @_plantaSeleccionada.Direccion · @_plantaSeleccionada.Localidad
+                            </MudText>
+
+                            <div class="mantia-lista-datos">
+                                <DataPoint Etiqueta="Alertas de stock activas"
+                                           Valor="@_plantaSeleccionada.AlertasActivas.ToString()" />
+                                <DataPoint Etiqueta="Máquinas registradas"
+                                           Valor="@_plantaSeleccionada.Maquinas.ToString()" />
+                                <DataPoint Etiqueta="Órdenes de trabajo abiertas"
+                                           Valor="@_plantaSeleccionada.OrdenesAbiertas.ToString()" />
+                                <DataPoint Etiqueta="Alta de la planta"
+                                           Valor="@Ui.Fecha(_plantaSeleccionada.FechaAlta)" />
+                                <DataPoint Etiqueta="Usuarios asignados"
+                                           Valor="@UsuariosDe(_plantaSeleccionada).ToString()" />
+                            </div>
+
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-4"
+                                       StartIcon="@Icons.Material.Filled.Factory" Href="/empresa/plantas">
+                                Ver todas las plantas
+                            </MudButton>
+                        }
+                    </MudItem>
+                </MudGrid>
+            </ChildContent>
+        </SectionCard>
+    </MudItem>
+
+    <MudItem xs="12" lg="4">
+        <SectionCard Titulo="Usuarios por rol"
+                     Bajada="@($"Distribución de los {UsuariosActivos} usuarios activos de la cuenta")">
+            @if (DistribucionRoles.Count == 0)
+            {
+                <EmptyState Titulo="Todavía no hay usuarios activos"
+                            Descripcion="Cuando se den de alta usuarios, acá se ve cómo se reparten entre los roles habilitados."
+                            Icono="@Icons.Material.Filled.Group" />
+            }
+            else
+            {
+                <div class="d-flex justify-center">
+                    <MudChart T="double" ChartType="ChartType.Donut"
+                              ChartSeries="@(new List<ChartSeries<double>> { new() { Name = "Usuarios", Data = DatosRoles } })"
+                              ChartLabels="@EtiquetasRoles"
+                              ChartOptions="@_opcionesRoles"
+                              Width="230px" Height="230px" />
+                </div>
+                <div class="mantia-lista-datos mt-3">
+                    @foreach (var (rol, cantidad) in DistribucionRoles)
+                    {
+                        <div class="d-flex align-center justify-space-between">
+                            <MudText Typo="Typo.body2">@Roles.Etiqueta(rol)</MudText>
+                            <MudText Typo="Typo.body2"><b>@cantidad</b></MudText>
+                        </div>
+                    }
+                </div>
+            }
+        </SectionCard>
+    </MudItem>
+
+    <MudItem xs="12" lg="6">
+        <SectionCard Titulo="Últimos accesos"
+                     Bajada="Quiénes entraron a la plataforma más recientemente"
+                     SinPadding="true">
+            <Acciones>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/empresa/usuarios"
+                           EndIcon="@Icons.Material.Filled.ArrowForward" Size="Size.Small">
+                    Ver usuarios
+                </MudButton>
+            </Acciones>
+            <ChildContent>
+                <MudTable Items="@UltimosAccesos" Dense="true" Hover="true" Elevation="0"
+                          Class="mantia-tabla" Breakpoint="Breakpoint.Sm" Striped="false">
+                    <HeaderContent>
+                        <MudTh>Usuario</MudTh>
+                        <MudTh>Rol</MudTh>
+                        <MudTh Style="text-align:right">Último acceso</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Usuario">
+                            <div class="d-flex align-center" style="gap:.75rem">
+                                <MudAvatar Color="Color.Primary" Size="Size.Small">@context.Iniciales</MudAvatar>
+                                <div class="mantia-celda-principal">
+                                    <strong>@context.NombreCompleto</strong>
+                                    <span>@context.Email</span>
+                                </div>
+                            </div>
+                        </MudTd>
+                        <MudTd DataLabel="Rol">
+                            <StatusChip Texto="@Roles.Etiqueta(context.Rol)" ChipColor="@ColorRol(context.Rol)"
+                                        Variante="Variant.Outlined" />
+                        </MudTd>
+                        <MudTd DataLabel="Último acceso" Style="text-align:right">
+                            @if (context.UltimoAcceso is null)
+                            {
+                                <MudText Typo="Typo.body2" Class="mud-text-secondary">Sin accesos</MudText>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.body2">@Ui.Relativo(context.UltimoAcceso.Value)</MudText>
+                            }
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </ChildContent>
+        </SectionCard>
+    </MudItem>
+
+    <MudItem xs="12" lg="6">
+        <SectionCard Titulo="Actividad administrativa reciente"
+                     Bajada="Altas, bajas y cambios de configuración registrados en la bitácora de la empresa">
+            <Acciones>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/empresa/bitacora"
+                           EndIcon="@Icons.Material.Filled.ArrowForward" Size="Size.Small">
+                    Ver bitácora
+                </MudButton>
+            </Acciones>
+            <ChildContent>
+                @if (ActividadReciente.Count == 0)
+                {
+                    <EmptyState Titulo="Sin actividad registrada"
+                                Descripcion="La bitácora todavía no tiene eventos administrativos para esta empresa."
+                                Icono="@Icons.Material.Filled.History" />
+                }
+                else
+                {
+                    @foreach (var evento in ActividadReciente)
+                    {
+                        <div class="mantia-timeline-item">
+                            <MudIcon Icon="@IconoNivel(evento.Nivel)" Color="@Ui.ColorDe(evento.Nivel)" Size="Size.Small" />
+                            <div style="flex:1 1 auto">
+                                <MudText Typo="Typo.body2">
+                                    <b>@evento.Accion · @evento.Recurso</b>
+                                </MudText>
+                                <MudText Typo="Typo.body2" Class="mud-text-secondary">@evento.Detalle</MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                    @evento.Usuario · @Ui.Relativo(evento.Fecha)
+                                </MudText>
+                            </div>
+                        </div>
+                    }
+                }
+            </ChildContent>
+        </SectionCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private PlantaVm? _plantaSeleccionada;
+
+    private readonly ChartOptions _opcionesRoles = new()
+    {
+        ChartPalette = ["#0B6FA4", "#00909B", "#DE9021", "#8FA8BC", "#EE7A22"]
+    };
+
+    private static readonly List<BreadcrumbItem> Migas =
+    [
+        new BreadcrumbItem("Administración de empresa", null, true),
+        new BreadcrumbItem("Panel de empresa", "/empresa")
+    ];
+
+    protected override void OnInitialized()
+    {
+        var alertas = DatosDemo.Alertas();
+
+        foreach (var planta in DatosDemo.Plantas)
+        {
+            planta.Maquinas = DatosDemo.Maquinas.Count(m => m.PlantaId == planta.Id);
+            planta.AlertasActivas = alertas.Count(a => a.Planta == planta.Nombre);
+            planta.OrdenesAbiertas = DatosDemo.Ordenes.Count(o => o.Planta == planta.Nombre
+                                                                  && o.Estado is EstadoOrden.Abierta or EstadoOrden.EnCurso);
+        }
+
+        _plantaSeleccionada = DatosDemo.Plantas.FirstOrDefault(p => p.Estado == EstadoGenerico.Activo)
+                              ?? DatosDemo.Plantas.FirstOrDefault();
+    }
+
+    private static int UsuariosActivos => DatosDemo.Usuarios.Count(u => u.Estado == EstadoGenerico.Activo);
+
+    private static int UsuariosInactivos => DatosDemo.Usuarios.Count(u => u.Estado == EstadoGenerico.Inactivo);
+
+    private static int PlantasActivas => DatosDemo.Plantas.Count(p => p.Estado == EstadoGenerico.Activo);
+
+    private static int MaquinasRegistradas => DatosDemo.Maquinas.Count;
+
+    private static int ConsumoPlan => DatosDemo.EmpresaActual.MaxMaquinasHabilitadas <= 0
+        ? 0
+        : (int)Math.Round(MaquinasRegistradas * 100d / DatosDemo.EmpresaActual.MaxMaquinasHabilitadas);
+
+    private static int CupoDisponible =>
+        Math.Max(DatosDemo.EmpresaActual.MaxMaquinasHabilitadas - MaquinasRegistradas, 0);
+
+    private static int UsuariosDe(PlantaVm planta) => DatosDemo.Usuarios
+        .Count(u => u.Estado == EstadoGenerico.Activo && u.Plantas.Contains(planta.Nombre));
+
+    private static List<(string Rol, int Cantidad)> DistribucionRoles => new[]
+        {
+            Roles.AdminEmpresa, Roles.Gerente, Roles.Supervisor, Roles.Empleado
+        }
+        .Select(rol => (Rol: rol, Cantidad: DatosDemo.Usuarios.Count(u => u.Rol == rol && u.Estado == EstadoGenerico.Activo)))
+        .Where(x => x.Cantidad > 0)
+        .ToList();
+
+    private static double[] DatosRoles => DistribucionRoles.Select(x => (double)x.Cantidad).ToArray();
+
+    private static string[] EtiquetasRoles => DistribucionRoles.Select(x => Roles.Etiqueta(x.Rol)).ToArray();
+
+    private static List<UsuarioVm> UltimosAccesos => DatosDemo.Usuarios
+        .Where(u => u.Estado == EstadoGenerico.Activo)
+        .OrderByDescending(u => u.UltimoAcceso ?? DateTime.MinValue)
+        .Take(6)
+        .ToList();
+
+    private static List<EventoBitacoraVm> ActividadReciente => DatosDemo.Bitacora
+        .Where(e => e.Empresa == DatosDemo.EmpresaActual.RazonSocial)
+        .OrderByDescending(e => e.Fecha)
+        .Take(6)
+        .ToList();
+
+    private static Color ColorRol(string rol) => rol switch
+    {
+        Roles.AdminEmpresa => Color.Primary,
+        Roles.Gerente => Color.Tertiary,
+        Roles.Supervisor => Color.Info,
+        _ => Color.Default
+    };
+
+    private static string IconoNivel(NivelLog nivel) => nivel switch
+    {
+        NivelLog.Error => Icons.Material.Filled.Error,
+        NivelLog.Warning => Icons.Material.Filled.WarningAmber,
+        NivelLog.Info => Icons.Material.Filled.Info,
+        _ => Icons.Material.Filled.BugReport
+    };
+}

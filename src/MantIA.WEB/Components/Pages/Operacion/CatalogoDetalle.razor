@@ -1,0 +1,250 @@
+@page "/catalogo/{Id:guid}"
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_ficha is null ? "Ficha técnica" : _ficha.Descripcion) · MantIA</PageTitle>
+
+@if (_ficha is null)
+{
+    <PageHeader Titulo="Ficha técnica" Icono="@Icons.Material.Filled.MenuBook" Migas="@Migas" />
+    <SectionCard>
+        <EmptyState Titulo="No encontramos la ficha técnica"
+                    Descripcion="El modelo que buscás no figura en el catálogo compartido de la plataforma."
+                    Icono="@Icons.Material.Filled.SearchOff">
+            <Accion>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/catalogo">
+                    Volver al catálogo
+                </MudButton>
+            </Accion>
+        </EmptyState>
+    </SectionCard>
+}
+else
+{
+    var ficha = _ficha!;
+
+    <PageHeader Titulo="@($"{ficha.Marca} {ficha.Modelo}")"
+                Bajada="@($"Ficha técnica compartida de la categoría {ficha.Categoria}. La documentación se construye con el aporte de todas las empresas que operan este modelo y se aplica automáticamente a cada máquina nueva que lo declare.")"
+                Icono="@Icons.Material.Filled.MenuBook"
+                Migas="@Migas">
+        <EtiquetaExtra>
+            <StatusChip Texto="@Ui.TextoDe(ficha.Estado)" ChipColor="@Ui.ColorDe(ficha.Estado)" />
+        </EtiquetaExtra>
+        <Acciones>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.ArrowBack" Href="/catalogo">
+                Volver al catálogo
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Autorenew" OnClick="Reejecutar"
+                       Disabled="@_procesando">
+                @(_procesando ? "Ejecutando el enriquecimiento" : "Volver a ejecutar el enriquecimiento")
+            </MudButton>
+        </Acciones>
+    </PageHeader>
+
+    @if (_procesando)
+    {
+        <SectionCard Class="mb-4">
+            <MudText Typo="Typo.subtitle2">Pipeline de enriquecimiento en ejecución</MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary mt-1 mb-3">
+                Se están revisando las fuentes técnicas del modelo @ficha.Marca @ficha.Modelo para actualizar
+                las fallas comunes, los repuestos sugeridos y los intervalos de mantenimiento.
+            </MudText>
+            <MudProgressLinear Indeterminate="true" Color="Color.Info" Rounded="true" Size="Size.Medium" />
+        </SectionCard>
+    }
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12">
+            <SectionCard Titulo="Estado de la documentación"
+                         Bajada="Trazabilidad del enriquecimiento automático de esta ficha">
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" sm="6" md="3">
+                        <DataPoint Etiqueta="Estado del enriquecimiento">
+                            <StatusChip Texto="@Ui.TextoDe(ficha.Estado)" ChipColor="@Ui.ColorDe(ficha.Estado)" />
+                        </DataPoint>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <DataPoint Etiqueta="Último enriquecimiento" Valor="@Ui.Fecha(ficha.FechaUltimoEnriquecimiento)" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <DataPoint Etiqueta="Empresas que usan la ficha" Valor="@ficha.TenantsQueLoUsan.ToString()" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <DataPoint Etiqueta="Máquinas propias con esta ficha" Valor="@MaquinasPropias.Count.ToString()" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <DataPoint Etiqueta="Intervalos de mantenimiento" Valor="@ficha.IntervalosMantenimiento" />
+                    </MudItem>
+                </MudGrid>
+
+                @if (!_procesando && ficha.Estado is EstadoEnriquecimiento.Pendiente or EstadoEnriquecimiento.EnProceso)
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4">
+                        La documentación de este modelo todavía no está completa. Las máquinas que lo declaran operan
+                        con normalidad, pero el motor de recomendaciones trabaja sin las fallas comunes ni los
+                        repuestos sugeridos del catálogo hasta que el pipeline termine.
+                    </MudAlert>
+                }
+            </SectionCard>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <SectionCard Titulo="Fallas comunes documentadas"
+                         Bajada="Modos de falla observados en este modelo dentro del parque instalado de la plataforma">
+                @if (ficha.FallasComunes.Count == 0)
+                {
+                    <EmptyState Titulo="Sin fallas documentadas"
+                                Descripcion="El pipeline todavía no cargó modos de falla para este modelo."
+                                Icono="@Icons.Material.Filled.ReportProblem" />
+                }
+                else
+                {
+                    <div class="mantia-lista-datos">
+                        @foreach (var falla in ficha.FallasComunes)
+                        {
+                            <div class="d-flex align-start" style="gap:.6rem">
+                                <MudIcon Icon="@Icons.Material.Filled.ReportProblem" Color="Color.Warning" Size="Size.Small" />
+                                <MudText Typo="Typo.body2">@falla</MudText>
+                            </div>
+                        }
+                    </div>
+                }
+            </SectionCard>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <SectionCard Titulo="Repuestos sugeridos"
+                         Bajada="Piezas que conviene tener disponibles para sostener la operación de este modelo">
+                @if (ficha.RepuestosSugeridos.Count == 0)
+                {
+                    <EmptyState Titulo="Sin repuestos sugeridos"
+                                Descripcion="El pipeline todavía no cargó repuestos para este modelo."
+                                Icono="@Icons.Material.Filled.Inventory2" />
+                }
+                else
+                {
+                    <div class="mantia-lista-datos">
+                        @foreach (var repuesto in ficha.RepuestosSugeridos)
+                        {
+                            <div class="d-flex align-start" style="gap:.6rem">
+                                <MudIcon Icon="@Icons.Material.Filled.Inventory2" Color="Color.Primary" Size="Size.Small" />
+                                <MudText Typo="Typo.body2">@repuesto</MudText>
+                            </div>
+                        }
+                    </div>
+                }
+            </SectionCard>
+        </MudItem>
+
+        <MudItem xs="12">
+            <SectionCard Titulo="@($"Máquinas de {DatosDemo.EmpresaActual.RazonSocial} que usan esta ficha")"
+                         Bajada="Activos propios que heredan las fallas comunes y los repuestos sugeridos de este modelo"
+                         SinPadding="true">
+                @if (MaquinasPropias.Count == 0)
+                {
+                    <div class="pa-4">
+                        <EmptyState Titulo="Ninguna máquina propia usa esta ficha"
+                                    Descripcion="La documentación está disponible para el resto de la plataforma. En cuanto registres un equipo de este modelo, la ficha se aplica automáticamente."
+                                    Icono="@Icons.Material.Filled.PrecisionManufacturing">
+                            <Accion>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/maquinas/nueva">
+                                    Registrar una máquina
+                                </MudButton>
+                            </Accion>
+                        </EmptyState>
+                    </div>
+                }
+                else
+                {
+                    <MudTable Items="@MaquinasPropias" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                              Breakpoint="Breakpoint.Sm" Striped="false"
+                              OnRowClick="@((TableRowClickEventArgs<MaquinaVm> e) => Abrir(e.Item))"
+                              RowStyle="cursor:pointer">
+                        <HeaderContent>
+                            <MudTh>Máquina</MudTh>
+                            <MudTh>Ubicación</MudTh>
+                            <MudTh>Criticidad</MudTh>
+                            <MudTh>Estado</MudTh>
+                            <MudTh Style="text-align:right">Horas de operación</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Máquina">
+                                <div class="mantia-celda-principal">
+                                    <strong>@context.Codigo · @context.Nombre</strong>
+                                    <span>Número de serie @context.NumeroSerie</span>
+                                </div>
+                            </MudTd>
+                            <MudTd DataLabel="Ubicación">
+                                <div class="mantia-celda-principal">
+                                    <strong>@context.Planta</strong>
+                                    <span>@context.Linea</span>
+                                </div>
+                            </MudTd>
+                            <MudTd DataLabel="Criticidad">
+                                <StatusChip Texto="@Ui.TextoDe(context.CriticidadOperativa)"
+                                            ChipColor="@Ui.ColorDe(context.CriticidadOperativa)" />
+                            </MudTd>
+                            <MudTd DataLabel="Estado">
+                                <StatusChip Texto="@Ui.TextoDe(context.Estado)" ChipColor="@Ui.ColorDe(context.Estado)"
+                                            Icono="@Ui.IconoDe(context.Estado)" />
+                            </MudTd>
+                            <MudTd DataLabel="Horas de operación" Style="text-align:right">
+                                @Ui.Numero(context.HorasOperacion) h
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </SectionCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private CatalogoMaquinaVm? _ficha;
+    private bool _procesando;
+
+    private static readonly List<BreadcrumbItem> Migas =
+    [
+        new BreadcrumbItem("Catálogo técnico", "/catalogo"),
+        new BreadcrumbItem("Ficha técnica", null, true)
+    ];
+
+    private List<MaquinaVm> MaquinasPropias => DatosDemo.Maquinas
+        .Where(m => m.CatalogoMaquinaId == Id)
+        .OrderBy(m => m.Codigo)
+        .ToList();
+
+    protected override void OnParametersSet() =>
+        _ficha = DatosDemo.Catalogo.FirstOrDefault(c => c.Id == Id);
+
+    private void Abrir(MaquinaVm? maquina)
+    {
+        if (maquina is not null) Nav.NavigateTo($"/maquinas/{maquina.Id}");
+    }
+
+    private async Task Reejecutar()
+    {
+        var ficha = _ficha;
+        if (ficha is null || _procesando) return;
+
+        _procesando = true;
+        StateHasChanged();
+
+        await Task.Delay(1200);
+
+        ficha.Estado = EstadoEnriquecimiento.Completado;
+        ficha.FechaUltimoEnriquecimiento = DateTime.Today;
+
+        foreach (var maquina in DatosDemo.Maquinas.Where(m => m.CatalogoMaquinaId == ficha.Id))
+        {
+            maquina.Enriquecimiento = EstadoEnriquecimiento.Completado;
+        }
+
+        _procesando = false;
+        Snackbar.Add($"La ficha de {ficha.Marca} {ficha.Modelo} quedó enriquecida y disponible para todas las empresas de la plataforma", Severity.Success);
+    }
+}

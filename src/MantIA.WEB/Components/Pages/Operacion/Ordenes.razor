@@ -1,0 +1,266 @@
+@page "/ordenes"
+@inject NavigationManager Nav
+
+<PageTitle>Órdenes de trabajo · MantIA</PageTitle>
+
+<PageHeader Titulo="Órdenes de trabajo"
+            Bajada="Registro de las intervenciones correctivas, preventivas y predictivas sobre el parque de equipos. El cierre de cada orden descuenta el stock consumido y alimenta el historial de fallas que usa el motor de recomendaciones."
+            Icono="@Icons.Material.Filled.Assignment"
+            Migas="@_migas">
+    <Acciones>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add" Href="/ordenes/nueva">
+            Nueva orden
+        </MudButton>
+    </Acciones>
+</PageHeader>
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Órdenes abiertas"
+                    Valor="@Abiertas.ToString()"
+                    Detalle="Todavía sin técnico trabajando en el equipo"
+                    Icono="@Icons.Material.Filled.FolderOpen"
+                    Acento="Color.Info" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Órdenes en curso"
+                    Valor="@EnCurso.ToString()"
+                    Detalle="Intervenciones tomadas y en ejecución"
+                    Icono="@Icons.Material.Filled.Engineering"
+                    Acento="Color.Warning" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Urgentes sin cerrar"
+                    Valor="@UrgentesSinCerrar.ToString()"
+                    Detalle="Prioridad Urgente con la máquina comprometida"
+                    Icono="@Icons.Material.Filled.PriorityHigh"
+                    Acento="@(UrgentesSinCerrar > 0 ? Color.Error : Color.Success)" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Tiempo medio de resolución"
+                    Valor="@TiempoMedio.ToString("0.0")" Unidad="h"
+                    Detalle="@($"Sobre {Cerradas} órdenes cerradas")"
+                    Icono="@Icons.Material.Filled.Timer"
+                    Acento="Color.Success" />
+    </MudItem>
+</MudGrid>
+
+<MudTabs Elevation="0" Rounded="true" Class="mt-6"
+         ActivePanelIndex="TabActivo" ActivePanelIndexChanged="CambiarTab">
+    <MudTabPanel Text="@($"Todas ({ConteoTotal})")" Icon="@Icons.Material.Filled.ListAlt" />
+    <MudTabPanel Text="@($"Abiertas ({ConteoAbiertas})")" Icon="@Icons.Material.Filled.FolderOpen" />
+    <MudTabPanel Text="@($"En curso ({ConteoEnCurso})")" Icon="@Icons.Material.Filled.Engineering" />
+    <MudTabPanel Text="@($"Cerradas ({ConteoCerradas})")" Icon="@Icons.Material.Filled.CheckCircle" />
+</MudTabs>
+
+<FilterBar>
+    <MudTextField T="string" @bind-Value="_busqueda" Immediate="true" Clearable="true"
+                  Placeholder="Buscar por número, máquina o descripción"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                  Class="mantia-filtros__buscador" />
+
+    <MudSelect T="string" @bind-Value="_estado" Label="Estado" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@Todos">Todos los estados</MudSelectItem>
+        <MudSelectItem T="string" Value="@(nameof(EstadoOrden.Abierta))">Abierta</MudSelectItem>
+        <MudSelectItem T="string" Value="@(nameof(EstadoOrden.EnCurso))">En curso</MudSelectItem>
+        <MudSelectItem T="string" Value="@(nameof(EstadoOrden.Cerrada))">Cerrada</MudSelectItem>
+    </MudSelect>
+
+    <MudSelect T="string" @bind-Value="_tipo" Label="Tipo de mantenimiento" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@Todos">Todos los tipos</MudSelectItem>
+        @foreach (var tipo in Enum.GetValues<TipoMantenimiento>())
+        {
+            <MudSelectItem T="string" Value="@tipo.ToString()">@tipo.ToString()</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="string" @bind-Value="_prioridad" Label="Prioridad" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@Todos">Todas las prioridades</MudSelectItem>
+        @foreach (var prioridad in Enum.GetValues<Prioridad>())
+        {
+            <MudSelectItem T="string" Value="@prioridad.ToString()">@prioridad.ToString()</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="string" @bind-Value="_planta" Label="Planta" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@Todos">Todas las plantas</MudSelectItem>
+        @foreach (var planta in DatosDemo.Plantas)
+        {
+            <MudSelectItem T="string" Value="@planta.Nombre">@planta.Nombre</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSpacer />
+
+    <MudText Typo="Typo.body2" Class="mud-text-secondary">
+        @Filtradas.Count de @DatosDemo.Ordenes.Count órdenes
+    </MudText>
+</FilterBar>
+
+@if (Filtradas.Count == 0)
+{
+    <EmptyState Titulo="No hay órdenes con esos criterios"
+                Descripcion="Probá quitando algún filtro o cambiando la solapa de estado. También podés registrar una orden nueva sobre cualquier máquina del parque."
+                Icono="@Icons.Material.Filled.Assignment">
+        <Accion>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add" Href="/ordenes/nueva">
+                Nueva orden
+            </MudButton>
+        </Accion>
+    </EmptyState>
+}
+else
+{
+    <MudTable Items="@Filtradas" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+              Breakpoint="Breakpoint.Sm" Striped="false"
+              OnRowClick="@((TableRowClickEventArgs<OrdenTrabajoVm> e) => Abrir(e.Item))"
+              RowStyle="cursor:pointer">
+        <HeaderContent>
+            <MudTh>Número</MudTh>
+            <MudTh>Máquina</MudTh>
+            <MudTh>Tipo de mantenimiento</MudTh>
+            <MudTh>Prioridad</MudTh>
+            <MudTh>Responsable</MudTh>
+            <MudTh>Estado</MudTh>
+            <MudTh>Apertura</MudTh>
+            <MudTh Style="text-align:right">Duración</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Número"><b>@context.Numero</b></MudTd>
+            <MudTd DataLabel="Máquina">
+                <div class="mantia-celda-principal">
+                    <strong>@context.Maquina</strong>
+                    <span>@context.TipoFalla</span>
+                </div>
+            </MudTd>
+            <MudTd DataLabel="Tipo de mantenimiento">
+                <StatusChip Texto="@context.TipoMantenimiento.ToString()"
+                            ChipColor="@Ui.ColorDe(context.TipoMantenimiento)"
+                            Variante="Variant.Outlined" />
+            </MudTd>
+            <MudTd DataLabel="Prioridad">
+                <StatusChip Texto="@context.Prioridad.ToString()"
+                            ChipColor="@Ui.ColorDe(context.Prioridad)" />
+            </MudTd>
+            <MudTd DataLabel="Responsable">@context.UsuarioAsignado</MudTd>
+            <MudTd DataLabel="Estado">
+                <StatusChip Texto="@Ui.TextoDe(context.Estado)"
+                            ChipColor="@Ui.ColorDe(context.Estado)" />
+            </MudTd>
+            <MudTd DataLabel="Apertura">@Ui.Fecha(context.FechaApertura)</MudTd>
+            <MudTd DataLabel="Duración" Style="text-align:right">
+                <MudText Typo="Typo.body2" Color="@(context.Estado == EstadoOrden.Cerrada ? Color.Default : Color.Warning)">
+                    @TextoDuracion(context)
+                </MudText>
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager RowsPerPageString="Órdenes por página"
+                           InfoFormat="{first_item}-{last_item} de {all_items}" />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    private const string Todos = "Todos";
+
+    private string _busqueda = "";
+    private string _estado = Todos;
+    private string _tipo = Todos;
+    private string _prioridad = Todos;
+    private string _planta = Todos;
+
+    private readonly List<BreadcrumbItem> _migas =
+    [
+        new("Operación", href: null, disabled: true),
+        new("Órdenes de trabajo", href: "/ordenes")
+    ];
+
+    private int Abiertas => DatosDemo.Ordenes.Count(o => o.Estado == EstadoOrden.Abierta);
+
+    private int EnCurso => DatosDemo.Ordenes.Count(o => o.Estado == EstadoOrden.EnCurso);
+
+    private int Cerradas => DatosDemo.Ordenes.Count(o => o.Estado == EstadoOrden.Cerrada);
+
+    private int UrgentesSinCerrar => DatosDemo.Ordenes
+        .Count(o => o.Prioridad == Prioridad.Urgente && o.Estado != EstadoOrden.Cerrada);
+
+    private double TiempoMedio
+    {
+        get
+        {
+            var cerradas = DatosDemo.Ordenes.Where(o => o.HorasResolucion.HasValue).ToList();
+            return cerradas.Count == 0 ? 0 : cerradas.Average(o => o.HorasResolucion!.Value);
+        }
+    }
+
+    private List<OrdenTrabajoVm> SinFiltroDeEstado => DatosDemo.Ordenes
+        .Where(CoincideTexto)
+        .Where(o => _tipo == Todos || o.TipoMantenimiento.ToString() == _tipo)
+        .Where(o => _prioridad == Todos || o.Prioridad.ToString() == _prioridad)
+        .Where(o => _planta == Todos || o.Planta == _planta)
+        .ToList();
+
+    private List<OrdenTrabajoVm> Filtradas => SinFiltroDeEstado
+        .Where(o => _estado == Todos || o.Estado.ToString() == _estado)
+        .OrderByDescending(o => o.FechaApertura)
+        .ToList();
+
+    private int ConteoTotal => SinFiltroDeEstado.Count;
+
+    private int ConteoAbiertas => SinFiltroDeEstado.Count(o => o.Estado == EstadoOrden.Abierta);
+
+    private int ConteoEnCurso => SinFiltroDeEstado.Count(o => o.Estado == EstadoOrden.EnCurso);
+
+    private int ConteoCerradas => SinFiltroDeEstado.Count(o => o.Estado == EstadoOrden.Cerrada);
+
+    private int TabActivo => _estado switch
+    {
+        nameof(EstadoOrden.Abierta) => 1,
+        nameof(EstadoOrden.EnCurso) => 2,
+        nameof(EstadoOrden.Cerrada) => 3,
+        _ => 0
+    };
+
+    private void CambiarTab(int indice) => _estado = indice switch
+    {
+        1 => nameof(EstadoOrden.Abierta),
+        2 => nameof(EstadoOrden.EnCurso),
+        3 => nameof(EstadoOrden.Cerrada),
+        _ => Todos
+    };
+
+    private bool CoincideTexto(OrdenTrabajoVm orden)
+    {
+        if (string.IsNullOrWhiteSpace(_busqueda)) return true;
+
+        var texto = _busqueda.Trim();
+        return orden.Numero.Contains(texto, StringComparison.OrdinalIgnoreCase)
+               || orden.Maquina.Contains(texto, StringComparison.OrdinalIgnoreCase)
+               || orden.Descripcion.Contains(texto, StringComparison.OrdinalIgnoreCase)
+               || orden.TipoFalla.Contains(texto, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string TextoDuracion(OrdenTrabajoVm orden)
+    {
+        if (orden.HorasResolucion.HasValue)
+            return $"{orden.HorasResolucion.Value:0.#} h de resolución";
+
+        var transcurrido = DateTime.Now - orden.FechaApertura;
+        if (transcurrido.TotalHours < 1) return $"Abierta hace {(int)transcurrido.TotalMinutes} min";
+        if (transcurrido.TotalHours < 24) return $"Abierta hace {(int)transcurrido.TotalHours} h";
+        return $"Abierta hace {(int)transcurrido.TotalDays} d";
+    }
+
+    private void Abrir(OrdenTrabajoVm? orden)
+    {
+        if (orden is not null) Nav.NavigateTo($"/ordenes/{orden.Id}");
+    }
+}

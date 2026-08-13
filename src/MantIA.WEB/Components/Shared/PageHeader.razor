@@ -1,0 +1,40 @@
+<div class="mantia-encabezado">
+    @if (Migas is not null && Migas.Count > 0)
+    {
+        <MudBreadcrumbs Items="Migas" Class="pa-0 mb-2" Separator="/" />
+    }
+    <div class="d-flex flex-wrap align-center justify-space-between" style="gap:1rem">
+        <div>
+            <div class="mantia-encabezado__titulo">
+                @if (!string.IsNullOrEmpty(Icono))
+                {
+                    <MudIcon Icon="@Icono" Color="Color.Primary" Size="Size.Large" />
+                }
+                <MudText Typo="Typo.h5">@Titulo</MudText>
+                @if (EtiquetaExtra is not null)
+                {
+                    @EtiquetaExtra
+                }
+            </div>
+            @if (!string.IsNullOrEmpty(Bajada))
+            {
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mt-1" Style="max-width:70ch">@Bajada</MudText>
+            }
+        </div>
+        @if (Acciones is not null)
+        {
+            <div class="d-flex flex-wrap align-center" style="gap:.5rem">
+                @Acciones
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Titulo { get; set; } = "";
+    [Parameter] public string? Bajada { get; set; }
+    [Parameter] public string? Icono { get; set; }
+    [Parameter] public List<BreadcrumbItem>? Migas { get; set; }
+    [Parameter] public RenderFragment? Acciones { get; set; }
+    [Parameter] public RenderFragment? EtiquetaExtra { get; set; }
+}

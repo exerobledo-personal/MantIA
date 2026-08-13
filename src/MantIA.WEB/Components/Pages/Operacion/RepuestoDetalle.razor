@@ -1,0 +1,327 @@
+@page "/repuestos/{Id:guid}"
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>@(_repuesto?.Nombre ?? "Repuesto") · MantIA</PageTitle>
+
+@if (_repuesto is null)
+{
+    <PageHeader Titulo="Repuesto no encontrado"
+                Bajada="El repuesto que estás buscando no figura en el inventario de la empresa."
+                Icono="@Icons.Material.Filled.SearchOff"
+                Migas="@Migas" />
+
+    <EmptyState Titulo="No encontramos el repuesto"
+                Descripcion="Es posible que se haya dado de baja o que el enlace esté desactualizado."
+                Icono="@Icons.Material.Filled.SearchOff">
+        <Accion>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/repuestos">
+                Volver al inventario
+            </MudButton>
+        </Accion>
+    </EmptyState>
+}
+else
+{
+    <PageHeader Titulo="@_repuesto.Nombre"
+                Bajada="@Bajada"
+                Icono="@Icons.Material.Filled.Inventory2"
+                Migas="@Migas">
+        <EtiquetaExtra>
+            <StatusChip Texto="@Ui.TextoDe(_repuesto.Criticidad)" ChipColor="@Ui.ColorDe(_repuesto.Criticidad)" />
+            <StatusChip Texto="@_repuesto.Estado.ToString()" ChipColor="@Ui.ColorDe(_repuesto.Estado)"
+                        Variante="Variant.Outlined" />
+            @if (_repuesto.BajoMinimo)
+            {
+                <StatusChip Texto="Bajo el mínimo" ChipColor="Color.Error"
+                            Icono="@Icons.Material.Filled.WarningAmber" />
+            }
+        </EtiquetaExtra>
+        <Acciones>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Tune" OnClick="AbrirAjusteUmbral">
+                Ajustar umbral mínimo
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Edit"
+                       Href="@($"/repuestos/{_repuesto.Id}/editar")">
+                Editar
+            </MudButton>
+        </Acciones>
+    </PageHeader>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" sm="6" lg="3">
+            <MetricCard Etiqueta="Stock actual" Valor="@Ui.Numero(_repuesto.StockActual)"
+                        Unidad="@_repuesto.UnidadMedida"
+                        Detalle="@($"Valorizado en {Ui.Moneda(_repuesto.StockActual * _repuesto.CostoUnitario)}")"
+                        Icono="@Icons.Material.Filled.Inventory"
+                        Acento="@(_repuesto.BajoMinimo ? Color.Error : Color.Success)" />
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <MetricCard Etiqueta="Stock mínimo" Valor="@Ui.Numero(_repuesto.StockMinimo)"
+                        Unidad="@_repuesto.UnidadMedida"
+                        Detalle="Umbral que dispara la alerta de stock"
+                        Icono="@Icons.Material.Filled.Tune" Acento="Color.Info" />
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <MetricCard Etiqueta="Consumo de los últimos 6 meses" Valor="@Ui.Numero(ConsumoSemestral)"
+                        Unidad="@_repuesto.UnidadMedida"
+                        Detalle="@($"En {Consumos.Count} órdenes de trabajo cerradas")"
+                        Icono="@Icons.Material.Filled.Timeline" Acento="Color.Primary" />
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <MetricCard Etiqueta="Costo de reposición hasta el mínimo" Valor="@Ui.Moneda(CostoHastaMinimo)"
+                        Detalle="@DetalleReposicion"
+                        Icono="@Icons.Material.Filled.PriceCheck"
+                        Acento="@(FaltanteHastaMinimo <= 0 ? Color.Success : Color.Secondary)" />
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Spacing="3" Class="mt-1">
+        <MudItem xs="12" lg="7">
+            <SectionCard Titulo="Datos del repuesto"
+                         Bajada="Información de compra y de reposición registrada en MantIA">
+                <div class="mantia-lista-datos">
+                    <DataPoint Etiqueta="Número de parte" Valor="@_repuesto.NumeroParte" />
+                    <DataPoint Etiqueta="Proveedor de referencia" Valor="@_repuesto.ProveedorReferencia" />
+                    <DataPoint Etiqueta="Unidad de medida" Valor="@_repuesto.UnidadMedida" />
+                    <DataPoint Etiqueta="Criticidad" Valor="@Ui.TextoDe(_repuesto.Criticidad)" />
+                    <DataPoint Etiqueta="Plazo de reposición" Valor="@($"{_repuesto.PlazoReposicionDias} días")" />
+                    <DataPoint Etiqueta="Costo unitario" Valor="@Ui.Moneda(_repuesto.CostoUnitario)" />
+                    <DataPoint Etiqueta="Alta en el inventario" Valor="@Ui.Fecha(_repuesto.FechaAlta)" />
+                    <DataPoint Etiqueta="Consumo mensual promedio"
+                               Valor="@($"{Ui.Numero(ConsumoMensual)} {_repuesto.UnidadMedida.ToLowerInvariant()} por mes")" />
+                </div>
+
+                <MudDivider Class="my-4" />
+
+                <div class="mantia-dato__label mb-2">Cobertura sobre el umbral mínimo</div>
+                <CoverageBar Actual="_repuesto.StockActual" Minimo="_repuesto.StockMinimo"
+                             Unidad="@_repuesto.UnidadMedida" />
+
+                <div class="mt-4">
+                    @if (ConsumoMensual <= 0)
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+                            Sin consumo registrado en los últimos seis meses, por lo que no se puede proyectar
+                            una cobertura en días. La alerta depende únicamente del umbral mínimo.
+                        </MudAlert>
+                    }
+                    else if (DiasCobertura < _repuesto.PlazoReposicionDias)
+                    {
+                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true"
+                                  Icon="@Icons.Material.Filled.WarningAmber">
+                            La cobertura estimada es de @DiasCobertura días y la reposición demora
+                            @_repuesto.PlazoReposicionDias días: si el consumo se sostiene, el repuesto entra
+                            en quiebre antes de que llegue el pedido.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true"
+                                  Icon="@Icons.Material.Filled.CheckCircle">
+                            La cobertura estimada es de @DiasCobertura días, por encima de los
+                            @_repuesto.PlazoReposicionDias días que demora la reposición.
+                        </MudAlert>
+                    }
+                </div>
+            </SectionCard>
+        </MudItem>
+
+        <MudItem xs="12" lg="5">
+            <SectionCard Titulo="Máquinas asociadas"
+                         Bajada="Equipos que consumen este repuesto según el catálogo técnico y las órdenes registradas">
+                @if (Maquinas.Count == 0)
+                {
+                    <EmptyState Titulo="Sin máquinas asociadas"
+                                Descripcion="Asociá el repuesto a las máquinas que lo consumen para que participe del motor de recomendaciones."
+                                Icono="@Icons.Material.Filled.LinkOff">
+                        <Accion>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Edit"
+                                       Href="@($"/repuestos/{_repuesto.Id}/editar")">
+                                Asociar máquinas
+                            </MudButton>
+                        </Accion>
+                    </EmptyState>
+                }
+                else
+                {
+                    <div class="mantia-lista-datos">
+                        @foreach (var maquina in Maquinas)
+                        {
+                            <div class="d-flex flex-wrap align-center justify-space-between" style="gap:.5rem">
+                                <div class="mantia-celda-principal">
+                                    <strong>@maquina.Codigo · @maquina.Nombre</strong>
+                                    <span>@maquina.Planta · @maquina.Linea · @maquina.Descripcion</span>
+                                </div>
+                                <div class="d-flex align-center" style="gap:.5rem">
+                                    <StatusChip Texto="@Ui.TextoDe(maquina.Estado)"
+                                                ChipColor="@Ui.ColorDe(maquina.Estado)"
+                                                Icono="@Ui.IconoDe(maquina.Estado)" />
+                                    <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Primary"
+                                               EndIcon="@Icons.Material.Filled.ArrowForward"
+                                               Href="@($"/maquinas/{maquina.Id}")">
+                                        Ver máquina
+                                    </MudButton>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </SectionCard>
+        </MudItem>
+
+        <MudItem xs="12">
+            <SectionCard Titulo="Historial de consumo"
+                         Bajada="Órdenes de trabajo cerradas en las que se consumió este repuesto"
+                         SinPadding="true">
+                <ChildContent>
+                    @if (Consumos.Count == 0)
+                    {
+                        <EmptyState Titulo="Sin consumos registrados"
+                                    Descripcion="Todavía no hay órdenes de trabajo cerradas que hayan utilizado este repuesto. El motor de recomendaciones va a trabajar sólo con reglas de negocio hasta que exista historial."
+                                    Icono="@Icons.Material.Filled.History" />
+                    }
+                    else
+                    {
+                        <MudTable Items="@Consumos" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                                  Breakpoint="Breakpoint.Sm" Striped="false">
+                            <HeaderContent>
+                                <MudTh>Fecha de cierre</MudTh>
+                                <MudTh>Orden de trabajo</MudTh>
+                                <MudTh>Máquina</MudTh>
+                                <MudTh Style="text-align:right">Cantidad consumida</MudTh>
+                                <MudTh Style="text-align:right">Stock anterior</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Fecha de cierre">@Ui.Fecha(context.Fecha)</MudTd>
+                                <MudTd DataLabel="Orden de trabajo">
+                                    <div class="mantia-celda-principal">
+                                        <strong>@context.Numero</strong>
+                                        <span>@context.TipoFalla</span>
+                                    </div>
+                                </MudTd>
+                                <MudTd DataLabel="Máquina">@context.Maquina</MudTd>
+                                <MudTd DataLabel="Cantidad consumida" Style="text-align:right">
+                                    <b>@Ui.Numero(context.Cantidad)</b> @_repuesto.UnidadMedida.ToLowerInvariant()
+                                </MudTd>
+                                <MudTd DataLabel="Stock anterior" Style="text-align:right">
+                                    @Ui.Numero(context.StockAnterior)
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                </ChildContent>
+            </SectionCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private RepuestoVm? _repuesto;
+
+    protected override void OnParametersSet() =>
+        _repuesto = DatosDemo.Repuestos.FirstOrDefault(r => r.Id == Id);
+
+    private List<BreadcrumbItem> Migas =>
+    [
+        new BreadcrumbItem("Panel principal", "/dashboard"),
+        new BreadcrumbItem("Repuestos críticos", "/repuestos"),
+        new BreadcrumbItem(_repuesto?.NumeroParte ?? "Detalle", null, true)
+    ];
+
+    private string Bajada => _repuesto is null
+        ? ""
+        : $"Número de parte {_repuesto.NumeroParte} · Proveedor de referencia {_repuesto.ProveedorReferencia}";
+
+    private List<MaquinaVm> Maquinas => _repuesto is null
+        ? []
+        : DatosDemo.Maquinas.Where(m => _repuesto.MaquinaIds.Contains(m.Id)).ToList();
+
+    private List<ConsumoHistorico> Consumos
+    {
+        get
+        {
+            var repuesto = _repuesto;
+            if (repuesto is null) return [];
+
+            return DatosDemo.Ordenes
+                .Where(o => o.Estado == EstadoOrden.Cerrada)
+                .SelectMany(o => o.Repuestos
+                    .Where(c => c.RepuestoId == repuesto.Id)
+                    .Select(c => new ConsumoHistorico(
+                        o.FechaCierre ?? o.FechaApertura,
+                        o.Numero,
+                        o.Maquina,
+                        o.TipoFalla,
+                        c.Cantidad,
+                        c.StockAnterior)))
+                .OrderByDescending(c => c.Fecha)
+                .ToList();
+        }
+    }
+
+    private decimal ConsumoSemestral => Consumos
+        .Where(c => c.Fecha >= DateTime.Now.AddMonths(-6))
+        .Sum(c => c.Cantidad);
+
+    private decimal ConsumoMensual => Math.Round(ConsumoSemestral / 6m, 2);
+
+    private int DiasCobertura => ConsumoMensual <= 0
+        ? 0
+        : (int)Math.Round((double)(_repuesto!.StockActual / ConsumoMensual) * 30);
+
+    private decimal FaltanteHastaMinimo => _repuesto is null
+        ? 0
+        : Math.Max(0, _repuesto.StockMinimo - _repuesto.StockActual);
+
+    private decimal CostoHastaMinimo => _repuesto is null
+        ? 0
+        : FaltanteHastaMinimo * _repuesto.CostoUnitario;
+
+    private string DetalleReposicion => FaltanteHastaMinimo <= 0
+        ? "El stock ya cubre el umbral mínimo"
+        : $"Faltan {Ui.Numero(FaltanteHastaMinimo)} {_repuesto?.UnidadMedida.ToLowerInvariant()} para llegar al mínimo";
+
+    private async Task AbrirAjusteUmbral()
+    {
+        if (_repuesto is null) return;
+
+        var parametros = new DialogParameters { ["Repuesto"] = _repuesto };
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+
+        var dialogo = await DialogService.ShowAsync<AjustarUmbralDialog>("Ajustar umbral mínimo", parametros, opciones);
+        var resultado = await dialogo.Result;
+
+        if (resultado is null || resultado.Canceled || resultado.Data is not decimal nuevoMinimo) return;
+
+        var anterior = _repuesto.StockMinimo;
+        if (nuevoMinimo == anterior)
+        {
+            Snackbar.Add("El umbral mínimo quedó sin cambios.", Severity.Info);
+            return;
+        }
+
+        var teniaAlerta = _repuesto.BajoMinimo;
+        _repuesto.StockMinimo = nuevoMinimo;
+
+        Snackbar.Add($"El umbral mínimo de {_repuesto.Nombre} pasó de {Ui.Numero(anterior)} a {Ui.Numero(nuevoMinimo)}.", Severity.Success);
+
+        if (_repuesto.BajoMinimo && !teniaAlerta)
+        {
+            Snackbar.Add($"Se generó una alerta de stock sobre {_repuesto.Nombre}.", Severity.Warning);
+        }
+        else if (!_repuesto.BajoMinimo && teniaAlerta)
+        {
+            Snackbar.Add($"Se resolvió la alerta de stock de {_repuesto.Nombre}.", Severity.Success);
+        }
+    }
+
+    private sealed record ConsumoHistorico(
+        DateTime Fecha, string Numero, string Maquina, string TipoFalla, decimal Cantidad, decimal StockAnterior);
+}

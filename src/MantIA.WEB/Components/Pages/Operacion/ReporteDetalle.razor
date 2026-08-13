@@ -1,0 +1,472 @@
+@page "/reportes/{Id:guid}"
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_reporte is null ? "Reporte" : _reporte.Nombre) · MantIA</PageTitle>
+
+@if (_reporte is null)
+{
+    <PageHeader Titulo="Reporte" Icono="@Icons.Material.Filled.Analytics" Migas="@_migas" />
+    <EmptyState Titulo="No encontramos el reporte"
+                Descripcion="El reporte que buscás no existe en el listado. Puede haber sido eliminado de forma definitiva o el enlace estar vencido."
+                Icono="@Icons.Material.Filled.SearchOff">
+        <Accion>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/reportes">
+                Volver al listado
+            </MudButton>
+        </Accion>
+    </EmptyState>
+}
+else
+{
+    var reporte = _reporte;
+
+    <PageHeader Titulo="@reporte.Nombre"
+                Bajada="@($"{reporte.TipoReporte} · Período {reporte.Periodo} · {reporte.Parametros}")"
+                Icono="@Icons.Material.Filled.Analytics"
+                Migas="@_migas">
+        <EtiquetaExtra>
+            <StatusChip Texto="@reporte.TipoReporte" ChipColor="Color.Primary" />
+            <StatusChip Texto="@reporte.Planta" ChipColor="Color.Default" Variante="Variant.Outlined"
+                        Icono="@Icons.Material.Filled.Factory" />
+            <StatusChip Texto="@TextoEstado(reporte.Estado)" ChipColor="@Ui.ColorDe(reporte.Estado)"
+                        Variante="Variant.Outlined" />
+        </EtiquetaExtra>
+        <Acciones>
+            <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/reportes">
+                Volver al listado
+            </MudButton>
+            <MudTooltip Text="La exportación queda registrada en el historial del reporte. La descarga del archivo se resuelve en la etapa de integración con el backend.">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.PictureAsPdf"
+                           OnClick="ExportarPdf">
+                    Exportar a PDF
+                </MudButton>
+            </MudTooltip>
+            <MudTooltip Text="La exportación queda registrada en el historial del reporte. La descarga del archivo se resuelve en la etapa de integración con el backend.">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.GridOn"
+                           OnClick="ExportarExcel">
+                    Exportar a Excel
+                </MudButton>
+            </MudTooltip>
+        </Acciones>
+    </PageHeader>
+
+    @if (reporte.Estado == EstadoGenerico.Inactivo)
+    {
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4"
+                  Icon="@Icons.Material.Filled.DeleteOutline">
+            <MudText Typo="Typo.subtitle2">Este reporte está eliminado</MudText>
+            <MudText Typo="Typo.body2" Class="mt-1">
+                La baja es lógica: el reporte no aparece en el listado habitual, pero se conserva junto con su
+                historial completo de cambios para consulta de administración.
+            </MudText>
+        </MudAlert>
+    }
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="4">
+            <SectionCard Titulo="Datos del reporte"
+                         Bajada="Configuración con la que se generó esta extracción">
+                <div class="mantia-lista-datos">
+                    <DataPoint Etiqueta="Tipo de reporte" Valor="@reporte.TipoReporte" />
+                    <DataPoint Etiqueta="Período informado" Valor="@reporte.Periodo" />
+                    <DataPoint Etiqueta="Planta" Valor="@reporte.Planta" />
+                    <DataPoint Etiqueta="Parámetros aplicados" Valor="@reporte.Parametros" />
+                    <DataPoint Etiqueta="Generado por" Valor="@reporte.UsuarioCreador" />
+                    <DataPoint Etiqueta="Fecha de generación" Valor="@Ui.FechaHora(reporte.FechaGeneracion)" />
+                    <DataPoint Etiqueta="Filas al generarse" Valor="@reporte.Filas.ToString()" />
+                    <DataPoint Etiqueta="Estado">
+                        <StatusChip Texto="@TextoEstado(reporte.Estado)" ChipColor="@Ui.ColorDe(reporte.Estado)" />
+                    </DataPoint>
+                    <DataPoint Etiqueta="Exportaciones registradas" Valor="@ExportacionesRegistradas" />
+                </div>
+            </SectionCard>
+        </MudItem>
+
+        <MudItem xs="12" md="8">
+            <SectionCard Titulo="@TituloGrafico" Bajada="@BajadaGrafico">
+                @if (EsGraficoDeLineas)
+                {
+                    <MudChart T="double" ChartType="ChartType.Line"
+                              ChartSeries="@Series"
+                              ChartLabels="@EtiquetasEjeX"
+                              ChartOptions="@_opciones"
+                              Width="100%" Height="320px" />
+                }
+                else
+                {
+                    <MudChart T="double" ChartType="ChartType.Bar"
+                              ChartSeries="@Series"
+                              ChartLabels="@EtiquetasEjeX"
+                              ChartOptions="@_opciones"
+                              Width="100%" Height="320px" />
+                }
+            </SectionCard>
+        </MudItem>
+
+        <MudItem xs="12">
+            <SectionCard Titulo="Filas del reporte"
+                         Bajada="@($"{Filas.Count} filas recalculadas sobre la información vigente de la empresa. Al generarse, el reporte trajo {reporte.Filas} filas.")"
+                         SinPadding="true">
+                @if (Filas.Count == 0)
+                {
+                    <EmptyState Titulo="El reporte no devuelve filas"
+                                Descripcion="Con los parámetros guardados no quedan registros en el alcance del reporte. Generá una versión nueva con otro recorte desde el listado de reportes."
+                                Icono="@Icons.Material.Filled.TableChart" />
+                }
+                else
+                {
+                    <MudTable Items="@Filas" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                              Breakpoint="Breakpoint.Sm" Striped="false">
+                        <HeaderContent>
+                            <MudTh>@Encabezados[0]</MudTh>
+                            <MudTh>@Encabezados[1]</MudTh>
+                            <MudTh>@Encabezados[2]</MudTh>
+                            <MudTh Style="text-align:right">@Encabezados[3]</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="@Encabezados[0]">
+                                <div class="mantia-celda-principal">
+                                    <strong>@context.Principal</strong>
+                                    <span>@context.Detalle</span>
+                                </div>
+                            </MudTd>
+                            <MudTd DataLabel="@Encabezados[1]">@context.Valor1</MudTd>
+                            <MudTd DataLabel="@Encabezados[2]">@context.Valor2</MudTd>
+                            <MudTd DataLabel="@Encabezados[3]" Style="text-align:right">@context.Valor3</MudTd>
+                        </RowTemplate>
+                        <PagerContent>
+                            <MudTablePager RowsPerPageString="Filas por página"
+                                           InfoFormat="{first_item}-{last_item} de {all_items}" />
+                        </PagerContent>
+                    </MudTable>
+                }
+            </SectionCard>
+        </MudItem>
+
+        <MudItem xs="12">
+            <SectionCard Titulo="Historial de cambios del reporte"
+                         Bajada="Quién lo generó, quién lo modificó, quién lo exportó y quién lo eliminó. Este registro no se borra con la baja lógica.">
+                @if (reporte.Historial.Count == 0)
+                {
+                    <EmptyState Titulo="Sin movimientos registrados"
+                                Descripcion="Todavía no hay entradas en el historial de este reporte."
+                                Icono="@Icons.Material.Filled.History" />
+                }
+                else
+                {
+                    @foreach (var entrada in reporte.Historial.OrderByDescending(h => h.Fecha))
+                    {
+                        <div class="mantia-timeline-item">
+                            <MudIcon Icon="@IconoDeAccion(entrada.Accion)" Color="@ColorDeAccion(entrada.Accion)" />
+                            <div>
+                                <MudText Typo="Typo.subtitle2">@entrada.Accion · @entrada.Usuario</MudText>
+                                @if (!string.IsNullOrWhiteSpace(entrada.Detalle))
+                                {
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">@entrada.Detalle</MudText>
+                                }
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                    @Ui.FechaHora(entrada.Fecha) · @Ui.Relativo(entrada.Fecha)
+                                </MudText>
+                            </div>
+                        </div>
+                    }
+                }
+            </SectionCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private const string TipoStock = "Estado de stock";
+    private const string TipoFallas = "Historial de fallas";
+    private const string TipoConsumo = "Consumo de repuestos";
+
+    private const string Consolidado = "Todas";
+
+    private ReporteVm? _reporte;
+
+    private readonly ChartOptions _opciones = new()
+    {
+        ChartPalette = ["#0B6FA4", "#DE9021", "#1E9E62", "#D14343"],
+    };
+
+    private readonly List<BreadcrumbItem> _migas =
+    [
+        new("Operación", href: null, disabled: true),
+        new("Reportes", href: "/reportes"),
+        new("Detalle", href: null, disabled: true)
+    ];
+
+    private sealed class FilaReporte
+    {
+        public string Principal { get; init; } = "";
+        public string Detalle { get; init; } = "";
+        public string Valor1 { get; init; } = "";
+        public string Valor2 { get; init; } = "";
+        public string Valor3 { get; init; } = "";
+    }
+
+    protected override void OnParametersSet() =>
+        _reporte = DatosDemo.Reportes.FirstOrDefault(r => r.Id == Id);
+
+    private static string TextoEstado(EstadoGenerico estado) =>
+        estado == EstadoGenerico.Activo ? "Activo" : "Eliminado";
+
+    private static string IconoDeAccion(string accion) => accion switch
+    {
+        "Generación" => Icons.Material.Filled.PlaylistAdd,
+        "Exportación" => Icons.Material.Filled.FileDownload,
+        "Modificación" => Icons.Material.Filled.Edit,
+        "Eliminación lógica" => Icons.Material.Filled.DeleteOutline,
+        _ => Icons.Material.Filled.History
+    };
+
+    private static Color ColorDeAccion(string accion) => accion switch
+    {
+        "Generación" => Color.Primary,
+        "Exportación" => Color.Tertiary,
+        "Modificación" => Color.Warning,
+        "Eliminación lógica" => Color.Error,
+        _ => Color.Default
+    };
+
+    private string Planta => _reporte?.Planta ?? Consolidado;
+
+    private bool EsDeLaPlanta(string planta) => Planta == Consolidado || planta == Planta;
+
+    private bool RepuestoEnLaPlanta(RepuestoVm repuesto) =>
+        Planta == Consolidado
+        || DatosDemo.Maquinas.Any(m => m.Planta == Planta && repuesto.MaquinaIds.Contains(m.Id));
+
+    private List<RepuestoVm> RepuestosDelAlcance =>
+        DatosDemo.Repuestos
+            .Where(r => r.Estado == EstadoGenerico.Activo)
+            .Where(RepuestoEnLaPlanta)
+            .OrderByDescending(r => r.Criticidad)
+            .ThenBy(r => r.Nombre)
+            .ToList();
+
+    private List<OrdenTrabajoVm> OrdenesDelAlcance =>
+        DatosDemo.Ordenes
+            .Where(o => EsDeLaPlanta(o.Planta))
+            .OrderByDescending(o => o.FechaApertura)
+            .ToList();
+
+    private string[] Encabezados => _reporte?.TipoReporte switch
+    {
+        TipoStock => ["Repuesto", "Stock actual", "Stock mínimo", "Criticidad"],
+        TipoFallas => ["Falla registrada", "Fecha", "Tipo", "Resolución"],
+        TipoConsumo => ["Repuesto consumido", "Cantidad", "Fecha", "Costo"],
+        _ => ["Orden", "Estado", "Responsable", "Apertura"]
+    };
+
+    private List<FilaReporte> Filas => _reporte?.TipoReporte switch
+    {
+        TipoStock => FilasDeStock(),
+        TipoFallas => FilasDeFallas(),
+        TipoConsumo => FilasDeConsumo(),
+        _ => FilasDeOrdenes()
+    };
+
+    private List<FilaReporte> FilasDeStock() =>
+        RepuestosDelAlcance
+            .Select(r => new FilaReporte
+            {
+                Principal = r.Nombre,
+                Detalle = $"Parte {r.NumeroParte} · {r.ProveedorReferencia}",
+                Valor1 = $"{Ui.Numero(r.StockActual)} {r.UnidadMedida}",
+                Valor2 = Ui.Numero(r.StockMinimo),
+                Valor3 = Ui.TextoDe(r.Criticidad)
+            })
+            .ToList();
+
+    private List<FilaReporte> FilasDeFallas() =>
+        OrdenesDelAlcance
+            .Select(o => new FilaReporte
+            {
+                Principal = o.TipoFalla,
+                Detalle = $"{o.Numero} · {o.Maquina}",
+                Valor1 = Ui.Fecha(o.FechaApertura),
+                Valor2 = o.TipoMantenimiento.ToString(),
+                Valor3 = o.HorasResolucion.HasValue ? $"{o.HorasResolucion.Value:0.#} h" : "Sin cerrar"
+            })
+            .ToList();
+
+    private List<FilaReporte> FilasDeConsumo()
+    {
+        var filas = new List<FilaReporte>();
+
+        foreach (var orden in OrdenesDelAlcance)
+        {
+            foreach (var consumo in orden.Repuestos)
+            {
+                var repuesto = DatosDemo.Repuestos.FirstOrDefault(r => r.Id == consumo.RepuestoId);
+                filas.Add(new FilaReporte
+                {
+                    Principal = consumo.Repuesto,
+                    Detalle = $"Parte {consumo.NumeroParte} · {orden.Numero} · {orden.Maquina}",
+                    Valor1 = Ui.Numero(consumo.Cantidad),
+                    Valor2 = Ui.Fecha(orden.FechaCierre ?? orden.FechaApertura),
+                    Valor3 = repuesto is null ? "—" : Ui.Moneda(consumo.Cantidad * repuesto.CostoUnitario)
+                });
+            }
+        }
+
+        return filas;
+    }
+
+    private List<FilaReporte> FilasDeOrdenes() =>
+        OrdenesDelAlcance
+            .Select(o => new FilaReporte
+            {
+                Principal = o.Numero,
+                Detalle = $"{o.Maquina} · {o.TipoFalla}",
+                Valor1 = Ui.TextoDe(o.Estado),
+                Valor2 = o.UsuarioAsignado,
+                Valor3 = Ui.Fecha(o.FechaApertura)
+            })
+            .ToList();
+
+    private bool EsGraficoDeLineas => _reporte?.TipoReporte == TipoFallas;
+
+    private string TituloGrafico => _reporte?.TipoReporte switch
+    {
+        TipoStock => "Stock disponible frente al umbral mínimo",
+        TipoFallas => "Fallas registradas por mes",
+        TipoConsumo => "Unidades de repuesto consumidas por mes",
+        _ => "Órdenes de trabajo por mes"
+    };
+
+    private string BajadaGrafico => _reporte?.TipoReporte switch
+    {
+        TipoStock => "Los ocho repuestos de mayor criticidad dentro del alcance del reporte",
+        TipoFallas => "Correctivo frente a preventivo en los últimos seis meses",
+        TipoConsumo => "Consumo descontado al cerrar cada orden de trabajo",
+        _ => "Órdenes abiertas frente a órdenes cerradas en los últimos seis meses"
+    };
+
+    private List<RepuestoVm> RepuestosDelGrafico => RepuestosDelAlcance.Take(8).ToList();
+
+    private string[] EtiquetasEjeX => _reporte?.TipoReporte == TipoStock
+        ? RepuestosDelGrafico.Select(r => r.NumeroParte).ToArray()
+        : EtiquetasDeMeses;
+
+    private static string[] EtiquetasDeMeses => Enumerable.Range(0, 6)
+        .Select(i => DateTime.Today.AddMonths(-5 + i).ToString("MMM").ToUpperInvariant())
+        .ToArray();
+
+    private static int IndiceDeMes(DateTime fecha)
+    {
+        var meses = (DateTime.Today.Year - fecha.Year) * 12 + DateTime.Today.Month - fecha.Month;
+        return 5 - meses;
+    }
+
+    private List<ChartSeries<double>> Series => _reporte?.TipoReporte switch
+    {
+        TipoStock => SeriesDeStock(),
+        TipoFallas => SeriesDeFallas(),
+        TipoConsumo => SeriesDeConsumo(),
+        _ => SeriesDeOrdenes()
+    };
+
+    private List<ChartSeries<double>> SeriesDeStock()
+    {
+        var repuestos = RepuestosDelGrafico;
+        var actual = repuestos.Select(r => (double)r.StockActual).ToArray();
+        var minimo = repuestos.Select(r => (double)r.StockMinimo).ToArray();
+
+        return
+        [
+            new ChartSeries<double> { Name = "Stock actual", Data = actual },
+            new ChartSeries<double> { Name = "Stock mínimo", Data = minimo }
+        ];
+    }
+
+    private List<ChartSeries<double>> SeriesDeFallas()
+    {
+        var correctivo = new double[6];
+        var preventivo = new double[6];
+
+        foreach (var orden in OrdenesDelAlcance)
+        {
+            var indice = IndiceDeMes(orden.FechaApertura);
+            if (indice is < 0 or > 5) continue;
+
+            if (orden.TipoMantenimiento == TipoMantenimiento.Correctivo) correctivo[indice]++;
+            else preventivo[indice]++;
+        }
+
+        return
+        [
+            new ChartSeries<double> { Name = "Correctivo", Data = correctivo },
+            new ChartSeries<double> { Name = "Preventivo y predictivo", Data = preventivo }
+        ];
+    }
+
+    private List<ChartSeries<double>> SeriesDeConsumo()
+    {
+        var unidades = new double[6];
+
+        foreach (var orden in OrdenesDelAlcance)
+        {
+            var indice = IndiceDeMes(orden.FechaCierre ?? orden.FechaApertura);
+            if (indice is < 0 or > 5) continue;
+
+            unidades[indice] += (double)orden.Repuestos.Sum(c => c.Cantidad);
+        }
+
+        return [new ChartSeries<double> { Name = "Unidades consumidas", Data = unidades }];
+    }
+
+    private List<ChartSeries<double>> SeriesDeOrdenes()
+    {
+        var abiertas = new double[6];
+        var cerradas = new double[6];
+
+        foreach (var orden in OrdenesDelAlcance)
+        {
+            var indiceApertura = IndiceDeMes(orden.FechaApertura);
+            if (indiceApertura is >= 0 and <= 5) abiertas[indiceApertura]++;
+
+            if (orden.FechaCierre is null) continue;
+
+            var indiceCierre = IndiceDeMes(orden.FechaCierre.Value);
+            if (indiceCierre is >= 0 and <= 5) cerradas[indiceCierre]++;
+        }
+
+        return
+        [
+            new ChartSeries<double> { Name = "Registradas", Data = abiertas },
+            new ChartSeries<double> { Name = "Cerradas", Data = cerradas }
+        ];
+    }
+
+    private string ExportacionesRegistradas =>
+        (_reporte?.Historial.Count(h => h.Accion == "Exportación") ?? 0).ToString();
+
+    private void ExportarPdf() => Exportar("PDF");
+
+    private void ExportarExcel() => Exportar("Excel");
+
+    private void Exportar(string formato)
+    {
+        var reporte = _reporte;
+        if (reporte is null) return;
+
+        reporte.Historial.Add(new ReporteHistorialVm
+        {
+            Usuario = DatosDemo.UsuarioActual.NombreCompleto,
+            Accion = "Exportación",
+            Fecha = DateTime.Now,
+            Detalle = $"Exportado a {formato}"
+        });
+
+        Snackbar.Add($"Se registró la exportación a {formato} de {reporte.Nombre} en el historial del reporte.",
+            Severity.Success);
+        StateHasChanged();
+    }
+}

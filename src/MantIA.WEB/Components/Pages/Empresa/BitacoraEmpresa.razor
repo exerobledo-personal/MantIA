@@ -1,0 +1,234 @@
+@page "/empresa/bitacora"
+
+<PageTitle>Bitácora de la empresa · MantIA</PageTitle>
+
+<PageHeader Titulo="Bitácora de la empresa"
+            Bajada="@($"Registro de todo lo que pasó en la cuenta de {DatosDemo.EmpresaActual.RazonSocial}: altas, bajas, modificaciones, validaciones y eventos generados por la plataforma. La bitácora es de sólo lectura y se persiste fuera de la base operativa, en el almacén de auditoría, para que ningún cambio en la operación pueda alterarla.")"
+            Icono="@Icons.Material.Filled.History"
+            Migas="@Migas">
+    <Acciones>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Group" Href="/empresa/usuarios">
+            Ver usuarios
+        </MudButton>
+    </Acciones>
+</PageHeader>
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Eventos del período" Valor="@DelPeriodo.Count.ToString()"
+                    Detalle="@($"Registrados en el período: {_periodo.ToLowerInvariant()}")"
+                    Icono="@Icons.Material.Filled.History" Acento="Color.Primary" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Altas registradas"
+                    Valor="@(DelPeriodo.Count(e => e.Accion == "Alta").ToString())"
+                    Detalle="Usuarios, plantas, máquinas y órdenes creadas"
+                    Icono="@Icons.Material.Filled.AddCircle" Acento="Color.Success" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Modificaciones"
+                    Valor="@(DelPeriodo.Count(e => e.Accion == "Modificación").ToString())"
+                    Detalle="Cambios sobre registros ya existentes"
+                    Icono="@Icons.Material.Filled.Edit" Acento="Color.Info" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Advertencias y errores"
+                    Valor="@(DelPeriodo.Count(e => e.Nivel is NivelLog.Warning or NivelLog.Error).ToString())"
+                    Detalle="@($"{DelPeriodo.Count(e => e.Nivel == NivelLog.Error)} eventos de nivel Error")"
+                    Icono="@Icons.Material.Filled.ReportProblem"
+                    Acento="@(DelPeriodo.Any(e => e.Nivel == NivelLog.Error) ? Color.Error : Color.Warning)" />
+    </MudItem>
+</MudGrid>
+
+<FilterBar>
+    <MudTextField @bind-Value="_busqueda" Immediate="true"
+                  Placeholder="Buscar por detalle del evento o recurso afectado"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                  Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"
+                  Class="mantia-filtros__buscador" />
+
+    <MudSelect T="string" @bind-Value="_accion" Label="Acción" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@TodasLasAcciones">@TodasLasAcciones</MudSelectItem>
+        @foreach (var accion in AccionesDisponibles)
+        {
+            <MudSelectItem T="string" Value="@accion">@accion</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="string" @bind-Value="_recurso" Label="Recurso" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@TodosLosRecursos">@TodosLosRecursos</MudSelectItem>
+        @foreach (var recurso in RecursosDisponibles)
+        {
+            <MudSelectItem T="string" Value="@recurso">@recurso</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="string" @bind-Value="_nivel" Label="Nivel de log" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@TodosLosNiveles">@TodosLosNiveles</MudSelectItem>
+        @foreach (var nivel in Enum.GetValues<NivelLog>())
+        {
+            <MudSelectItem T="string" Value="@nivel.ToString()">@nivel.ToString()</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="string" @bind-Value="_periodo" Label="Período" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        @foreach (var periodo in Periodos)
+        {
+            <MudSelectItem T="string" Value="@periodo">@periodo</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSpacer />
+
+    <MudText Typo="Typo.body2" Class="mud-text-secondary">
+        @Filtrados.Count de @DeLaEmpresa.Count eventos
+    </MudText>
+</FilterBar>
+
+@if (Filtrados.Count == 0)
+{
+    <SectionCard>
+        <EmptyState Titulo="No hay eventos que coincidan con el filtro"
+                    Descripcion="Probá con otro texto de búsqueda, ampliá el período o quitá los filtros de acción, recurso y nivel."
+                    Icono="@Icons.Material.Filled.SearchOff">
+            <Accion>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LimpiarFiltros">
+                    Limpiar filtros
+                </MudButton>
+            </Accion>
+        </EmptyState>
+    </SectionCard>
+}
+else
+{
+    <SectionCard Titulo="Línea de tiempo de la cuenta"
+                 Bajada="Del evento más reciente al más antiguo. Cada entrada conserva el usuario, el origen y el nivel con el que se registró.">
+        @foreach (var evento in Filtrados)
+        {
+            <div class="mantia-timeline-item">
+                <MudIcon Icon="@IconoDe(evento)" Color="@Ui.ColorDe(evento.Nivel)" Size="Size.Small" />
+                <div style="flex:1 1 auto">
+                    <div class="d-flex flex-wrap align-center justify-space-between" style="gap:.5rem">
+                        <MudText Typo="Typo.body1">
+                            <b>@evento.Accion · @evento.Recurso</b>
+                        </MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                            @Ui.Relativo(evento.Fecha) · @Ui.FechaHora(evento.Fecha)
+                        </MudText>
+                    </div>
+                    <MudText Typo="Typo.body2" Class="mt-1">@evento.Detalle</MudText>
+                    <div class="d-flex flex-wrap align-center mt-2" style="gap:.5rem">
+                        <StatusChip Texto="@evento.Usuario" ChipColor="Color.Default"
+                                    Icono="@Icons.Material.Filled.Person" Variante="Variant.Outlined" />
+                        <StatusChip Texto="@evento.Origen" ChipColor="Color.Default" Variante="Variant.Outlined" />
+                        <StatusChip Texto="@evento.Nivel.ToString()" ChipColor="@Ui.ColorDe(evento.Nivel)" />
+                    </div>
+                </div>
+            </div>
+        }
+    </SectionCard>
+}
+
+@code {
+    private const string TodasLasAcciones = "Todas las acciones";
+    private const string TodosLosRecursos = "Todos los recursos";
+    private const string TodosLosNiveles = "Todos los niveles";
+    private const string Ultimas24 = "Últimas 24 horas";
+    private const string Ultimos7 = "Últimos 7 días";
+    private const string Todo = "Todo el historial";
+
+    private static readonly string[] Periodos = [Ultimas24, Ultimos7, Todo];
+
+    private string _busqueda = "";
+    private string _accion = TodasLasAcciones;
+    private string _recurso = TodosLosRecursos;
+    private string _nivel = TodosLosNiveles;
+    private string _periodo = Ultimos7;
+
+    private static readonly List<BreadcrumbItem> Migas =
+    [
+        new BreadcrumbItem("Administración de empresa", "/empresa"),
+        new BreadcrumbItem("Bitácora", "/empresa/bitacora")
+    ];
+
+    private static List<EventoBitacoraVm> DeLaEmpresa => DatosDemo.Bitacora
+        .Where(e => e.Empresa == DatosDemo.EmpresaActual.RazonSocial)
+        .OrderByDescending(e => e.Fecha)
+        .ToList();
+
+    private static List<string> AccionesDisponibles => DeLaEmpresa
+        .Select(e => e.Accion)
+        .Distinct()
+        .OrderBy(a => a)
+        .ToList();
+
+    private static List<string> RecursosDisponibles => DeLaEmpresa
+        .Select(e => e.Recurso)
+        .Distinct()
+        .OrderBy(r => r)
+        .ToList();
+
+    private List<EventoBitacoraVm> DelPeriodo
+    {
+        get
+        {
+            if (_periodo == Todo) return DeLaEmpresa;
+
+            var desde = _periodo == Ultimas24
+                ? DateTime.Now.AddHours(-24)
+                : DateTime.Now.AddDays(-7);
+
+            return DeLaEmpresa.Where(e => e.Fecha >= desde).ToList();
+        }
+    }
+
+    private List<EventoBitacoraVm> Filtrados => DelPeriodo
+        .Where(e => _accion == TodasLasAcciones || e.Accion == _accion)
+        .Where(e => _recurso == TodosLosRecursos || e.Recurso == _recurso)
+        .Where(e => _nivel == TodosLosNiveles || e.Nivel.ToString() == _nivel)
+        .Where(Coincide)
+        .ToList();
+
+    private bool Coincide(EventoBitacoraVm evento)
+    {
+        if (string.IsNullOrWhiteSpace(_busqueda)) return true;
+
+        var texto = _busqueda.Trim();
+        return evento.Detalle.Contains(texto, StringComparison.OrdinalIgnoreCase)
+               || evento.Recurso.Contains(texto, StringComparison.OrdinalIgnoreCase)
+               || evento.Usuario.Contains(texto, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void LimpiarFiltros()
+    {
+        _busqueda = "";
+        _accion = TodasLasAcciones;
+        _recurso = TodosLosRecursos;
+        _nivel = TodosLosNiveles;
+        _periodo = Todo;
+    }
+
+    private static string IconoDe(EventoBitacoraVm evento)
+    {
+        if (evento.Nivel == NivelLog.Error) return Icons.Material.Filled.Error;
+        if (evento.Nivel == NivelLog.Warning) return Icons.Material.Filled.WarningAmber;
+
+        return evento.Accion switch
+        {
+            "Alta" => Icons.Material.Filled.AddCircle,
+            "Baja" => Icons.Material.Filled.RemoveCircle,
+            "Modificación" => Icons.Material.Filled.Edit,
+            "Consulta" => Icons.Material.Filled.Visibility,
+            "Cierre" => Icons.Material.Filled.CheckCircle,
+            "Validación" => Icons.Material.Filled.Check,
+            "Exportación" => Icons.Material.Filled.FileDownload,
+            "Generación" => Icons.Material.Filled.Psychology,
+            _ => Icons.Material.Filled.Info
+        };
+    }
+}

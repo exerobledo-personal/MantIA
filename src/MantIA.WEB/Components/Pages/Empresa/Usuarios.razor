@@ -1,0 +1,340 @@
+@page "/empresa/usuarios"
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Usuarios y niveles · MantIA</PageTitle>
+
+<PageHeader Titulo="Usuarios y niveles de permiso"
+            Bajada="@($"Altas, bajas y modificaciones de los usuarios de {DatosDemo.EmpresaActual.RazonSocial}. Cada usuario tiene un rol, que define qué recursos ve, y un nivel Jr o Sr, que define hasta dónde puede operar sobre esos recursos.")"
+            Icono="@Icons.Material.Filled.Group"
+            Migas="@Migas">
+    <Acciones>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.AdminPanelSettings" Href="/empresa/permisos">
+            Matriz de permisos
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.PersonAdd" Href="/empresa/usuarios/nuevo">
+            Nuevo usuario
+        </MudButton>
+    </Acciones>
+</PageHeader>
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Usuarios activos"
+                    Valor="@DatosDemo.Usuarios.Count(u => u.Estado == EstadoGenerico.Activo).ToString()"
+                    Detalle="@($"Sobre {DatosDemo.Usuarios.Count} usuarios registrados en la cuenta")"
+                    Icono="@Icons.Material.Filled.Group" Acento="Color.Primary" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Supervisores"
+                    Valor="@DatosDemo.Usuarios.Count(u => u.Rol == Roles.Supervisor && u.Estado == EstadoGenerico.Activo).ToString()"
+                    Detalle="Pueden validar recomendaciones y cerrar órdenes"
+                    Icono="@Icons.Material.Filled.SupervisorAccount" Acento="Color.Info" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Empleados de mantenimiento"
+                    Valor="@DatosDemo.Usuarios.Count(u => u.Rol == Roles.Empleado && u.Estado == EstadoGenerico.Activo).ToString()"
+                    Detalle="@($"{DatosDemo.Usuarios.Where(u => u.Rol == Roles.Empleado && u.Estado == EstadoGenerico.Activo).Sum(u => u.OrdenesAsignadas)} órdenes asignadas en total")"
+                    Icono="@Icons.Material.Filled.Build" Acento="Color.Tertiary" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MetricCard Etiqueta="Usuarios inactivos"
+                    Valor="@DatosDemo.Usuarios.Count(u => u.Estado == EstadoGenerico.Inactivo).ToString()"
+                    Detalle="Conservan su historial de órdenes y validaciones"
+                    Icono="@Icons.Material.Filled.Block" Acento="Color.Default" />
+    </MudItem>
+</MudGrid>
+
+<FilterBar>
+    <MudTextField @bind-Value="_busqueda" Immediate="true"
+                  Placeholder="Buscar por nombre, apellido o correo corporativo"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                  Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"
+                  Class="mantia-filtros__buscador" />
+
+    <MudSelect T="string" @bind-Value="_rol" Label="Rol" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@TodosLosRoles">@TodosLosRoles</MudSelectItem>
+        @foreach (var rol in RolesDisponibles)
+        {
+            <MudSelectItem T="string" Value="@rol">@Roles.Etiqueta(rol)</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="string" @bind-Value="_nivel" Label="Nivel" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@TodosLosNiveles">@TodosLosNiveles</MudSelectItem>
+        @foreach (var nivel in DatosDemo.Niveles)
+        {
+            <MudSelectItem T="string" Value="@nivel.Nombre">@nivel.Nombre</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="string" @bind-Value="_planta" Label="Planta" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@TodasLasPlantas">@TodasLasPlantas</MudSelectItem>
+        @foreach (var planta in DatosDemo.Plantas)
+        {
+            <MudSelectItem T="string" Value="@planta.Nombre">@planta.Nombre</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="string" @bind-Value="_estado" Label="Estado" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        <MudSelectItem T="string" Value="@TodosLosEstados">@TodosLosEstados</MudSelectItem>
+        @foreach (var estado in Enum.GetValues<EstadoGenerico>())
+        {
+            <MudSelectItem T="string" Value="@estado.ToString()">@estado.ToString()</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSpacer />
+
+    <MudText Typo="Typo.body2" Class="mud-text-secondary">
+        @Filtrados.Count de @DatosDemo.Usuarios.Count usuarios
+    </MudText>
+</FilterBar>
+
+@if (Filtrados.Count == 0)
+{
+    <SectionCard>
+        <EmptyState Titulo="No hay usuarios que coincidan con el filtro"
+                    Descripcion="Probá con otro texto de búsqueda o ampliá el alcance a todos los roles, niveles, plantas y estados."
+                    Icono="@Icons.Material.Filled.SearchOff">
+            <Accion>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LimpiarFiltros">
+                    Limpiar filtros
+                </MudButton>
+            </Accion>
+        </EmptyState>
+    </SectionCard>
+}
+else
+{
+    <SectionCard Titulo="Usuarios de la empresa"
+                 Bajada="El rol define qué recursos ve el usuario y el nivel hasta dónde puede operar sobre ellos"
+                 SinPadding="true">
+        <MudTable Items="@Filtrados" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                  Breakpoint="Breakpoint.Sm" Striped="false">
+            <HeaderContent>
+                <MudTh>Usuario</MudTh>
+                <MudTh>Rol</MudTh>
+                <MudTh>Nivel</MudTh>
+                <MudTh>Plantas asignadas</MudTh>
+                <MudTh Style="text-align:right">Órdenes asignadas</MudTh>
+                <MudTh>Último acceso</MudTh>
+                <MudTh>Estado</MudTh>
+                <MudTh Style="text-align:right">Acciones</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Usuario">
+                    <div class="d-flex align-center" style="gap:.75rem">
+                        <MudAvatar Color="Color.Primary" Size="Size.Small">@context.Iniciales</MudAvatar>
+                        <div class="mantia-celda-principal">
+                            <strong>@context.NombreCompleto</strong>
+                            <span>@context.Email</span>
+                        </div>
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="Rol">
+                    <StatusChip Texto="@Roles.Etiqueta(context.Rol)" ChipColor="@ColorRol(context.Rol)"
+                                Variante="Variant.Outlined" />
+                </MudTd>
+                <MudTd DataLabel="Nivel">
+                    <StatusChip Texto="@context.Nivel" ChipColor="@(context.Nivel == "Sr" ? Color.Info : Color.Default)" />
+                </MudTd>
+                <MudTd DataLabel="Plantas asignadas">
+                    @if (context.Plantas.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">Sin planta asignada</MudText>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-wrap" style="gap:.25rem">
+                            @foreach (var planta in context.Plantas)
+                            {
+                                <StatusChip Texto="@planta" ChipColor="Color.Default" Variante="Variant.Outlined" />
+                            }
+                        </div>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Órdenes asignadas" Style="text-align:right">@context.OrdenesAsignadas</MudTd>
+                <MudTd DataLabel="Último acceso">
+                    @if (context.UltimoAcceso is null)
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">Sin accesos</MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2">@Ui.Relativo(context.UltimoAcceso.Value)</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Estado">
+                    <StatusChip Texto="@context.Estado.ToString()" ChipColor="@Ui.ColorDe(context.Estado)" />
+                </MudTd>
+                <MudTd DataLabel="Acciones" Style="text-align:right">
+                    <div class="d-flex justify-end" style="gap:.25rem">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       Color="Color.Default" aria-label="Editar datos del usuario"
+                                       Href="@($"/empresa/usuarios/{context.Id}/editar")" />
+                        @if (context.Estado == EstadoGenerico.Activo)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Block" Size="Size.Small"
+                                           Color="Color.Error" aria-label="Desactivar usuario"
+                                           OnClick="@(() => Desactivar(context))" />
+                        }
+                        else
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.HowToReg" Size="Size.Small"
+                                           Color="Color.Success" aria-label="Reactivar usuario"
+                                           OnClick="@(() => Reactivar(context))" />
+                        }
+                    </div>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager RowsPerPageString="Filas por página"
+                                   InfoFormat="{first_item}-{last_item} de {all_items}"
+                                   AllItemsText="Todas" />
+            </PagerContent>
+        </MudTable>
+    </SectionCard>
+
+}
+
+<SectionCard Titulo="Niveles de permiso" Class="mt-4"
+             Bajada="El nivel acota lo que el rol habilita. Un mismo rol opera distinto según sea Jr o Sr.">
+    <Acciones>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/empresa/permisos"
+                   EndIcon="@Icons.Material.Filled.ArrowForward" Size="Size.Small">
+            Ver matriz de permisos
+        </MudButton>
+    </Acciones>
+    <ChildContent>
+        <MudTable Items="@DatosDemo.Niveles" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                  Breakpoint="Breakpoint.Sm" Striped="false">
+            <HeaderContent>
+                <MudTh>Nivel</MudTh>
+                <MudTh>Qué habilita</MudTh>
+                <MudTh Style="text-align:right">Usuarios con este nivel</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Nivel">
+                    <StatusChip Texto="@context.Nombre"
+                                ChipColor="@(context.Nombre == "Sr" ? Color.Info : Color.Default)" />
+                </MudTd>
+                <MudTd DataLabel="Qué habilita">@context.Descripcion</MudTd>
+                <MudTd DataLabel="Usuarios con este nivel" Style="text-align:right">
+                    <b>@(DatosDemo.Usuarios.Count(u => u.Nivel == context.Nombre))</b>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </ChildContent>
+</SectionCard>
+
+@code {
+    private const string TodosLosRoles = "Todos los roles";
+    private const string TodosLosNiveles = "Todos los niveles";
+    private const string TodasLasPlantas = "Todas las plantas";
+    private const string TodosLosEstados = "Todos los estados";
+
+    private string _busqueda = "";
+    private string _rol = TodosLosRoles;
+    private string _nivel = TodosLosNiveles;
+    private string _planta = TodasLasPlantas;
+    private string _estado = TodosLosEstados;
+
+    private static readonly string[] RolesDisponibles =
+        [Roles.AdminEmpresa, Roles.Gerente, Roles.Supervisor, Roles.Empleado];
+
+    private static readonly List<BreadcrumbItem> Migas =
+    [
+        new BreadcrumbItem("Administración de empresa", "/empresa"),
+        new BreadcrumbItem("Usuarios y niveles", "/empresa/usuarios")
+    ];
+
+    private List<UsuarioVm> Filtrados => DatosDemo.Usuarios
+        .Where(u => _rol == TodosLosRoles || u.Rol == _rol)
+        .Where(u => _nivel == TodosLosNiveles || u.Nivel == _nivel)
+        .Where(u => _planta == TodasLasPlantas || u.Plantas.Contains(_planta))
+        .Where(u => _estado == TodosLosEstados || u.Estado.ToString() == _estado)
+        .Where(Coincide)
+        .OrderBy(u => u.Apellido)
+        .ThenBy(u => u.Nombre)
+        .ToList();
+
+    private bool Coincide(UsuarioVm usuario)
+    {
+        if (string.IsNullOrWhiteSpace(_busqueda)) return true;
+
+        var texto = _busqueda.Trim();
+        return usuario.NombreCompleto.Contains(texto, StringComparison.OrdinalIgnoreCase)
+               || usuario.Email.Contains(texto, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void LimpiarFiltros()
+    {
+        _busqueda = "";
+        _rol = TodosLosRoles;
+        _nivel = TodosLosNiveles;
+        _planta = TodasLasPlantas;
+        _estado = TodosLosEstados;
+    }
+
+    private static Color ColorRol(string rol) => rol switch
+    {
+        Roles.AdminEmpresa => Color.Primary,
+        Roles.Gerente => Color.Tertiary,
+        Roles.Supervisor => Color.Info,
+        _ => Color.Default
+    };
+
+    private static string SupervisorDe(UsuarioVm usuario)
+    {
+        var planta = usuario.Plantas.FirstOrDefault();
+        if (planta is null) return "el administrador de la empresa";
+
+        var supervisor = DatosDemo.Usuarios.FirstOrDefault(u => u.Rol == Roles.Supervisor
+                                                                && u.Estado == EstadoGenerico.Activo
+                                                                && u.Id != usuario.Id
+                                                                && u.Plantas.Contains(planta));
+
+        return supervisor is null ? "el administrador de la empresa" : supervisor.NombreCompleto;
+    }
+
+    private async Task Desactivar(UsuarioVm usuario)
+    {
+        var parametros = new DialogParameters
+        {
+            { "Mensaje", $"¿Confirmás la desactivación de {usuario.NombreCompleto}?" },
+            { "Detalle", $"El usuario pierde el acceso a la plataforma en su próxima sesión y sus {usuario.OrdenesAsignadas} órdenes de trabajo abiertas se reasignan a {SupervisorDe(usuario)}, supervisor de su planta. El historial de intervenciones y validaciones se conserva." },
+            { "TextoConfirmar", "Desactivar usuario" },
+            { "ColorAccion", Color.Error },
+            { "Icono", Icons.Material.Filled.Block }
+        };
+
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dialogo = await DialogService.ShowAsync<ConfirmDialog>("Desactivar usuario", parametros, opciones);
+        var resultado = await dialogo.Result;
+
+        if (resultado is null || resultado.Canceled) return;
+
+        var ordenes = usuario.OrdenesAsignadas;
+        usuario.Estado = EstadoGenerico.Inactivo;
+        usuario.OrdenesAsignadas = 0;
+
+        Snackbar.Add(ordenes == 0
+            ? $"{usuario.NombreCompleto} quedó desactivado. No tenía órdenes abiertas para reasignar."
+            : $"{usuario.NombreCompleto} quedó desactivado. Se reasignaron {ordenes} órdenes a {SupervisorDe(usuario)}.",
+            Severity.Success);
+    }
+
+    private void Reactivar(UsuarioVm usuario)
+    {
+        usuario.Estado = EstadoGenerico.Activo;
+        Snackbar.Add($"{usuario.NombreCompleto} volvió a tener acceso con rol {Roles.Etiqueta(usuario.Rol)} y nivel {usuario.Nivel}",
+            Severity.Success);
+    }
+}

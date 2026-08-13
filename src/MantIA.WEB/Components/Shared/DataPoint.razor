@@ -1,0 +1,17 @@
+<div class="mantia-dato">
+    <span class="mantia-dato__label">@Etiqueta</span>
+    @if (ChildContent is not null)
+    {
+        <span class="mantia-dato__valor">@ChildContent</span>
+    }
+    else
+    {
+        <span class="mantia-dato__valor">@(string.IsNullOrWhiteSpace(Valor) ? "—" : Valor)</span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Etiqueta { get; set; } = "";
+    [Parameter] public string? Valor { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

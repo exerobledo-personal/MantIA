@@ -1,0 +1,17 @@
+<MudChip T="string"
+         Size="@Tamanio"
+         Color="@ChipColor"
+         Variant="@Variante"
+         Icon="@Icono"
+         Class="@($"ma-0 {Class}")">
+    @Texto
+</MudChip>
+
+@code {
+    [Parameter, EditorRequired] public string Texto { get; set; } = "";
+    [Parameter] public Color ChipColor { get; set; } = Color.Default;
+    [Parameter] public string? Icono { get; set; }
+    [Parameter] public Size Tamanio { get; set; } = Size.Small;
+    [Parameter] public Variant Variante { get; set; } = Variant.Filled;
+    [Parameter] public string? Class { get; set; }
+}

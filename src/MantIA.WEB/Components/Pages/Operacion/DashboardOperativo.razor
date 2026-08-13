@@ -1,0 +1,349 @@
+@page "/dashboard"
+@inject NavigationManager Nav
+
+<PageTitle>Panel principal · MantIA</PageTitle>
+
+<PageHeader Titulo="Panel operativo"
+            Bajada="@($"Estado del parque de equipos y del stock crítico de {DatosDemo.EmpresaActual.RazonSocial}. Los indicadores se recalculan con cada movimiento de stock, alta de máquina o cierre de orden.")"
+            Icono="@Icons.Material.Filled.SpaceDashboard">
+    <Acciones>
+        <MudSelect T="string" @bind-Value="_planta" Dense="true" Variant="Variant.Outlined"
+                   Margin="Margin.Dense" Style="min-width:190px" Label="Planta">
+            <MudSelectItem T="string" Value="@Todas">Todas las plantas</MudSelectItem>
+            @foreach (var planta in DatosDemo.Plantas)
+            {
+                <MudSelectItem T="string" Value="@planta.Nombre">@planta.Nombre</MudSelectItem>
+            }
+        </MudSelect>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Assignment" Href="/ordenes/nueva">
+            Nueva orden
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add" Href="/maquinas/nueva">
+            Nueva máquina
+        </MudButton>
+    </Acciones>
+</PageHeader>
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" sm="6" md="4" lg="2">
+        <MetricCard Etiqueta="Máquinas activas" Valor="@Maquinas.Count(m => m.Estado != EstadoMaquina.Inactiva).ToString()"
+                    Unidad="@($"/ {DatosDemo.EmpresaActual.MaxMaquinasHabilitadas}")"
+                    Detalle="@($"{Maquinas.Count(m => m.Estado == EstadoMaquina.Operativa)} operativas ahora")"
+                    Icono="@Icons.Material.Filled.PrecisionManufacturing" Acento="Color.Primary" Href="/maquinas" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4" lg="2">
+        <MetricCard Etiqueta="Alertas de stock activas" Valor="@Alertas.Count.ToString()"
+                    Detalle="@($"{Alertas.Count(a => a.Criticidad == Criticidad.Critica)} sobre repuestos críticos")"
+                    Icono="@Icons.Material.Filled.WarningAmber"
+                    Acento="@(Alertas.Any(a => a.Criticidad == Criticidad.Critica) ? Color.Error : Color.Warning)"
+                    Href="/alertas" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4" lg="2">
+        <MetricCard Etiqueta="Órdenes abiertas" Valor="@Ordenes.Count(o => o.Estado is EstadoOrden.Abierta or EstadoOrden.EnCurso).ToString()"
+                    Detalle="@($"{Ordenes.Count(o => o.Prioridad == Prioridad.Urgente && o.Estado != EstadoOrden.Cerrada)} urgentes sin cerrar")"
+                    Icono="@Icons.Material.Filled.Assignment" Acento="Color.Info" Href="/ordenes" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4" lg="2">
+        <MetricCard Etiqueta="Recomendaciones pendientes" Valor="@Recomendaciones.Count(r => r.Estado == EstadoRecomendacion.Activa).ToString()"
+                    Detalle="@($"{Recomendaciones.Count(r => r.Origen == OrigenRecomendacion.Modelo && r.Estado == EstadoRecomendacion.Activa)} generadas por el modelo")"
+                    Icono="@Icons.Material.Filled.Psychology" Acento="Color.Tertiary" Href="/recomendaciones" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4" lg="2">
+        <MetricCard Etiqueta="Capital en riesgo" Valor="@Ui.Moneda(CapitalEnRiesgo)"
+                    Detalle="Costo de reposición de lo que está bajo mínimo"
+                    Icono="@Icons.Material.Filled.PriceCheck" Acento="Color.Secondary" Href="/repuestos" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4" lg="2">
+        <MetricCard Etiqueta="Tiempo medio de resolución" Valor="@TiempoMedio.ToString("0.0")" Unidad="h"
+                    Detalle="@($"Sobre {Ordenes.Count(o => o.Estado == EstadoOrden.Cerrada)} órdenes cerradas")"
+                    Icono="@Icons.Material.Filled.Timer" Acento="Color.Success" Href="/reportes" />
+    </MudItem>
+</MudGrid>
+
+<MudGrid Spacing="3" Class="mt-1">
+    <MudItem xs="12" lg="8">
+        <SectionCard Titulo="Órdenes de trabajo por mes"
+                     Bajada="Correctivo frente a preventivo en los últimos seis meses">
+            <MudChart T="double" ChartType="ChartType.Bar"
+                      ChartSeries="@SeriesOrdenes"
+                      ChartLabels="@MesesEtiquetas"
+                      ChartOptions="@_opcionesBarras"
+                      Width="100%" Height="300px" />
+        </SectionCard>
+    </MudItem>
+
+    <MudItem xs="12" lg="4">
+        <SectionCard Titulo="Estado del parque" Bajada="@($"{Maquinas.Count} máquinas en el alcance seleccionado")">
+            <div class="d-flex justify-center">
+                <MudChart T="double" ChartType="ChartType.Donut"
+                          ChartSeries="@(new List<ChartSeries<double>> { new() { Name = "Máquinas", Data = DatosParque } })"
+                          ChartLabels="@EtiquetasParque"
+                          ChartOptions="@_opcionesParque"
+                          Width="230px" Height="230px" />
+            </div>
+            <div class="mantia-lista-datos mt-3">
+                @foreach (var (estado, cantidad) in ParqueDetalle)
+                {
+                    <div class="d-flex align-center justify-space-between">
+                        <div class="d-flex align-center" style="gap:.5rem">
+                            <MudIcon Icon="@Ui.IconoDe(estado)" Color="@Ui.ColorDe(estado)" Size="Size.Small" />
+                            <MudText Typo="Typo.body2">@Ui.TextoDe(estado)</MudText>
+                        </div>
+                        <MudText Typo="Typo.body2"><b>@cantidad</b></MudText>
+                    </div>
+                }
+            </div>
+        </SectionCard>
+    </MudItem>
+
+    <MudItem xs="12" lg="7">
+        <SectionCard Titulo="Alertas de stock que requieren decisión"
+                     Bajada="Ordenadas por criticidad y días de cobertura restantes"
+                     SinPadding="true">
+            <Acciones>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/alertas"
+                           EndIcon="@Icons.Material.Filled.ArrowForward" Size="Size.Small">
+                    Ver todas
+                </MudButton>
+            </Acciones>
+            <ChildContent>
+                @if (Alertas.Count == 0)
+                {
+                    <EmptyState Titulo="Sin alertas activas"
+                                Descripcion="Todos los repuestos críticos están por encima de su umbral mínimo configurado."
+                                Icono="@Icons.Material.Filled.CheckCircle" />
+                }
+                else
+                {
+                    <MudTable Items="@Alertas.Take(6)" Dense="true" Hover="true" Class="mantia-tabla" Elevation="0" Breakpoint="Breakpoint.Sm">
+                        <HeaderContent>
+                            <MudTh>Repuesto</MudTh>
+                            <MudTh>Criticidad</MudTh>
+                            <MudTh>Cobertura</MudTh>
+                            <MudTh Style="text-align:right">Cobertura restante</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Repuesto">
+                                <div class="mantia-celda-principal">
+                                    <strong>@context.Repuesto</strong>
+                                    <span>@context.NumeroParte · @context.Maquina</span>
+                                </div>
+                            </MudTd>
+                            <MudTd DataLabel="Criticidad">
+                                <StatusChip Texto="@Ui.TextoDe(context.Criticidad)" ChipColor="@Ui.ColorDe(context.Criticidad)" />
+                            </MudTd>
+                            <MudTd DataLabel="Cobertura" Style="min-width:150px">
+                                <CoverageBar Actual="context.StockActual" Minimo="context.StockMinimo" />
+                            </MudTd>
+                            <MudTd DataLabel="Cobertura restante" Style="text-align:right">
+                                @if (context.DiasCobertura >= 999)
+                                {
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Sin consumo</MudText>
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.body2" Color="@(context.DiasCobertura < 30 ? Color.Error : Color.Default)">
+                                        <b>@context.DiasCobertura</b> días
+                                    </MudText>
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </ChildContent>
+        </SectionCard>
+    </MudItem>
+
+    <MudItem xs="12" lg="5">
+        <SectionCard Titulo="Próxima decisión sugerida"
+                     Bajada="La recomendación de mayor prioridad generada por el motor">
+            <Acciones>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/recomendaciones"
+                           EndIcon="@Icons.Material.Filled.ArrowForward" Size="Size.Small">
+                    Ver panel
+                </MudButton>
+            </Acciones>
+            <ChildContent>
+                @if (RecomendacionDestacada is null)
+                {
+                    <EmptyState Titulo="Sin recomendaciones activas"
+                                Descripcion="El motor no detectó riesgos de reposición en el último análisis."
+                                Icono="@Icons.Material.Filled.Psychology" />
+                }
+                else
+                {
+                    <div class="d-flex flex-wrap align-center mb-3" style="gap:.5rem">
+                        <StatusChip Texto="@Ui.TextoDe(RecomendacionDestacada.Origen)"
+                                    ChipColor="@Ui.ColorDe(RecomendacionDestacada.Origen)"
+                                    Icono="@Ui.IconoDe(RecomendacionDestacada.Origen)" />
+                        <StatusChip Texto="@($"Prioridad {RecomendacionDestacada.Prioridad}")"
+                                    ChipColor="@Ui.ColorDe(RecomendacionDestacada.Prioridad)" Variante="Variant.Outlined" />
+                    </div>
+                    <MudText Typo="Typo.h6">@RecomendacionDestacada.Repuesto</MudText>
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+                        @RecomendacionDestacada.Maquina · @RecomendacionDestacada.Planta
+                    </MudText>
+                    <MudText Typo="Typo.body2" Class="mb-3">@RecomendacionDestacada.Justificacion</MudText>
+                    <div class="mantia-reco__bloque">
+                        <div class="mantia-reco__bloque-titulo">Por qué se disparó</div>
+                        <MudText Typo="Typo.body2">@RecomendacionDestacada.ReglaAplicada</MudText>
+                    </div>
+                    <div class="d-flex justify-space-between mt-4">
+                        <DataPoint Etiqueta="Stock actual" Valor="@Ui.Numero(RecomendacionDestacada.StockActual)" />
+                        <DataPoint Etiqueta="Sugerido" Valor="@($"+{Ui.Numero(RecomendacionDestacada.CantidadSugerida)}")" />
+                        <DataPoint Etiqueta="Capital en riesgo" Valor="@Ui.Moneda(RecomendacionDestacada.ImpactoEstimado)" />
+                    </div>
+                }
+            </ChildContent>
+        </SectionCard>
+    </MudItem>
+
+    <MudItem xs="12">
+        <SectionCard Titulo="Actividad reciente de mantenimiento"
+                     Bajada="Últimas órdenes registradas en el alcance seleccionado"
+                     SinPadding="true">
+            <Acciones>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/ordenes"
+                           EndIcon="@Icons.Material.Filled.ArrowForward" Size="Size.Small">
+                    Ver todas
+                </MudButton>
+            </Acciones>
+            <ChildContent>
+                <MudTable Items="@Ordenes.OrderByDescending(o => o.FechaApertura).Take(7)" Dense="true" Hover="true"
+                          Class="mantia-tabla" Elevation="0" Breakpoint="Breakpoint.Sm"
+                          OnRowClick="@((TableRowClickEventArgs<OrdenTrabajoVm> e) => AbrirOrden(e.Item))"
+                          RowStyle="cursor:pointer">
+                    <HeaderContent>
+                        <MudTh>Orden</MudTh>
+                        <MudTh>Máquina</MudTh>
+                        <MudTh>Tipo</MudTh>
+                        <MudTh>Prioridad</MudTh>
+                        <MudTh>Responsable</MudTh>
+                        <MudTh>Estado</MudTh>
+                        <MudTh Style="text-align:right">Apertura</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Orden"><b>@context.Numero</b></MudTd>
+                        <MudTd DataLabel="Máquina">
+                            <div class="mantia-celda-principal">
+                                <strong>@context.Maquina</strong>
+                                <span>@context.TipoFalla</span>
+                            </div>
+                        </MudTd>
+                        <MudTd DataLabel="Tipo">
+                            <StatusChip Texto="@context.TipoMantenimiento.ToString()"
+                                        ChipColor="@Ui.ColorDe(context.TipoMantenimiento)" Variante="Variant.Outlined" />
+                        </MudTd>
+                        <MudTd DataLabel="Prioridad">
+                            <StatusChip Texto="@context.Prioridad.ToString()" ChipColor="@Ui.ColorDe(context.Prioridad)" />
+                        </MudTd>
+                        <MudTd DataLabel="Responsable">@context.UsuarioAsignado</MudTd>
+                        <MudTd DataLabel="Estado">
+                            <StatusChip Texto="@Ui.TextoDe(context.Estado)" ChipColor="@Ui.ColorDe(context.Estado)" />
+                        </MudTd>
+                        <MudTd DataLabel="Apertura" Style="text-align:right">@Ui.Relativo(context.FechaApertura)</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </ChildContent>
+        </SectionCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private const string Todas = "Todas";
+    private string _planta = Todas;
+
+    private readonly BarChartOptions _opcionesBarras = new()
+    {
+        YAxisTicks = 1,
+        MaxNumYAxisTicks = 6,
+        ChartPalette = ["#D14343", "#2E90C4"],
+    };
+
+    private readonly ChartOptions _opcionesParque = new()
+    {
+        ChartPalette = ["#1E9E62", "#DE9021", "#D14343", "#8FA8BC"]
+    };
+
+    private List<MaquinaVm> Maquinas => _planta == Todas
+        ? DatosDemo.Maquinas
+        : DatosDemo.Maquinas.Where(m => m.Planta == _planta).ToList();
+
+    private List<OrdenTrabajoVm> Ordenes => _planta == Todas
+        ? DatosDemo.Ordenes
+        : DatosDemo.Ordenes.Where(o => o.Planta == _planta).ToList();
+
+    private List<AlertaStockVm> Alertas => _planta == Todas
+        ? DatosDemo.Alertas()
+        : DatosDemo.Alertas().Where(a => a.Planta == _planta).ToList();
+
+    private List<RecomendacionVm> Recomendaciones => _planta == Todas
+        ? DatosDemo.Recomendaciones
+        : DatosDemo.Recomendaciones.Where(r => r.Planta == _planta).ToList();
+
+    private RecomendacionVm? RecomendacionDestacada => Recomendaciones
+        .Where(r => r.Estado == EstadoRecomendacion.Activa)
+        .OrderByDescending(r => r.Prioridad)
+        .ThenByDescending(r => r.ImpactoEstimado)
+        .FirstOrDefault();
+
+    private decimal CapitalEnRiesgo => DatosDemo.Repuestos
+        .Where(r => r.BajoMinimo && r.Estado == EstadoGenerico.Activo)
+        .Sum(r => (r.StockMinimo - r.StockActual) * r.CostoUnitario);
+
+    private double TiempoMedio
+    {
+        get
+        {
+            var cerradas = Ordenes.Where(o => o.HorasResolucion.HasValue).ToList();
+            return cerradas.Count == 0 ? 0 : cerradas.Average(o => o.HorasResolucion!.Value);
+        }
+    }
+
+    private List<(EstadoMaquina Estado, int Cantidad)> ParqueDetalle =>
+        Enum.GetValues<EstadoMaquina>()
+            .Select(e => (Estado: e, Cantidad: Maquinas.Count(m => m.Estado == e)))
+            .Where(x => x.Cantidad > 0)
+            .ToList();
+
+    private double[] DatosParque => ParqueDetalle.Select(x => (double)x.Cantidad).ToArray();
+
+    private string[] EtiquetasParque => ParqueDetalle.Select(x => Ui.TextoDe(x.Estado)).ToArray();
+
+    private string[] MesesEtiquetas => Enumerable.Range(0, 6)
+        .Select(i => DateTime.Today.AddMonths(-5 + i).ToString("MMM").ToUpperInvariant())
+        .ToArray();
+
+    private List<ChartSeries<double>> SeriesOrdenes
+    {
+        get
+        {
+            double[] correctivo = new double[6];
+            double[] preventivo = new double[6];
+
+            foreach (var orden in Ordenes)
+            {
+                var meses = (DateTime.Today.Year - orden.FechaApertura.Year) * 12
+                            + DateTime.Today.Month - orden.FechaApertura.Month;
+                var indice = 5 - meses;
+                if (indice is < 0 or > 5) continue;
+
+                if (orden.TipoMantenimiento == TipoMantenimiento.Correctivo) correctivo[indice]++;
+                else preventivo[indice]++;
+            }
+
+            return
+            [
+                new ChartSeries<double> { Name = "Correctivo", Data = correctivo },
+                new ChartSeries<double> { Name = "Preventivo", Data = preventivo }
+            ];
+        }
+    }
+
+    private void AbrirOrden(OrdenTrabajoVm? orden)
+    {
+        if (orden is not null) Nav.NavigateTo($"/ordenes/{orden.Id}");
+    }
+}

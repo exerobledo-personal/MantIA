@@ -1,0 +1,217 @@
+@page "/empresa/permisos"
+@inject ISnackbar Snackbar
+
+<PageTitle>Matriz de permisos · MantIA</PageTitle>
+
+<PageHeader Titulo="Matriz de permisos por rol y nivel"
+            Bajada="Cada combinación de rol y nivel define qué acciones puede ejecutar un usuario sobre cada recurso de la plataforma. Los permisos no se configuran por persona: se configuran acá y alcanzan a todos los usuarios que comparten ese perfil."
+            Icono="@Icons.Material.Filled.AdminPanelSettings"
+            Migas="@Migas">
+    <Acciones>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Group" Href="/empresa/usuarios">
+            Ver usuarios
+        </MudButton>
+    </Acciones>
+</PageHeader>
+
+<FilterBar>
+    <MudSelect T="string" @bind-Value="_rol" Label="Rol" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        @foreach (var rol in RolesDisponibles)
+        {
+            <MudSelectItem T="string" Value="@rol">@Roles.Etiqueta(rol)</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="string" @bind-Value="_nivel" Label="Nivel" Dense="true"
+               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mantia-filtros__campo">
+        @foreach (var nivel in DatosDemo.Niveles)
+        {
+            <MudSelectItem T="string" Value="@nivel.Nombre">@nivel.Nombre</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSpacer />
+
+    <MudText Typo="Typo.body2" Class="mud-text-secondary">
+        @(Habilitadas(_rol, _nivel)) de @TotalCombinaciones acciones habilitadas ·
+        @UsuariosDelPerfil usuarios con este perfil
+    </MudText>
+</FilterBar>
+
+@if (JrMasPermisivoQueSr(_rol))
+{
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">
+        El nivel Jr de @(Roles.Etiqueta(_rol)) tiene @(Habilitadas(_rol, "Jr")) acciones habilitadas contra
+        @(Habilitadas(_rol, "Sr")) del nivel Sr. Por definición, Sr es el nivel de mayor alcance dentro del mismo rol:
+        la configuración actual es inconsistente. Podés guardarla igual, pero conviene revisarla.
+        @if (AccionesSoloEnJr.Count > 0)
+        {
+            <span> Acciones habilitadas en Jr y no en Sr: @(string.Join(" · ", AccionesSoloEnJr)).</span>
+        }
+    </MudAlert>
+}
+
+<SectionCard Titulo="@($"Permisos de {Roles.Etiqueta(_rol)} · nivel {_nivel}")"
+             Bajada="Marcá o desmarcá cada acción sobre cada recurso. El cambio se registra en la bitácora de la empresa."
+             SinPadding="true">
+    <div class="mantia-scroll-x">
+        <MudTable Items="@DatosDemo.Recursos" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                  Breakpoint="Breakpoint.None" Striped="false">
+            <HeaderContent>
+                <MudTh Style="min-width:180px">Recurso</MudTh>
+                @foreach (var accion in DatosDemo.Acciones)
+                {
+                    <MudTh Style="text-align:center;min-width:120px">@accion</MudTh>
+                }
+                <MudTh Style="text-align:right;min-width:120px">Habilitadas</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Recurso">
+                    <div class="mantia-celda-principal">
+                        <strong>@context</strong>
+                        <span>@DescripcionDe(context)</span>
+                    </div>
+                </MudTd>
+                @foreach (var accion in DatosDemo.Acciones)
+                {
+                    var recurso = context;
+                    <MudTd DataLabel="@accion" Style="text-align:center">
+                        <MudSwitch T="bool" Color="Color.Primary"
+                                   Value="@EstaHabilitado(recurso, accion)"
+                                   ValueChanged="@((bool valor) => Alternar(recurso, accion, valor))" />
+                    </MudTd>
+                }
+                <MudTd DataLabel="Habilitadas" Style="text-align:right">
+                    <b>@HabilitadasDelRecurso(context)</b> de @DatosDemo.Acciones.Length
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </div>
+</SectionCard>
+
+<SectionCard Titulo="Comparativa de todos los perfiles" Class="mt-4"
+             Bajada="@($"Cuántas acciones tiene habilitadas cada combinación de rol y nivel sobre un total de {TotalCombinaciones} acciones posibles")"
+             SinPadding="true">
+    <MudTable Items="@RolesDisponibles" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+              Breakpoint="Breakpoint.Sm" Striped="false">
+        <HeaderContent>
+            <MudTh>Rol</MudTh>
+            <MudTh Style="text-align:right">Acciones en Jr</MudTh>
+            <MudTh Style="text-align:right">Acciones en Sr</MudTh>
+            <MudTh Style="text-align:right">Usuarios Jr</MudTh>
+            <MudTh Style="text-align:right">Usuarios Sr</MudTh>
+            <MudTh>Coherencia entre niveles</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Rol">
+                <div class="mantia-celda-principal">
+                    <strong>@Roles.Etiqueta(context)</strong>
+                    <span>@AlcanceDe(context)</span>
+                </div>
+            </MudTd>
+            <MudTd DataLabel="Acciones en Jr" Style="text-align:right">
+                <b>@Habilitadas(context, "Jr")</b> de @TotalCombinaciones
+            </MudTd>
+            <MudTd DataLabel="Acciones en Sr" Style="text-align:right">
+                <b>@Habilitadas(context, "Sr")</b> de @TotalCombinaciones
+            </MudTd>
+            <MudTd DataLabel="Usuarios Jr" Style="text-align:right">
+                @(DatosDemo.Usuarios.Count(u => u.Rol == context && u.Nivel == "Jr"))
+            </MudTd>
+            <MudTd DataLabel="Usuarios Sr" Style="text-align:right">
+                @(DatosDemo.Usuarios.Count(u => u.Rol == context && u.Nivel == "Sr"))
+            </MudTd>
+            <MudTd DataLabel="Coherencia entre niveles">
+                @if (JrMasPermisivoQueSr(context))
+                {
+                    <StatusChip Texto="Jr supera a Sr" ChipColor="Color.Warning"
+                                Icono="@Icons.Material.Filled.WarningAmber" />
+                }
+                else if (Habilitadas(context, "Jr") == Habilitadas(context, "Sr"))
+                {
+                    <StatusChip Texto="Niveles equivalentes" ChipColor="Color.Info" Variante="Variant.Outlined" />
+                }
+                else
+                {
+                    <StatusChip Texto="Sr más amplio que Jr" ChipColor="Color.Success"
+                                Icono="@Icons.Material.Filled.CheckCircle" Variante="Variant.Outlined" />
+                }
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+</SectionCard>
+
+@code {
+    private string _rol = Roles.Empleado;
+    private string _nivel = "Jr";
+
+    private static readonly string[] RolesDisponibles =
+        [Roles.Empleado, Roles.Supervisor, Roles.Gerente, Roles.AdminEmpresa];
+
+    private static readonly List<BreadcrumbItem> Migas =
+    [
+        new BreadcrumbItem("Administración de empresa", "/empresa"),
+        new BreadcrumbItem("Matriz de permisos", "/empresa/permisos")
+    ];
+
+    private static int TotalCombinaciones => DatosDemo.Recursos.Length * DatosDemo.Acciones.Length;
+
+    private int UsuariosDelPerfil => DatosDemo.Usuarios.Count(u => u.Rol == _rol && u.Nivel == _nivel);
+
+    private static int Habilitadas(string rol, string nivel) =>
+        DatosDemo.Permisos.Count(p => p.Rol == rol && p.Nivel == nivel && p.Habilitado);
+
+    private static bool JrMasPermisivoQueSr(string rol) => Habilitadas(rol, "Jr") > Habilitadas(rol, "Sr");
+
+    private List<string> AccionesSoloEnJr => DatosDemo.Permisos
+        .Where(p => p.Rol == _rol && p.Nivel == "Jr" && p.Habilitado)
+        .Where(p => !DatosDemo.Permisos.Any(s => s.Rol == _rol && s.Nivel == "Sr"
+                                                 && s.Recurso == p.Recurso && s.Accion == p.Accion && s.Habilitado))
+        .Select(p => $"{p.Accion} sobre {p.Recurso}")
+        .ToList();
+
+    private PermisoVm? Buscar(string recurso, string accion) => DatosDemo.Permisos
+        .FirstOrDefault(p => p.Rol == _rol && p.Nivel == _nivel && p.Recurso == recurso && p.Accion == accion);
+
+    private bool EstaHabilitado(string recurso, string accion) => Buscar(recurso, accion)?.Habilitado ?? false;
+
+    private int HabilitadasDelRecurso(string recurso) => DatosDemo.Permisos
+        .Count(p => p.Rol == _rol && p.Nivel == _nivel && p.Recurso == recurso && p.Habilitado);
+
+    private void Alternar(string recurso, string accion, bool valor)
+    {
+        var permiso = Buscar(recurso, accion);
+        if (permiso is null) return;
+
+        permiso.Habilitado = valor;
+
+        Snackbar.Add(valor
+            ? $"Se habilitó {accion} sobre {recurso} para {Roles.Etiqueta(_rol)} de nivel {_nivel}. El cambio aplica en la próxima sesión de los usuarios afectados."
+            : $"Se deshabilitó {accion} sobre {recurso} para {Roles.Etiqueta(_rol)} de nivel {_nivel}. El cambio aplica en la próxima sesión de los usuarios afectados.",
+            Severity.Success);
+    }
+
+    private static string DescripcionDe(string recurso) => recurso switch
+    {
+        "Máquinas" => "Parque de equipos y sus fichas técnicas",
+        "Repuestos" => "Catálogo de repuestos críticos y umbrales de stock",
+        "Alertas" => "Alertas de stock por debajo del mínimo",
+        "Órdenes de trabajo" => "Apertura, seguimiento y cierre de intervenciones",
+        "Recomendaciones" => "Sugerencias de reposición del motor de recomendaciones",
+        "Reportes" => "Reportes operativos y su exportación",
+        "Usuarios" => "Altas, bajas y modificaciones de usuarios de la empresa",
+        "Plantas" => "Instalaciones habilitadas de la empresa",
+        _ => "Recurso de la plataforma"
+    };
+
+    private static string AlcanceDe(string rol) => rol switch
+    {
+        Roles.Empleado => "Ejecuta las intervenciones en planta",
+        Roles.Supervisor => "Coordina el equipo y valida recomendaciones",
+        Roles.Gerente => "Consulta consolidada y reportes de gestión",
+        Roles.AdminEmpresa => "Administra usuarios, plantas y permisos",
+        _ => "Perfil de la plataforma"
+    };
+}
