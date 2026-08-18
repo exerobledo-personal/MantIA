@@ -24,8 +24,15 @@ COPY --from=build /publicado .
 
 # Render, App Service y Container Apps inyectan el puerto por la variable PORT.
 # Si no viene, se usa 8080, que es lo habitual en local.
+#
+# reloadConfigOnChange=false es obligatorio en contenedores: por defecto .NET vigila
+# appsettings.json con un FileSystemWatcher, y eso consume una instancia de inotify
+# del kernel. En hosts compartidos el limite (128 por usuario) suele estar agotado y
+# la aplicacion revienta en WebApplication.CreateBuilder, antes de existir.
 ENV ASPNETCORE_ENVIRONMENT=Production \
-    ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
+    ASPNETCORE_FORWARDEDHEADERS_ENABLED=true \
+    DOTNET_hostBuilder__reloadConfigOnChange=false \
+    DOTNET_USE_POLLING_FILE_WATCHER=true
 EXPOSE 8080
 
 ENTRYPOINT ["/bin/sh", "-c", "ASPNETCORE_HTTP_PORTS=${PORT:-8080} exec dotnet MantIA.WEB.dll"]

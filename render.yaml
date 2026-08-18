@@ -27,6 +27,14 @@ services:
       - key: ASPNETCORE_FORWARDEDHEADERS_ENABLED
         value: "true"
 
+      # Sin esto la aplicacion no arranca: .NET vigila appsettings.json con un
+      # FileSystemWatcher, que consume una instancia de inotify del kernel, y en
+      # el host compartido de Render el limite de 128 ya esta agotado.
+      - key: DOTNET_hostBuilder__reloadConfigOnChange
+        value: "false"
+      - key: DOTNET_USE_POLLING_FILE_WATCHER
+        value: "true"
+
       # Valores de relleno: la maqueta no usa Auth0 ni base de datos, pero sin
       # ellos la aplicacion no llega a arrancar.
       - key: Auth0__Domain
