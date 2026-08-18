@@ -189,7 +189,7 @@
     private PlantaVm? _plantaSeleccionada;
     private List<AlertaStockVm> _alertas = [];
 
-    private static readonly List<BreadcrumbItem> Migas =
+    private readonly List<BreadcrumbItem> Migas =
     [
         new BreadcrumbItem("Administración de empresa", "/empresa"),
         new BreadcrumbItem("Mapa de plantas", "/empresa/mapa")
@@ -219,9 +219,9 @@
         ? []
         : _alertas.Where(a => a.Planta == _plantaSeleccionada.Nombre).ToList();
 
-    private static string Coordenadas(PlantaVm planta) =>
+    private string Coordenadas(PlantaVm planta) =>
         planta.Latitud.ToString("F4") + ", " + planta.Longitud.ToString("F4");
 
-    private static int UsuariosDe(PlantaVm planta) => DatosDemo.Usuarios
+    private int UsuariosDe(PlantaVm planta) => DatosDemo.Usuarios
         .Count(u => u.Estado == EstadoGenerico.Activo && u.Plantas.Contains(planta.Nombre));
 }

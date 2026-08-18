@@ -1,12 +1,43 @@
 namespace MantIA.WEB.Demo;
 
-public static class DatosDemo
+public class DatosDemo
 {
-    private static readonly DateTime Hoy = DateTime.Today;
+    private readonly DateTime Hoy = DateTime.Today;
 
-    public static EmpresaVm EmpresaActual => Empresas[0];
+    public DatosDemo()
+    {
+        // Tramo de siembra: los Id de los datos de ejemplo se generan de forma
+        // deterministica, iguales en todas las sesiones. Sin esto, cada circuito
+        // tendria sus propios Guid y un enlace directo o un F5 sobre
+        // /maquinas/{id} caeria en "no encontramos la maquina".
+        using var siembra = IdDemo.Sembrando();
 
-    public static readonly UsuarioVm UsuarioActual = new()
+        Plantas = ConstruirPlantas();
+        Catalogo = ConstruirCatalogo();
+        Maquinas = ConstruirMaquinas();
+        Repuestos = ConstruirRepuestos();
+        Usuarios = ConstruirUsuarios();
+        Niveles = ConstruirNiveles();
+        Ordenes = ConstruirOrdenes();
+        Recomendaciones = ConstruirRecomendaciones();
+        Reportes = ConstruirReportes();
+        Planes = ConstruirPlanes();
+        Empresas = ConstruirEmpresas();
+        Servicios = ConstruirServicios();
+        Bitacora = ConstruirBitacora();
+        Recursos = ConstruirRecursos();
+        Acciones = ConstruirAcciones();
+        Permisos = ConstruirPermisos();
+        UsuarioActual = ConstruirUsuarioActual();
+
+        SincronizarPlantas();
+    }
+
+    public EmpresaVm EmpresaActual => Empresas[0];
+
+    public UsuarioVm UsuarioActual { get; }
+
+    private UsuarioVm ConstruirUsuarioActual() => new()
     {
         Nombre = "Exequiel",
         Apellido = "Robledo",
@@ -18,7 +49,9 @@ public static class DatosDemo
         UltimoAcceso = DateTime.Now.AddMinutes(-3)
     };
 
-    public static readonly List<PlantaVm> Plantas =
+    public List<PlantaVm> Plantas { get; }
+
+    private List<PlantaVm> ConstruirPlantas() =>
     [
         new() { Nombre = "Planta Norte", Direccion = "Ruta Panamericana Km 44,5", Localidad = "Pilar, Buenos Aires",
                 Latitud = -34.4587m, Longitud = -58.9142m, FechaAlta = Hoy.AddMonths(-14) },
@@ -28,11 +61,13 @@ public static class DatosDemo
                 Latitud = -34.6637m, Longitud = -58.3816m, FechaAlta = Hoy.AddMonths(-6) }
     ];
 
-    public static PlantaVm PlantaNorte => Plantas[0];
-    public static PlantaVm PlantaOeste => Plantas[1];
-    public static PlantaVm PlantaSur => Plantas[2];
+    private PlantaVm PlantaNorte => Plantas[0];
+    private PlantaVm PlantaOeste => Plantas[1];
+    private PlantaVm PlantaSur => Plantas[2];
 
-    public static readonly List<CatalogoMaquinaVm> Catalogo =
+    public List<CatalogoMaquinaVm> Catalogo { get; }
+
+    private List<CatalogoMaquinaVm> ConstruirCatalogo() =>
     [
         new() { Marca = "Tetra Pak", Modelo = "A3/Speed", Categoria = "Llenado aséptico",
                 FallasComunes = ["Desgaste de mordazas de sellado", "Fuga en válvula aséptica", "Desalineación de banda de cartón"],
@@ -101,9 +136,9 @@ public static class DatosDemo
                 Estado = EstadoEnriquecimiento.Pendiente, TenantsQueLoUsan = 2 }
     ];
 
-    public static readonly List<MaquinaVm> Maquinas = ConstruirMaquinas();
+    public List<MaquinaVm> Maquinas { get; }
 
-    private static List<MaquinaVm> ConstruirMaquinas()
+    private List<MaquinaVm> ConstruirMaquinas()
     {
         MaquinaVm Nueva(string codigo, string nombre, string serie, PlantaVm planta, int catalogo,
             string linea, EstadoMaquina estado, Criticidad criticidad, int mesesAlta, int diasUltima, int horas)
@@ -148,9 +183,9 @@ public static class DatosDemo
         ];
     }
 
-    public static readonly List<RepuestoVm> Repuestos = ConstruirRepuestos();
+    public List<RepuestoVm> Repuestos { get; }
 
-    private static List<RepuestoVm> ConstruirRepuestos()
+    private List<RepuestoVm> ConstruirRepuestos()
     {
         RepuestoVm Nuevo(string nombre, string parte, string proveedor, string unidad, decimal actual,
             decimal minimo, Criticidad criticidad, int plazo, decimal costo, params string[] maquinas)
@@ -198,7 +233,9 @@ public static class DatosDemo
         ];
     }
 
-    public static readonly List<UsuarioVm> Usuarios =
+    public List<UsuarioVm> Usuarios { get; }
+
+    private List<UsuarioVm> ConstruirUsuarios() =>
     [
         new() { Nombre = "Laura", Apellido = "Giménez", Email = "laura.gimenez@alimentospampa.com.ar", Rol = Roles.AdminEmpresa,
                 Nivel = "Sr", Plantas = ["Planta Norte", "Planta Oeste", "Planta Sur"], FechaAlta = Hoy.AddMonths(-14),
@@ -232,15 +269,17 @@ public static class DatosDemo
                 UltimoAcceso = Hoy.AddMonths(-2), OrdenesAsignadas = 0 }
     ];
 
-    public static readonly List<NivelPermisoVm> Niveles =
+    public List<NivelPermisoVm> Niveles { get; }
+
+    private List<NivelPermisoVm> ConstruirNiveles() =>
     [
         new() { Nombre = "Jr", Descripcion = "Acceso operativo restringido. No puede dar de baja registros ni cerrar órdenes de trabajo.", Usuarios = 4 },
         new() { Nombre = "Sr", Descripcion = "Acceso operativo completo dentro de su rol, incluyendo bajas y cierres.", Usuarios = 6 }
     ];
 
-    public static readonly List<OrdenTrabajoVm> Ordenes = ConstruirOrdenes();
+    public List<OrdenTrabajoVm> Ordenes { get; }
 
-    private static List<OrdenTrabajoVm> ConstruirOrdenes()
+    private List<OrdenTrabajoVm> ConstruirOrdenes()
     {
         var lista = new List<OrdenTrabajoVm>();
         var n = 1;
@@ -350,9 +389,9 @@ public static class DatosDemo
         return lista;
     }
 
-    public static readonly List<RecomendacionVm> Recomendaciones = ConstruirRecomendaciones();
+    public List<RecomendacionVm> Recomendaciones { get; }
 
-    private static List<RecomendacionVm> ConstruirRecomendaciones()
+    private List<RecomendacionVm> ConstruirRecomendaciones()
     {
         RecomendacionVm Nueva(string parte, string codigoMaquina, OrigenRecomendacion origen, string regla,
             decimal cantidad, string justificacion, List<string> evidencia, int confianza, Prioridad prioridad,
@@ -443,7 +482,9 @@ public static class DatosDemo
         ];
     }
 
-    public static readonly List<ReporteVm> Reportes =
+    public List<ReporteVm> Reportes { get; }
+
+    private List<ReporteVm> ConstruirReportes() =>
     [
         new() { Nombre = "Stock crítico consolidado — Agosto", TipoReporte = "Estado de stock",
                 Parametros = "Todas las plantas · Criticidad Alta y Crítica", Periodo = "01/08 al 31/08",
@@ -476,7 +517,9 @@ public static class DatosDemo
                               new() { Usuario = "Laura Giménez", Accion = "Eliminación lógica", Fecha = Hoy.AddDays(-30), Detalle = "Reporte marcado como eliminado por duplicado" } ] }
     ];
 
-    public static readonly List<PlanVm> Planes =
+    public List<PlanVm> Planes { get; }
+
+    private List<PlanVm> ConstruirPlanes() =>
     [
         new() { Nombre = "Básico", MaxMaquinas = 15, Precio = 180000,
                 Descripcion = "Una planta, hasta 15 máquinas y recomendaciones por reglas de negocio.", EmpresasActivas = 2 },
@@ -488,7 +531,9 @@ public static class DatosDemo
                 Descripcion = "Prueba sin costo por 60 días, hasta 5 máquinas y una sola planta.", EmpresasActivas = 1 }
     ];
 
-    public static readonly List<EmpresaVm> Empresas =
+    public List<EmpresaVm> Empresas { get; }
+
+    private List<EmpresaVm> ConstruirEmpresas() =>
     [
         new() { RazonSocial = "Alimentos Pampa S.A.", Dominio = "alimentospampa.com.ar", TenantId = "org_pampa_7f31",
                 Plan = "Profesional", MaxMaquinasHabilitadas = 50, MaquinasRegistradas = 14, UsuariosActivos = 9,
@@ -520,7 +565,9 @@ public static class DatosDemo
                 OrdenesUltimoMes = 6, RecomendacionesProcesadas = 9 }
     ];
 
-    public static readonly List<ServicioVm> Servicios =
+    public List<ServicioVm> Servicios { get; }
+
+    private List<ServicioVm> ConstruirServicios() =>
     [
         new() { Nombre = "Aplicación web", Tecnologia = "Azure App Service · Blazor Server", Estado = EstadoServicio.Operativo,
                 LatenciaMs = 84, Disponibilidad = 99.98, UltimoIncidente = "Sin incidentes en 90 días" },
@@ -538,9 +585,9 @@ public static class DatosDemo
                 LatenciaMs = 22, Disponibilidad = 100.00, UltimoIncidente = "Sin incidentes en 90 días" }
     ];
 
-    public static readonly List<EventoBitacoraVm> Bitacora = ConstruirBitacora();
+    public List<EventoBitacoraVm> Bitacora { get; }
 
-    private static List<EventoBitacoraVm> ConstruirBitacora()
+    private List<EventoBitacoraVm> ConstruirBitacora()
     {
         EventoBitacoraVm E(int horas, string usuario, string empresa, string accion, string recurso,
             string detalle, NivelLog nivel, string origen) => new()
@@ -588,14 +635,18 @@ public static class DatosDemo
         ];
     }
 
-    public static readonly string[] Recursos =
+    public string[] Recursos { get; }
+
+    private string[] ConstruirRecursos() =>
         ["Máquinas", "Repuestos", "Alertas", "Órdenes de trabajo", "Recomendaciones", "Reportes", "Usuarios", "Plantas"];
 
-    public static readonly string[] Acciones = ["Alta", "Baja", "Modificación", "Consulta"];
+    public string[] Acciones { get; }
 
-    public static readonly List<PermisoVm> Permisos = ConstruirPermisos();
+    private string[] ConstruirAcciones() => ["Alta", "Baja", "Modificación", "Consulta"];
 
-    private static List<PermisoVm> ConstruirPermisos()
+    public List<PermisoVm> Permisos { get; }
+
+    private List<PermisoVm> ConstruirPermisos()
     {
         var roles = new[] { Roles.Empleado, Roles.Supervisor, Roles.Gerente, Roles.AdminEmpresa };
         var lista = new List<PermisoVm>();
@@ -616,7 +667,7 @@ public static class DatosDemo
         return lista;
     }
 
-    private static bool PermisoPorDefecto(string rol, string nivel, string recurso, string accion)
+    private bool PermisoPorDefecto(string rol, string nivel, string recurso, string accion)
     {
         var administrativo = recurso is "Usuarios" or "Plantas";
 
@@ -648,7 +699,7 @@ public static class DatosDemo
         };
     }
 
-    public static List<AlertaStockVm> Alertas()
+    public List<AlertaStockVm> Alertas()
     {
         return Repuestos
             .Where(r => r.Estado == EstadoGenerico.Activo && r.BajoMinimo)
@@ -676,7 +727,7 @@ public static class DatosDemo
             .ToList();
     }
 
-    private static decimal ConsumoMensual(RepuestoVm repuesto)
+    private decimal ConsumoMensual(RepuestoVm repuesto)
     {
         var consumos = Ordenes
             .Where(o => o.Estado == EstadoOrden.Cerrada && o.FechaCierre >= DateTime.Now.AddMonths(-6))
@@ -687,7 +738,7 @@ public static class DatosDemo
         return Math.Round(consumos / 6m, 2);
     }
 
-    public static List<HistorialFallaVm> HistorialDe(Guid maquinaId)
+    public List<HistorialFallaVm> HistorialDe(Guid maquinaId)
     {
         return Ordenes
             .Where(o => o.MaquinaId == maquinaId && o.Estado == EstadoOrden.Cerrada)
@@ -707,9 +758,7 @@ public static class DatosDemo
             .ToList();
     }
 
-    static DatosDemo() => SincronizarPlantas();
-
-    public static void SincronizarPlantas()
+    public void SincronizarPlantas()
     {
         var alertas = Alertas();
 
@@ -722,7 +771,7 @@ public static class DatosDemo
         }
     }
 
-    public static string SiguienteNumeroOrden() => $"OT-2026-{Ordenes.Count + 1:D4}";
+    public string SiguienteNumeroOrden() => $"OT-2026-{Ordenes.Count + 1:D4}";
 
-    public static string SiguienteCodigoMaquina() => $"MAQ-{Maquinas.Count + 1:D3}";
+    public string SiguienteCodigoMaquina() => $"MAQ-{Maquinas.Count + 1:D3}";
 }

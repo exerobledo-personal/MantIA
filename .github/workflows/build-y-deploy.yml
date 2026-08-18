@@ -1,0 +1,77 @@
+name: Compilar y publicar MantIA.WEB
+
+# Dos trabajos independientes a proposito:
+#
+#   verificar  -> compila TODA la solucion en cada push. Es la red de seguridad:
+#                 el entorno de desarrollo local puede quedarse sin restaurar
+#                 paquetes NuGet, y aca siempre hay conexion.
+#
+#   desplegar  -> publica MantIA.WEB en Azure App Service. NO depende de
+#                 "verificar" para que un test rojo nunca bloquee una demo.
+#                 Se dispara a mano, o solo en la rama configurada.
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+      - 'feature/**'
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      desplegar:
+        description: 'Publicar en Azure App Service ademas de compilar'
+        type: boolean
+        default: false
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  PROYECTO_WEB: src/MantIA.WEB/MantIA.WEB.csproj
+
+jobs:
+  verificar:
+    name: Compilar solucion y correr tests unitarios
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar el SDK de .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restaurar paquetes
+        run: dotnet restore MantIA.slnx
+
+      - name: Compilar en Release
+        run: dotnet build MantIA.slnx -c Release --no-restore
+
+      - name: Tests unitarios
+        run: dotnet test tests/MantIA.UnitTests/MantIA.UnitTests.csproj -c Release --no-build --verbosity normal
+
+  desplegar:
+    name: Publicar en Azure App Service
+    runs-on: ubuntu-latest
+    # Solo corre si ya existe la variable con el nombre del Web App.
+    # Mientras no exista, el trabajo se saltea sin marcar el workflow en rojo.
+    if: >-
+      vars.AZURE_WEBAPP_NAME != '' &&
+      (github.event_name == 'workflow_dispatch' && inputs.desplegar ||
+       github.ref == format('refs/heads/{0}', vars.RAMA_DEMO))
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar el SDK de .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Publicar MantIA.WEB
+        run: dotnet publish ${{ env.PROYECTO_WEB }} -c Release -o ${{ github.workspace }}/publicado
+
+      - name: Desplegar en App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ${{ github.workspace }}/publicado

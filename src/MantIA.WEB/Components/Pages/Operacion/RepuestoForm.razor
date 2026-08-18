@@ -219,9 +219,9 @@ else
     private decimal _costoUnitario;
     private IReadOnlyCollection<string?>? _maquinasSeleccionadas = new List<string?>();
 
-    private static readonly string[] Unidades = ["Unidad", "Kit", "Juego", "Litro", "Metro", "Kilogramo"];
+    private readonly string[] Unidades = ["Unidad", "Kit", "Juego", "Litro", "Metro", "Kilogramo"];
 
-    private static readonly Criticidad[] Niveles =
+    private readonly Criticidad[] Niveles =
         [Criticidad.Critica, Criticidad.Alta, Criticidad.Media, Criticidad.Baja];
 
     private bool EsAlta => Id is null;
@@ -261,7 +261,7 @@ else
         _maquinasSeleccionadas = _repuesto.Maquinas.Select(m => (string?)m).ToList();
     }
 
-    private static string EtiquetaDe(MaquinaVm maquina) => $"{maquina.Codigo} · {maquina.Nombre}";
+    private string EtiquetaDe(MaquinaVm maquina) => $"{maquina.Codigo} · {maquina.Nombre}";
 
     private List<MaquinaVm> MaquinasElegidas
     {
@@ -363,7 +363,7 @@ else
     private void Cancelar() =>
         Nav.NavigateTo(EsAlta ? "/repuestos" : $"/repuestos/{Id}");
 
-    private static bool Coincide(string nombre, string sugerido)
+    private bool Coincide(string nombre, string sugerido)
     {
         var izquierda = Normalizar(nombre);
         var derecha = Normalizar(sugerido);
@@ -377,7 +377,7 @@ else
             .Any(palabra => derecha.Contains(palabra));
     }
 
-    private static string Normalizar(string texto)
+    private string Normalizar(string texto)
     {
         var descompuesto = texto.Trim().ToLowerInvariant().Normalize(NormalizationForm.FormD);
         var limpio = descompuesto

@@ -46,8 +46,8 @@
         ? "Tu cuenta no está habilitada para operar en esta plataforma."
         : Mensaje;
 
-    private static string Administrador => DatosDemo.EmpresaActual.AdminInicial;
+    private string Administrador => DatosDemo.EmpresaActual.AdminInicial;
 
-    private static string EnlaceCorreo =>
+    private string EnlaceCorreo =>
         $"mailto:{Administrador}?subject=Solicitud%20de%20acceso%20a%20MantIA";
 }

@@ -329,57 +329,57 @@
     private NivelLog _nivelLog = NivelLog.Warning;
     private NivelLog _nivelAplicado = NivelLog.Warning;
 
-    private static readonly List<BreadcrumbItem> Migas =
+    private readonly List<BreadcrumbItem> Migas =
     [
         new BreadcrumbItem("Plataforma MantIA", "/plataforma"),
         new BreadcrumbItem("Panel de sistema", "/plataforma/sistema")
     ];
 
-    private static readonly string[] Periodos = [Ultimas24, Ultimos7, Ultimos30, TodoElPeriodo];
+    private readonly string[] Periodos = [Ultimas24, Ultimos7, Ultimos30, TodoElPeriodo];
 
-    private static int Operativos => DatosDemo.Servicios.Count(s => s.Estado == EstadoServicio.Operativo);
+    private int Operativos => DatosDemo.Servicios.Count(s => s.Estado == EstadoServicio.Operativo);
 
-    private static List<ServicioVm> Comprometidos => DatosDemo.Servicios
+    private List<ServicioVm> Comprometidos => DatosDemo.Servicios
         .Where(s => s.Estado != EstadoServicio.Operativo)
         .OrderByDescending(s => s.Estado)
         .ToList();
 
-    private static string DetalleServicios => Comprometidos.Count == 0
+    private string DetalleServicios => Comprometidos.Count == 0
         ? "Toda la infraestructura responde con normalidad"
         : $"Con incidencia: {string.Join(", ", Comprometidos.Select(s => s.Nombre))}";
 
-    private static double DisponibilidadPromedio => DatosDemo.Servicios.Count == 0
+    private double DisponibilidadPromedio => DatosDemo.Servicios.Count == 0
         ? 0
         : DatosDemo.Servicios.Average(s => s.Disponibilidad);
 
-    private static double LatenciaPromedio => DatosDemo.Servicios.Count == 0
+    private double LatenciaPromedio => DatosDemo.Servicios.Count == 0
         ? 0
         : Math.Round(DatosDemo.Servicios.Average(s => s.LatenciaMs));
 
-    private static double LatenciaMaxima => DatosDemo.Servicios.Count == 0
+    private double LatenciaMaxima => DatosDemo.Servicios.Count == 0
         ? 0
         : DatosDemo.Servicios.Max(s => s.LatenciaMs);
 
-    private static int ErroresRecientes => DatosDemo.Bitacora
+    private int ErroresRecientes => DatosDemo.Bitacora
         .Count(e => e.Nivel == NivelLog.Error && e.Fecha >= DateTime.Now.AddHours(-24));
 
-    private static int AdvertenciasRecientes => DatosDemo.Bitacora
+    private int AdvertenciasRecientes => DatosDemo.Bitacora
         .Count(e => e.Nivel == NivelLog.Warning && e.Fecha >= DateTime.Now.AddHours(-24));
 
-    private static List<EventoBitacoraVm> TodosLosDeAuditoria => DatosDemo.Bitacora
+    private List<EventoBitacoraVm> TodosLosDeAuditoria => DatosDemo.Bitacora
         .Where(e => e.Accion != "Excepción")
         .ToList();
 
-    private static int TotalAuditoria => TodosLosDeAuditoria.Count;
+    private int TotalAuditoria => TodosLosDeAuditoria.Count;
 
-    private static List<string> EmpresasConEventos => DatosDemo.Bitacora
+    private List<string> EmpresasConEventos => DatosDemo.Bitacora
         .Select(e => e.Empresa)
         .Where(e => !string.IsNullOrWhiteSpace(e) && e != "—")
         .Distinct()
         .OrderBy(e => e)
         .ToList();
 
-    private static List<string> AccionesAuditadas => TodosLosDeAuditoria
+    private List<string> AccionesAuditadas => TodosLosDeAuditoria
         .Select(e => e.Accion)
         .Distinct()
         .OrderBy(a => a)
@@ -433,13 +433,13 @@
         _ => "Registra únicamente errores. Reduce el volumen pero oculta las advertencias tempranas."
     };
 
-    private static bool EsDePlataforma(EventoBitacoraVm evento) =>
+    private bool EsDePlataforma(EventoBitacoraVm evento) =>
         string.IsNullOrWhiteSpace(evento.Empresa) || evento.Empresa == "—";
 
-    private static string NombreEmpresa(EventoBitacoraVm evento) =>
+    private string NombreEmpresa(EventoBitacoraVm evento) =>
         EsDePlataforma(evento) ? SoloPlataforma : evento.Empresa;
 
-    private static string TextoServicio(EstadoServicio estado) => estado switch
+    private string TextoServicio(EstadoServicio estado) => estado switch
     {
         EstadoServicio.Operativo => "Operativo",
         EstadoServicio.Degradado => "Degradado",

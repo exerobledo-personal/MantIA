@@ -221,7 +221,7 @@ else
         new BreadcrumbItem(EsAlta ? "Nueva empresa" : "Edición", null, true)
     ];
 
-    private static List<string> Rubros => DatosDemo.Empresas
+    private List<string> Rubros => DatosDemo.Empresas
         .Select(e => e.Rubro)
         .Concat(["Agroindustria", "Bebidas", "Cementera", "Farmacéutica", "Papelera", "Siderúrgica"])
         .Distinct()
@@ -373,10 +373,10 @@ else
         Nav.NavigateTo($"/plataforma/empresas/{empresa.Id}");
     }
 
-    private static string NuevoTenantId(string razonSocial) =>
+    private string NuevoTenantId(string razonSocial) =>
         $"org_{Slug(razonSocial)}_{Random.Shared.Next(0, 65536):x4}";
 
-    private static string Slug(string razonSocial)
+    private string Slug(string razonSocial)
     {
         var corte = razonSocial.IndexOf(" S.", StringComparison.Ordinal);
         var baseTexto = corte > 0 ? razonSocial[..corte] : razonSocial;
@@ -393,7 +393,7 @@ else
         return letras.Length <= 6 ? letras : letras[..6];
     }
 
-    private static void SincronizarPlanes()
+    private void SincronizarPlanes()
     {
         foreach (var plan in DatosDemo.Planes)
         {

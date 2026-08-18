@@ -168,10 +168,10 @@
     private string _planta = Todos;
     private bool _incluirEliminados;
 
-    private static readonly string[] Tipos =
+    private readonly string[] Tipos =
         ["Estado de stock", "Historial de fallas", "Consumo de repuestos", "Órdenes de trabajo"];
 
-    private static readonly List<BreadcrumbItem> Migas =
+    private readonly List<BreadcrumbItem> Migas =
     [
         new BreadcrumbItem("Panel principal", "/dashboard"),
         new BreadcrumbItem("Reportes", null, true)
@@ -213,10 +213,10 @@
         }
     }
 
-    private static string TextoEstado(EstadoGenerico estado) =>
+    private string TextoEstado(EstadoGenerico estado) =>
         estado == EstadoGenerico.Activo ? "Activo" : "Eliminado";
 
-    private static string EstiloFila(ReporteVm reporte, int indice) =>
+    private string EstiloFila(ReporteVm reporte, int indice) =>
         reporte.Estado == EstadoGenerico.Inactivo ? "opacity:.6" : "";
 
     private void LimpiarFiltros()

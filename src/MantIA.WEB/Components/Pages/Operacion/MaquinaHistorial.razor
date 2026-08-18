@@ -158,7 +158,7 @@ else
     private const string TodosLosTipos = "Todos los tipos";
     private const string TodoElHistorial = "Todo el historial";
 
-    private static readonly string[] Periodos =
+    private readonly string[] Periodos =
         ["Últimos 3 meses", "Últimos 6 meses", "Últimos 12 meses", TodoElHistorial];
 
     [Parameter] public Guid Id { get; set; }

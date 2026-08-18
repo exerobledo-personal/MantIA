@@ -135,7 +135,7 @@ else
     private string _busqueda = "";
     private string _estado = TodosLosEstados;
 
-    private static readonly List<BreadcrumbItem> Migas =
+    private readonly List<BreadcrumbItem> Migas =
     [
         new BreadcrumbItem("Operación", null, true),
         new BreadcrumbItem("Catálogo técnico", "/catalogo")
@@ -161,7 +161,7 @@ else
                || ficha.Categoria.Contains(texto, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static int MaquinasDe(CatalogoMaquinaVm ficha) =>
+    private int MaquinasDe(CatalogoMaquinaVm ficha) =>
         DatosDemo.Maquinas.Count(m => m.CatalogoMaquinaId == ficha.Id);
 
     private void LimpiarFiltros()

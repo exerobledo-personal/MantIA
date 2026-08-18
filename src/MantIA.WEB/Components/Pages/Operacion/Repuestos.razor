@@ -194,16 +194,16 @@
     private string _maquina = Todas;
     private bool _soloBajoMinimo;
 
-    private static readonly Criticidad[] Niveles =
+    private readonly Criticidad[] Niveles =
         [Criticidad.Critica, Criticidad.Alta, Criticidad.Media, Criticidad.Baja];
 
-    private static readonly List<BreadcrumbItem> Migas =
+    private readonly List<BreadcrumbItem> Migas =
     [
         new BreadcrumbItem("Panel principal", "/dashboard"),
         new BreadcrumbItem("Repuestos críticos", null, true)
     ];
 
-    private static string Etiqueta(MaquinaVm maquina) => $"{maquina.Codigo} · {maquina.Nombre}";
+    private string Etiqueta(MaquinaVm maquina) => $"{maquina.Codigo} · {maquina.Nombre}";
 
     private List<RepuestoVm> Activos =>
         DatosDemo.Repuestos.Where(r => r.Estado == EstadoGenerico.Activo).ToList();
@@ -238,7 +238,7 @@
         }
     }
 
-    private static string EstiloFila(RepuestoVm repuesto, int indice) =>
+    private string EstiloFila(RepuestoVm repuesto, int indice) =>
         repuesto.BajoMinimo ? "background:rgba(209,67,67,.08)" : "";
 
     private void LimpiarFiltros()

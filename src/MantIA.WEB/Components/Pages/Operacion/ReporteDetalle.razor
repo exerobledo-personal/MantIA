@@ -213,10 +213,10 @@ else
     protected override void OnParametersSet() =>
         _reporte = DatosDemo.Reportes.FirstOrDefault(r => r.Id == Id);
 
-    private static string TextoEstado(EstadoGenerico estado) =>
+    private string TextoEstado(EstadoGenerico estado) =>
         estado == EstadoGenerico.Activo ? "Activo" : "Eliminado";
 
-    private static string IconoDeAccion(string accion) => accion switch
+    private string IconoDeAccion(string accion) => accion switch
     {
         "Generación" => Icons.Material.Filled.PlaylistAdd,
         "Exportación" => Icons.Material.Filled.FileDownload,
@@ -225,7 +225,7 @@ else
         _ => Icons.Material.Filled.History
     };
 
-    private static Color ColorDeAccion(string accion) => accion switch
+    private Color ColorDeAccion(string accion) => accion switch
     {
         "Generación" => Color.Primary,
         "Exportación" => Color.Tertiary,
@@ -355,11 +355,11 @@ else
         ? RepuestosDelGrafico.Select(r => r.NumeroParte).ToArray()
         : EtiquetasDeMeses;
 
-    private static string[] EtiquetasDeMeses => Enumerable.Range(0, 6)
+    private string[] EtiquetasDeMeses => Enumerable.Range(0, 6)
         .Select(i => DateTime.Today.AddMonths(-5 + i).ToString("MMM").ToUpperInvariant())
         .ToArray();
 
-    private static int IndiceDeMes(DateTime fecha)
+    private int IndiceDeMes(DateTime fecha)
     {
         var meses = (DateTime.Today.Year - fecha.Year) * 12 + DateTime.Today.Month - fecha.Month;
         return 5 - meses;

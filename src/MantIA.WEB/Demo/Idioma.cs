@@ -1,31 +1,37 @@
 namespace MantIA.WEB.Demo;
 
-public static class Idioma
+/// <summary>
+/// Idioma activo de la interfaz. Se registra con alcance scoped: cada circuito de
+/// Blazor Server elige su idioma sin afectar al resto de las sesiones conectadas.
+/// </summary>
+public class Idioma
 {
     public const string Espanol = "es";
     public const string Ingles = "en";
 
-    public static string Actual { get; private set; } = Espanol;
+    public string Actual { get; private set; } = Espanol;
 
-    public static event Action? Cambio;
+    public event Action? Cambio;
 
-    public static IReadOnlyList<(string Codigo, string Nombre)> Disponibles { get; } =
+    private static readonly (string Codigo, string Nombre)[] TodosLosIdiomas =
     [
         (Espanol, "Español"),
         (Ingles, "English")
     ];
 
-    public static string NombreActual =>
+    public IReadOnlyList<(string Codigo, string Nombre)> Disponibles => TodosLosIdiomas;
+
+    public string NombreActual =>
         Disponibles.First(i => i.Codigo == Actual).Nombre;
 
-    public static void Cambiar(string codigo)
+    public void Cambiar(string codigo)
     {
         if (codigo == Actual) return;
         Actual = codigo;
         Cambio?.Invoke();
     }
 
-    public static string T(string clave) =>
+    public string T(string clave) =>
         Actual == Ingles && Traducciones.TryGetValue(clave, out var texto) ? texto : Textos[clave];
 
     private static readonly Dictionary<string, string> Textos = new()

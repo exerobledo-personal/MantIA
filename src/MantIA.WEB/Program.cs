@@ -59,6 +59,14 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddMudServices();
 builder.Services.AddMemoryCache();
+
+// Estado de la maqueta funcional. Alcance scoped = una copia por circuito de Blazor
+// Server, para que dos usuarios conectados al mismo tiempo no compartan datos, vista
+// ni idioma. Cuando cada modulo pase a base de datos, estos tres registros se
+// reemplazan por los servicios reales sin tocar las pantallas.
+builder.Services.AddScoped<MantIA.WEB.Demo.DatosDemo>();
+builder.Services.AddScoped<MantIA.WEB.Demo.Sesion>();
+builder.Services.AddScoped<MantIA.WEB.Demo.Idioma>();
 builder.Services.AddScoped<MantIA.BLL.Authorization.IPermisoService, MantIA.BLL.Authorization.PermisoService>();
 builder.Services.AddScoped<MantIA.BLL.Authorization.IUsuarioActual, MantIA.BLL.Authorization.UsuarioActual>();
 builder.Services.AddCascadingAuthenticationState();

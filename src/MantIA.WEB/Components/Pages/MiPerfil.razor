@@ -317,29 +317,35 @@
 @code {
     private const string TodasLasPlantas = "Todas";
 
-    private static readonly List<BreadcrumbItem> Migas =
+    private readonly List<BreadcrumbItem> Migas =
     [
         new BreadcrumbItem("Panel principal", "/dashboard"),
         new BreadcrumbItem("Mi perfil", null, true)
     ];
 
-    private static readonly string[] Idiomas =
+    private readonly string[] Idiomas =
         ["Español rioplatense", "Español neutro", "Portugués de Brasil", "Inglés"];
 
-    private string _nombre = DatosDemo.UsuarioActual.Nombre;
-    private string _apellido = DatosDemo.UsuarioActual.Apellido;
+    private string _nombre = string.Empty;
+    private string _apellido = string.Empty;
 
     private bool _avisoCriticas = true;
     private bool _resumenDiario = true;
     private string _plantaPorDefecto = TodasLasPlantas;
     private string _idioma = "Español rioplatense";
 
-    private static UsuarioVm Usuario => DatosDemo.UsuarioActual;
+    protected override void OnInitialized()
+    {
+        _nombre = DatosDemo.UsuarioActual.Nombre;
+        _apellido = DatosDemo.UsuarioActual.Apellido;
+    }
 
-    private static string TextoEstado =>
+    private UsuarioVm Usuario => DatosDemo.UsuarioActual;
+
+    private string TextoEstado =>
         Usuario.Estado == EstadoGenerico.Activo ? "Cuenta activa" : "Cuenta inactiva";
 
-    private static string UltimoAccesoTexto =>
+    private string UltimoAccesoTexto =>
         Usuario.UltimoAcceso is null ? "Sin registros" : Ui.Relativo(Usuario.UltimoAcceso.Value);
 
     private sealed class AccesoVm
@@ -361,7 +367,7 @@
         public bool Actual { get; init; }
     }
 
-    private static readonly List<AccesoVm> Accesos =
+    private readonly List<AccesoVm> Accesos =
     [
         new() { Modulo = "Operación", Pantalla = "Panel principal", Ruta = "/dashboard",
                 Descripcion = "Indicadores del parque de equipos y del stock crítico" },
@@ -403,7 +409,7 @@
                 Descripcion = "Estado de los servicios y bitácora técnica" }
     ];
 
-    private static int ModulosDistintos => Accesos.Select(a => a.Modulo).Distinct().Count();
+    private int ModulosDistintos => Accesos.Select(a => a.Modulo).Distinct().Count();
 
     private readonly List<SesionVm> _sesiones =
     [

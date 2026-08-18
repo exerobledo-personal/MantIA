@@ -183,7 +183,7 @@ else
     private string _nivel = "Jr";
     private IReadOnlyCollection<string?>? _plantasSeleccionadas = new List<string?>();
 
-    private static readonly string[] RolesDisponibles =
+    private readonly string[] RolesDisponibles =
         [Roles.Empleado, Roles.Supervisor, Roles.Gerente, Roles.AdminEmpresa];
 
     private bool EsAlta => Id is null;
@@ -316,7 +316,7 @@ else
         Nav.NavigateTo("/empresa/usuarios");
     }
 
-    private static Color ColorAccion(string accion) => accion switch
+    private Color ColorAccion(string accion) => accion switch
     {
         "Alta" => Color.Success,
         "Baja" => Color.Error,
@@ -324,7 +324,7 @@ else
         _ => Color.Info
     };
 
-    private static void ActualizarContadorDeNivel(string nivel)
+    private void ActualizarContadorDeNivel(string nivel)
     {
         var registro = DatosDemo.Niveles.FirstOrDefault(n => n.Nombre == nivel);
         if (registro is not null) registro.Usuarios = DatosDemo.Usuarios.Count(u => u.Nivel == nivel);

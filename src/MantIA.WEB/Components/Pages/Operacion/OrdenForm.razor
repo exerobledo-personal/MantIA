@@ -233,7 +233,7 @@ else
         _tecnico = _orden.UsuarioAsignado;
     }
 
-    private static string Etiqueta(MaquinaVm maquina) => $"{maquina.Codigo} · {maquina.Nombre}";
+    private string Etiqueta(MaquinaVm maquina) => $"{maquina.Codigo} · {maquina.Nombre}";
 
     private MaquinaVm? MaquinaElegida => string.IsNullOrEmpty(_maquina)
         ? null

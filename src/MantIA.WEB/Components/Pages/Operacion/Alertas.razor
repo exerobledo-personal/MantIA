@@ -194,16 +194,16 @@
         [Criticidad.Baja] = false
     };
 
-    private static readonly Criticidad[] Niveles =
+    private readonly Criticidad[] Niveles =
         [Criticidad.Critica, Criticidad.Alta, Criticidad.Media, Criticidad.Baja];
 
-    private static readonly List<BreadcrumbItem> Migas =
+    private readonly List<BreadcrumbItem> Migas =
     [
         new BreadcrumbItem("Panel principal", "/dashboard"),
         new BreadcrumbItem("Alertas de stock", null, true)
     ];
 
-    private static string Etiqueta(MaquinaVm maquina) => $"{maquina.Codigo} · {maquina.Nombre}";
+    private string Etiqueta(MaquinaVm maquina) => $"{maquina.Codigo} · {maquina.Nombre}";
 
     private string Planta
     {
@@ -235,10 +235,10 @@
     private decimal CapitalNecesario => Filtradas
         .Sum(a => (a.StockMinimo - a.StockActual) * CostoUnitarioDe(a.RepuestoId));
 
-    private static decimal CostoUnitarioDe(Guid repuestoId) =>
+    private decimal CostoUnitarioDe(Guid repuestoId) =>
         DatosDemo.Repuestos.FirstOrDefault(r => r.Id == repuestoId)?.CostoUnitario ?? 0;
 
-    private static string TituloPanel(Criticidad nivel, int cantidad) =>
+    private string TituloPanel(Criticidad nivel, int cantidad) =>
         $"Criticidad {Ui.TextoDe(nivel).ToLowerInvariant()} · {cantidad} {(cantidad == 1 ? "alerta" : "alertas")}";
 
     private void LimpiarFiltros()

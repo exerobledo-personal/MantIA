@@ -147,23 +147,23 @@
     private string _rol = Roles.Empleado;
     private string _nivel = "Jr";
 
-    private static readonly string[] RolesDisponibles =
+    private readonly string[] RolesDisponibles =
         [Roles.Empleado, Roles.Supervisor, Roles.Gerente, Roles.AdminEmpresa];
 
-    private static readonly List<BreadcrumbItem> Migas =
+    private readonly List<BreadcrumbItem> Migas =
     [
         new BreadcrumbItem("Administración de empresa", "/empresa"),
         new BreadcrumbItem("Matriz de permisos", "/empresa/permisos")
     ];
 
-    private static int TotalCombinaciones => DatosDemo.Recursos.Length * DatosDemo.Acciones.Length;
+    private int TotalCombinaciones => DatosDemo.Recursos.Length * DatosDemo.Acciones.Length;
 
     private int UsuariosDelPerfil => DatosDemo.Usuarios.Count(u => u.Rol == _rol && u.Nivel == _nivel);
 
-    private static int Habilitadas(string rol, string nivel) =>
+    private int Habilitadas(string rol, string nivel) =>
         DatosDemo.Permisos.Count(p => p.Rol == rol && p.Nivel == nivel && p.Habilitado);
 
-    private static bool JrMasPermisivoQueSr(string rol) => Habilitadas(rol, "Jr") > Habilitadas(rol, "Sr");
+    private bool JrMasPermisivoQueSr(string rol) => Habilitadas(rol, "Jr") > Habilitadas(rol, "Sr");
 
     private List<string> AccionesSoloEnJr => DatosDemo.Permisos
         .Where(p => p.Rol == _rol && p.Nivel == "Jr" && p.Habilitado)
@@ -193,7 +193,7 @@
             Severity.Success);
     }
 
-    private static string DescripcionDe(string recurso) => recurso switch
+    private string DescripcionDe(string recurso) => recurso switch
     {
         "Máquinas" => "Parque de equipos y sus fichas técnicas",
         "Repuestos" => "Catálogo de repuestos críticos y umbrales de stock",
@@ -206,7 +206,7 @@
         _ => "Recurso de la plataforma"
     };
 
-    private static string AlcanceDe(string rol) => rol switch
+    private string AlcanceDe(string rol) => rol switch
     {
         Roles.Empleado => "Ejecuta las intervenciones en planta",
         Roles.Supervisor => "Coordina el equipo y valida recomendaciones",

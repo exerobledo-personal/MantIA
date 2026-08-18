@@ -142,7 +142,7 @@ else
     private const string Ultimos7 = "Últimos 7 días";
     private const string Todo = "Todo el historial";
 
-    private static readonly string[] Periodos = [Ultimas24, Ultimos7, Todo];
+    private readonly string[] Periodos = [Ultimas24, Ultimos7, Todo];
 
     private string _busqueda = "";
     private string _accion = TodasLasAcciones;
@@ -150,24 +150,24 @@ else
     private string _nivel = TodosLosNiveles;
     private string _periodo = Ultimos7;
 
-    private static readonly List<BreadcrumbItem> Migas =
+    private readonly List<BreadcrumbItem> Migas =
     [
         new BreadcrumbItem("Administración de empresa", "/empresa"),
         new BreadcrumbItem("Bitácora", "/empresa/bitacora")
     ];
 
-    private static List<EventoBitacoraVm> DeLaEmpresa => DatosDemo.Bitacora
+    private List<EventoBitacoraVm> DeLaEmpresa => DatosDemo.Bitacora
         .Where(e => e.Empresa == DatosDemo.EmpresaActual.RazonSocial)
         .OrderByDescending(e => e.Fecha)
         .ToList();
 
-    private static List<string> AccionesDisponibles => DeLaEmpresa
+    private List<string> AccionesDisponibles => DeLaEmpresa
         .Select(e => e.Accion)
         .Distinct()
         .OrderBy(a => a)
         .ToList();
 
-    private static List<string> RecursosDisponibles => DeLaEmpresa
+    private List<string> RecursosDisponibles => DeLaEmpresa
         .Select(e => e.Recurso)
         .Distinct()
         .OrderBy(r => r)
@@ -213,7 +213,7 @@ else
         _periodo = Todo;
     }
 
-    private static string IconoDe(EventoBitacoraVm evento)
+    private string IconoDe(EventoBitacoraVm evento)
     {
         if (evento.Nivel == NivelLog.Error) return Icons.Material.Filled.Error;
         if (evento.Nivel == NivelLog.Warning) return Icons.Material.Filled.WarningAmber;

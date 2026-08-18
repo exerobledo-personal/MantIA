@@ -195,26 +195,26 @@ else
     protected override void OnParametersSet() =>
         _orden = DatosDemo.Ordenes.FirstOrDefault(o => o.Id == Id);
 
-    private static string HorasDe(OrdenTrabajoVm orden) =>
+    private string HorasDe(OrdenTrabajoVm orden) =>
         orden.HorasResolucion.HasValue ? orden.HorasResolucion.Value.ToString("0.#") : "—";
 
-    private static string ResolucionDe(OrdenTrabajoVm orden) =>
+    private string ResolucionDe(OrdenTrabajoVm orden) =>
         string.IsNullOrWhiteSpace(orden.ResolucionAplicada)
             ? "No se registró el detalle de la resolución aplicada."
             : orden.ResolucionAplicada;
 
-    private static string DescripcionDe(OrdenTrabajoVm orden) =>
+    private string DescripcionDe(OrdenTrabajoVm orden) =>
         string.IsNullOrWhiteSpace(orden.Descripcion)
             ? "No se registró una descripción del problema."
             : orden.Descripcion;
 
-    private static string ProveedorDe(Guid repuestoId)
+    private string ProveedorDe(Guid repuestoId)
     {
         var repuesto = DatosDemo.Repuestos.FirstOrDefault(r => r.Id == repuestoId);
         return repuesto is null ? "Repuesto fuera de catálogo" : repuesto.ProveedorReferencia;
     }
 
-    private static string TextoDuracion(OrdenTrabajoVm orden)
+    private string TextoDuracion(OrdenTrabajoVm orden)
     {
         if (orden.HorasResolucion.HasValue) return $"{orden.HorasResolucion.Value:0.#} h de resolución";
 

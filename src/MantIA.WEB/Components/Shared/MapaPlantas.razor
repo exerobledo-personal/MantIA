@@ -1,64 +1,44 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
 <div class="mantia-mapa">
-    <svg viewBox="0 0 800 520" role="img" aria-label="Mapa de plantas industriales en el área metropolitana de Buenos Aires">
-        <defs>
-            <linearGradient id="mantia-tierra" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#152C3F" />
-                <stop offset="100%" stop-color="#0E1F2E" />
-            </linearGradient>
-            <linearGradient id="mantia-agua" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#123A52" />
-                <stop offset="100%" stop-color="#0C2739" />
-            </linearGradient>
-        </defs>
+    <div @ref="_contenedor" class="mantia-mapa__lienzo"></div>
 
-        <rect width="800" height="520" fill="url(#mantia-tierra)" />
+    @if (!_cargado)
+    {
+        <div class="mantia-mapa__cargando">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
+            <span>Cargando el mapa…</span>
+        </div>
+    }
 
-        <g stroke="#22415A" stroke-width="1" opacity=".5">
-            @for (var i = 1; i < 8; i++)
+    @if (_fallo)
+    {
+        <div class="mantia-mapa__sinmapa">
+            <MudIcon Icon="@Icons.Material.Outlined.MapsHomeWork" Size="Size.Large" />
+            <p>No se pudo cargar el mapa</p>
+            <span>Las imágenes del mapa se descargan en línea: revisá la conexión.</span>
+        </div>
+    }
+
+    @if (Plantas.Count > 0)
+    {
+        <ul class="mantia-mapa__leyenda">
+            @foreach (var planta in Plantas)
             {
-                <line x1="@(i * 100)" y1="0" x2="@(i * 100)" y2="520" />
+                var activa = PlantaSeleccionada?.Id == planta.Id;
+                <li>
+                    <button type="button"
+                            class="@(activa ? "mantia-mapa__chip mantia-mapa__chip--activo" : "mantia-mapa__chip")"
+                            @onclick="@(() => Seleccionar(planta))">
+                        <span class="mantia-mapa__punto mantia-mapa__punto--@Severidad(planta)"></span>
+                        @planta.Nombre
+                        <span class="mantia-mapa__conteo">@planta.Maquinas</span>
+                    </button>
+                </li>
             }
-            @for (var i = 1; i < 6; i++)
-            {
-                <line x1="0" y1="@(i * 87)" x2="800" y2="@(i * 87)" />
-            }
-        </g>
-
-        <polygon points="500,27 578,123 622,219 711,301 733,369 778,438 800,520 800,0"
-                 fill="url(#mantia-agua)" />
-        <polyline points="500,27 578,123 622,219 711,301 733,369 778,438"
-                  fill="none" stroke="#2E7295" stroke-width="2.5" />
-
-        <g stroke="#2A4A63" stroke-width="3" fill="none" opacity=".8">
-            <path d="M 95 108 L 320 190 L 515 261" />
-            <path d="M 515 261 L 640 320 L 687 388" />
-            <path d="M 95 108 L 240 300 L 400 470" />
-        </g>
-
-        <text x="700" y="180" fill="#3E7B9C" font-size="15" font-style="italic" font-family="inherit">Río de la Plata</text>
-        <text x="24" y="500" fill="#5A7C94" font-size="13" font-family="inherit">Área Metropolitana de Buenos Aires</text>
-
-        @foreach (var planta in Plantas)
-        {
-            var punto = Proyectar(planta);
-            var color = ColorPlanta(planta);
-            var seleccionada = PlantaSeleccionada?.Id == planta.Id;
-            <g class="mantia-mapa__pin" @onclick="@(() => Seleccionar(planta))" @onclick:stopPropagation="true">
-                @if (seleccionada)
-                {
-                    <circle cx="@punto.X" cy="@punto.Y" r="30" fill="@color" opacity=".18" />
-                }
-                <circle cx="@punto.X" cy="@punto.Y" r="20" fill="@color" opacity=".26" />
-                <circle cx="@punto.X" cy="@punto.Y" r="10" fill="@color" stroke="#0B1620" stroke-width="2.5" />
-                <text x="@punto.X" y="@(punto.Y - 30)" fill="#E8F1F7" font-size="15" font-weight="600"
-                      text-anchor="middle" font-family="inherit">@planta.Nombre</text>
-                <text x="@punto.X" y="@(punto.Y + 38)" fill="#9FBACE" font-size="12.5"
-                      text-anchor="middle" font-family="inherit">
-                    @planta.Maquinas máquinas · @planta.AlertasActivas alertas
-                </text>
-            </g>
-        }
-    </svg>
+        </ul>
+    }
 </div>
 
 @code {
@@ -66,21 +46,104 @@
     [Parameter] public PlantaVm? PlantaSeleccionada { get; set; }
     [Parameter] public EventCallback<PlantaVm> PlantaSeleccionadaChanged { get; set; }
 
-    private const decimal LonMin = -59.00m, LonMax = -58.28m, LatMin = -34.76m, LatMax = -34.38m;
+    private ElementReference _contenedor;
+    private IJSObjectReference? _modulo;
+    private DotNetObjectReference<MapaPlantas>? _referencia;
+    private bool _cargado;
+    private bool _fallo;
+    private string _firmaPrevia = "";
 
-    private static (int X, int Y) Proyectar(PlantaVm planta)
+    protected override async Task OnAfterRenderAsync(bool primeraVez)
     {
-        var x = (int)Math.Round((planta.Longitud - LonMin) / (LonMax - LonMin) * 800);
-        var y = (int)Math.Round((LatMax - planta.Latitud) / (LatMax - LatMin) * 520);
-        return (Math.Clamp(x, 60, 740), Math.Clamp(y, 60, 460));
+        if (_fallo) return;
+
+        var firma = Firma();
+
+        try
+        {
+            if (primeraVez)
+            {
+                _modulo = await JS.InvokeAsync<IJSObjectReference>("import", "./js/mapa-plantas.js");
+                _referencia = DotNetObjectReference.Create(this);
+                await _modulo.InvokeVoidAsync("crear", _contenedor, Puntos(), _referencia);
+
+                _cargado = true;
+                _firmaPrevia = firma;
+                StateHasChanged();
+                return;
+            }
+
+            if (_modulo is null || firma == _firmaPrevia) return;
+
+            _firmaPrevia = firma;
+            await _modulo.InvokeVoidAsync("actualizar", _contenedor, Puntos());
+        }
+        catch (JSDisconnectedException)
+        {
+            // El circuito se cerro mientras se dibujaba el mapa: no hay nada que hacer.
+        }
+        catch (JSException)
+        {
+            _fallo = true;
+            _cargado = true;
+            StateHasChanged();
+        }
     }
 
-    private static string ColorPlanta(PlantaVm planta) => planta.AlertasActivas switch
+    /// <summary>Devuelve al componente padre el clic sobre un marcador del mapa.</summary>
+    [JSInvokable]
+    public async Task SeleccionarDesdeMapa(Guid id)
     {
-        >= 4 => "#D14343",
-        >= 1 => "#DE9021",
-        _ => "#1E9E62"
-    };
+        var planta = Plantas.FirstOrDefault(p => p.Id == id);
+        if (planta is not null) await Seleccionar(planta);
+    }
 
     private Task Seleccionar(PlantaVm planta) => PlantaSeleccionadaChanged.InvokeAsync(planta);
+
+    // Evita redibujar el mapa en cada render: solo cuando cambia algo que el mapa muestra.
+    private string Firma() =>
+        string.Join('|', Plantas.Select(p =>
+            $"{p.Id}:{p.Latitud}:{p.Longitud}:{p.Maquinas}:{p.AlertasActivas}:{p.OrdenesAbiertas}:{p.Nombre}"))
+        + $"#{PlantaSeleccionada?.Id}";
+
+    private object[] Puntos() => Plantas.Select(p => (object)new
+    {
+        id = p.Id,
+        nombre = p.Nombre,
+        localidad = p.Localidad,
+        latitud = (double)p.Latitud,
+        longitud = (double)p.Longitud,
+        maquinas = p.Maquinas,
+        alertas = p.AlertasActivas,
+        ordenes = p.OrdenesAbiertas,
+        severidad = Severidad(p),
+        seleccionada = PlantaSeleccionada?.Id == p.Id
+    }).ToArray();
+
+    private static string Severidad(PlantaVm planta) => planta.AlertasActivas switch
+    {
+        >= 4 => "critico",
+        >= 1 => "atencion",
+        _ => "normal"
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_modulo is not null)
+            {
+                await _modulo.InvokeVoidAsync("destruir", _contenedor);
+                await _modulo.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (JSException)
+        {
+        }
+
+        _referencia?.Dispose();
+    }
 }

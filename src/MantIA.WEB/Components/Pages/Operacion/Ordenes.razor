@@ -248,7 +248,7 @@ else
                || orden.TipoFalla.Contains(texto, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string TextoDuracion(OrdenTrabajoVm orden)
+    private string TextoDuracion(OrdenTrabajoVm orden)
     {
         if (orden.HorasResolucion.HasValue)
             return $"{orden.HorasResolucion.Value:0.#} h de resolución";

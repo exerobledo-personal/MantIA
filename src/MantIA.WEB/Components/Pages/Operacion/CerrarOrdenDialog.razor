@@ -133,7 +133,7 @@
         public decimal Cantidad { get; set; }
     }
 
-    private static string Etiqueta(RepuestoVm repuesto) => $"{repuesto.Nombre} · {repuesto.NumeroParte}";
+    private string Etiqueta(RepuestoVm repuesto) => $"{repuesto.Nombre} · {repuesto.NumeroParte}";
 
     private bool EsCompatible(RepuestoVm repuesto) => repuesto.MaquinaIds.Contains(Orden.MaquinaId);
 

@@ -276,7 +276,7 @@ else
         new BreadcrumbItem(EsAlta ? "Nueva máquina" : "Edición", null, true)
     ];
 
-    private static List<string> Marcas => DatosDemo.Catalogo
+    private List<string> Marcas => DatosDemo.Catalogo
         .Select(c => c.Marca)
         .Distinct()
         .OrderBy(m => m)
@@ -458,6 +458,6 @@ else
         return ficha;
     }
 
-    private static void ActualizarContador(PlantaVm planta) =>
+    private void ActualizarContador(PlantaVm planta) =>
         planta.Maquinas = DatosDemo.Maquinas.Count(m => m.PlantaId == planta.Id);
 }

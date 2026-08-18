@@ -1,0 +1,37 @@
+# Blueprint de Render para la demo de MantIA.
+#
+# En Render: New > Blueprint > elegir el repositorio. Lee este archivo y crea
+# el servicio con toda la configuracion ya puesta, sin cargar nada a mano.
+#
+# La rama que se publica es la de este archivo: cambiar "branch" si se quiere
+# publicar otra.
+
+services:
+  - type: web
+    name: mantia-demo
+    runtime: docker
+    plan: free
+    region: ohio                       # es la region mas cercana a Buenos Aires que ofrece Render
+    branch: feature/backend-mantia
+    dockerfilePath: ./src/MantIA.WEB/Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+
+      # Render corta el TLS en su proxy y le pasa la request al contenedor por
+      # HTTP plano. Sin esta variable la aplicacion cree que la conexion es
+      # insegura y arma mal cualquier URL absoluta.
+      - key: ASPNETCORE_FORWARDEDHEADERS_ENABLED
+        value: "true"
+
+      # Valores de relleno: la maqueta no usa Auth0 ni base de datos, pero sin
+      # ellos la aplicacion no llega a arrancar.
+      - key: Auth0__Domain
+        value: mantia-tfi.us.auth0.com
+      - key: Auth0__ClientId
+        value: PENDIENTE_DE_CONFIGURAR
+      - key: Auth0__ClientSecret
+        value: PENDIENTE_DE_CONFIGURAR

@@ -275,7 +275,7 @@ else
         Nav.NavigateTo("/empresa/plantas");
     }
 
-    private static void PropagarNombre(string anterior, string nuevo)
+    private void PropagarNombre(string anterior, string nuevo)
     {
         foreach (var maquina in DatosDemo.Maquinas.Where(m => m.Planta == anterior))
         {

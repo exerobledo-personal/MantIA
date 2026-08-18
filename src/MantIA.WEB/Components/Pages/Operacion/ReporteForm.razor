@@ -263,9 +263,9 @@
     private string _estadoOrden = Todas;
     private string _tecnico = Todas;
 
-    private static readonly string[] Tipos = [TipoStock, TipoFallas, TipoConsumo, TipoOrdenes];
+    private readonly string[] Tipos = [TipoStock, TipoFallas, TipoConsumo, TipoOrdenes];
 
-    private static readonly Criticidad[] Criticidades =
+    private readonly Criticidad[] Criticidades =
         [Criticidad.Critica, Criticidad.Alta, Criticidad.Media, Criticidad.Baja];
 
     private readonly List<BreadcrumbItem> _migas =
@@ -284,7 +284,7 @@
         public string Valor3 { get; init; } = "";
     }
 
-    private static string Etiqueta(MaquinaVm maquina) => $"{maquina.Codigo} · {maquina.Nombre}";
+    private string Etiqueta(MaquinaVm maquina) => $"{maquina.Codigo} · {maquina.Nombre}";
 
     private List<MaquinaVm> MaquinasDelAlcance => _planta == Consolidado
         ? DatosDemo.Maquinas.OrderBy(m => m.Codigo).ToList()

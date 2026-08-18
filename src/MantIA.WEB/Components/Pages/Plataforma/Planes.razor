@@ -141,7 +141,7 @@
 </MudGrid>
 
 @code {
-    private static readonly List<BreadcrumbItem> Migas =
+    private readonly List<BreadcrumbItem> Migas =
     [
         new BreadcrumbItem("Plataforma MantIA", "/plataforma"),
         new BreadcrumbItem("Planes de suscripción", "/plataforma/planes")
@@ -155,41 +155,41 @@
         ChartPalette = ["#0B6FA4"],
     };
 
-    private static int EmpresasActivas =>
+    private int EmpresasActivas =>
         DatosDemo.Empresas.Count(e => e.Estado == EstadoGenerico.Activo);
 
-    private static int EmpresasEnPiloto =>
+    private int EmpresasEnPiloto =>
         DatosDemo.Empresas.Count(e => DatosDemo.Planes.Any(p => p.Nombre == e.Plan && p.Precio == 0));
 
-    private static int ContratosDe(PlanVm? plan) => plan is null
+    private int ContratosDe(PlanVm? plan) => plan is null
         ? 0
         : DatosDemo.Empresas.Count(e => e.Plan == plan.Nombre);
 
-    private static decimal IngresoDe(PlanVm plan) =>
+    private decimal IngresoDe(PlanVm plan) =>
         plan.Precio * DatosDemo.Empresas.Count(e => e.Plan == plan.Nombre && e.Estado == EstadoGenerico.Activo);
 
-    private static decimal IngresoTotal => DatosDemo.Planes.Sum(IngresoDe);
+    private decimal IngresoTotal => DatosDemo.Planes.Sum(IngresoDe);
 
-    private static decimal IngresoPromedio => EmpresasActivas == 0
+    private decimal IngresoPromedio => EmpresasActivas == 0
         ? 0
         : Math.Round(IngresoTotal / EmpresasActivas, 0);
 
-    private static int Participacion(PlanVm plan) => IngresoTotal <= 0
+    private int Participacion(PlanVm plan) => IngresoTotal <= 0
         ? 0
         : (int)Math.Round(IngresoDe(plan) / IngresoTotal * 100);
 
-    private static PlanVm? PlanMasContratado => DatosDemo.Planes
+    private PlanVm? PlanMasContratado => DatosDemo.Planes
         .OrderByDescending(ContratosDe)
         .ThenByDescending(p => p.Precio)
         .FirstOrDefault();
 
-    private static bool EsDestacado(PlanVm plan) => PlanMasContratado?.Nombre == plan.Nombre;
+    private bool EsDestacado(PlanVm plan) => PlanMasContratado?.Nombre == plan.Nombre;
 
-    private static string EstiloTarjeta(PlanVm plan) => EsDestacado(plan)
+    private string EstiloTarjeta(PlanVm plan) => EsDestacado(plan)
         ? "height:100%;border-color:#0B6FA4;box-shadow:0 0 0 1px #0B6FA4 inset"
         : "height:100%";
 
-    private static List<ChartSeries<double>> SeriesIngreso =>
+    private List<ChartSeries<double>> SeriesIngreso =>
     [
         new ChartSeries<double>
         {
@@ -198,7 +198,7 @@
         }
     ];
 
-    private static string[] EtiquetasPlanes => DatosDemo.Planes.Select(p => p.Nombre).ToArray();
+    private string[] EtiquetasPlanes => DatosDemo.Planes.Select(p => p.Nombre).ToArray();
 
     private async Task Editar(PlanVm plan)
     {

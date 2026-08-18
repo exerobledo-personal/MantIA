@@ -236,12 +236,13 @@
 @code {
     private bool _menuAbierto = true;
     private bool _modoOscuro;
-    private string _empresaContexto = DatosDemo.EmpresaActual.RazonSocial;
+    private string _empresaContexto = string.Empty;
 
-    private static List<AlertaStockVm> Alertas => DatosDemo.Alertas();
+    private List<AlertaStockVm> Alertas => DatosDemo.Alertas();
 
     protected override void OnInitialized()
     {
+        _empresaContexto = DatosDemo.EmpresaActual.RazonSocial;
         Idioma.Cambio += Refrescar;
         Sesion.Cambio += Refrescar;
     }
@@ -325,7 +326,7 @@
 
     private void IrAlRepuesto(AlertaStockVm alerta) => Nav.NavigateTo($"/repuestos/{alerta.RepuestoId}");
 
-    private static string ColorCriticidad(Criticidad criticidad) => criticidad switch
+    private string ColorCriticidad(Criticidad criticidad) => criticidad switch
     {
         Criticidad.Critica => "#D14343",
         Criticidad.Alta => "#DE9021",

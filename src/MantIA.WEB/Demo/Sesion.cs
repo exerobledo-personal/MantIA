@@ -10,27 +10,38 @@ public enum Vista
     Plataforma
 }
 
-public static class Sesion
+/// <summary>
+/// Vista activa del superadministrador. Se registra con alcance scoped, de modo que
+/// cada circuito de Blazor Server (cada pestaña o usuario conectado) tiene su propia
+/// vista sin pisar la de los demás.
+/// </summary>
+public class Sesion
 {
-    public static Vista Actual { get; private set; } = Vista.Completa;
+    private readonly DatosDemo _datos;
 
-    public static event Action? Cambio;
+    public Sesion(DatosDemo datos) => _datos = datos;
 
-    public static bool EsCompleta => Actual == Vista.Completa;
+    private static readonly Vista[] TodasLasVistas =
+        [Vista.Completa, Vista.Operacion, Vista.Empresa, Vista.Plataforma];
 
-    public static void Ver(Vista vista)
+    public Vista Actual { get; private set; } = Vista.Completa;
+
+    public event Action? Cambio;
+
+    public bool EsCompleta => Actual == Vista.Completa;
+
+    public void Ver(Vista vista)
     {
         if (vista == Actual) return;
         Actual = vista;
         Cambio?.Invoke();
     }
 
-    public static void Restablecer() => Ver(Vista.Completa);
+    public void Restablecer() => Ver(Vista.Completa);
 
-    public static IReadOnlyList<Vista> Disponibles { get; } =
-        [Vista.Completa, Vista.Operacion, Vista.Empresa, Vista.Plataforma];
+    public IReadOnlyList<Vista> Disponibles => TodasLasVistas;
 
-    public static string Nombre(Vista vista) => vista switch
+    public string Nombre(Vista vista) => vista switch
     {
         Vista.Operacion => "Operación",
         Vista.Empresa => "Administración de empresa",
@@ -38,14 +49,14 @@ public static class Sesion
         _ => "Vista completa"
     };
 
-    public static string Rol(Vista vista) => vista switch
+    public string Rol(Vista vista) => vista switch
     {
         Vista.Operacion => Roles.Supervisor,
         Vista.Empresa => Roles.AdminEmpresa,
         _ => Roles.SuperAdmin
     };
 
-    public static string Descripcion(Vista vista) => vista switch
+    public string Descripcion(Vista vista) => vista switch
     {
         Vista.Operacion => "Lo que ve un supervisor de mantenimiento en la planta",
         Vista.Empresa => "Lo que ve el administrador de la empresa cliente",
@@ -53,21 +64,21 @@ public static class Sesion
         _ => "Todos los módulos de la plataforma, sin filtrar"
     };
 
-    public static string RutaInicio(Vista vista) => vista switch
+    public string RutaInicio(Vista vista) => vista switch
     {
         Vista.Empresa => "/empresa",
         Vista.Plataforma => "/plataforma",
         _ => "/dashboard"
     };
 
-    public static string NombreInicio(Vista vista) => vista switch
+    public string NombreInicio(Vista vista) => vista switch
     {
         Vista.Empresa => "Panel de empresa",
         Vista.Plataforma => "Panel de plataforma",
         _ => "Panel operativo"
     };
 
-    public static string Icono(Vista vista) => vista switch
+    public string Icono(Vista vista) => vista switch
     {
         Vista.Operacion => Icons.Material.Filled.PrecisionManufacturing,
         Vista.Empresa => Icons.Material.Filled.Business,
@@ -75,19 +86,19 @@ public static class Sesion
         _ => Icons.Material.Filled.GridView
     };
 
-    public static UsuarioVm UsuarioVisible
+    public UsuarioVm UsuarioVisible
     {
         get
         {
             var rol = Rol(Actual);
             return rol == Roles.SuperAdmin
-                ? DatosDemo.UsuarioActual
-                : DatosDemo.Usuarios.FirstOrDefault(u => u.Rol == rol && u.Estado == EstadoGenerico.Activo)
-                  ?? DatosDemo.UsuarioActual;
+                ? _datos.UsuarioActual
+                : _datos.Usuarios.FirstOrDefault(u => u.Rol == rol && u.Estado == EstadoGenerico.Activo)
+                  ?? _datos.UsuarioActual;
         }
     }
 
-    public static bool PuedeVer(Modulo modulo) => Actual switch
+    public bool PuedeVer(Modulo modulo) => Actual switch
     {
         Vista.Completa => true,
         Vista.Operacion => modulo is Modulo.Operacion or Modulo.Recomendaciones or Modulo.Reportes,

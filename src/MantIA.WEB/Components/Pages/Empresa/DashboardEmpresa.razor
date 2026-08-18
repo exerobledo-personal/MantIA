@@ -237,7 +237,7 @@
         ChartPalette = ["#0B6FA4", "#00909B", "#DE9021", "#8FA8BC", "#EE7A22"]
     };
 
-    private static readonly List<BreadcrumbItem> Migas =
+    private readonly List<BreadcrumbItem> Migas =
     [
         new BreadcrumbItem("Administración de empresa", null, true),
         new BreadcrumbItem("Panel de empresa", "/empresa")
@@ -259,25 +259,25 @@
                               ?? DatosDemo.Plantas.FirstOrDefault();
     }
 
-    private static int UsuariosActivos => DatosDemo.Usuarios.Count(u => u.Estado == EstadoGenerico.Activo);
+    private int UsuariosActivos => DatosDemo.Usuarios.Count(u => u.Estado == EstadoGenerico.Activo);
 
-    private static int UsuariosInactivos => DatosDemo.Usuarios.Count(u => u.Estado == EstadoGenerico.Inactivo);
+    private int UsuariosInactivos => DatosDemo.Usuarios.Count(u => u.Estado == EstadoGenerico.Inactivo);
 
-    private static int PlantasActivas => DatosDemo.Plantas.Count(p => p.Estado == EstadoGenerico.Activo);
+    private int PlantasActivas => DatosDemo.Plantas.Count(p => p.Estado == EstadoGenerico.Activo);
 
-    private static int MaquinasRegistradas => DatosDemo.Maquinas.Count;
+    private int MaquinasRegistradas => DatosDemo.Maquinas.Count;
 
-    private static int ConsumoPlan => DatosDemo.EmpresaActual.MaxMaquinasHabilitadas <= 0
+    private int ConsumoPlan => DatosDemo.EmpresaActual.MaxMaquinasHabilitadas <= 0
         ? 0
         : (int)Math.Round(MaquinasRegistradas * 100d / DatosDemo.EmpresaActual.MaxMaquinasHabilitadas);
 
-    private static int CupoDisponible =>
+    private int CupoDisponible =>
         Math.Max(DatosDemo.EmpresaActual.MaxMaquinasHabilitadas - MaquinasRegistradas, 0);
 
-    private static int UsuariosDe(PlantaVm planta) => DatosDemo.Usuarios
+    private int UsuariosDe(PlantaVm planta) => DatosDemo.Usuarios
         .Count(u => u.Estado == EstadoGenerico.Activo && u.Plantas.Contains(planta.Nombre));
 
-    private static List<(string Rol, int Cantidad)> DistribucionRoles => new[]
+    private List<(string Rol, int Cantidad)> DistribucionRoles => new[]
         {
             Roles.AdminEmpresa, Roles.Gerente, Roles.Supervisor, Roles.Empleado
         }
@@ -285,23 +285,23 @@
         .Where(x => x.Cantidad > 0)
         .ToList();
 
-    private static double[] DatosRoles => DistribucionRoles.Select(x => (double)x.Cantidad).ToArray();
+    private double[] DatosRoles => DistribucionRoles.Select(x => (double)x.Cantidad).ToArray();
 
-    private static string[] EtiquetasRoles => DistribucionRoles.Select(x => Roles.Etiqueta(x.Rol)).ToArray();
+    private string[] EtiquetasRoles => DistribucionRoles.Select(x => Roles.Etiqueta(x.Rol)).ToArray();
 
-    private static List<UsuarioVm> UltimosAccesos => DatosDemo.Usuarios
+    private List<UsuarioVm> UltimosAccesos => DatosDemo.Usuarios
         .Where(u => u.Estado == EstadoGenerico.Activo)
         .OrderByDescending(u => u.UltimoAcceso ?? DateTime.MinValue)
         .Take(6)
         .ToList();
 
-    private static List<EventoBitacoraVm> ActividadReciente => DatosDemo.Bitacora
+    private List<EventoBitacoraVm> ActividadReciente => DatosDemo.Bitacora
         .Where(e => e.Empresa == DatosDemo.EmpresaActual.RazonSocial)
         .OrderByDescending(e => e.Fecha)
         .Take(6)
         .ToList();
 
-    private static Color ColorRol(string rol) => rol switch
+    private Color ColorRol(string rol) => rol switch
     {
         Roles.AdminEmpresa => Color.Primary,
         Roles.Gerente => Color.Tertiary,
@@ -309,7 +309,7 @@
         _ => Color.Default
     };
 
-    private static string IconoNivel(NivelLog nivel) => nivel switch
+    private string IconoNivel(NivelLog nivel) => nivel switch
     {
         NivelLog.Error => Icons.Material.Filled.Error,
         NivelLog.Warning => Icons.Material.Filled.WarningAmber,

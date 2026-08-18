@@ -246,10 +246,10 @@ else
     private string _planta = TodasLasPlantas;
     private string _estado = TodosLosEstados;
 
-    private static readonly string[] RolesDisponibles =
+    private readonly string[] RolesDisponibles =
         [Roles.AdminEmpresa, Roles.Gerente, Roles.Supervisor, Roles.Empleado];
 
-    private static readonly List<BreadcrumbItem> Migas =
+    private readonly List<BreadcrumbItem> Migas =
     [
         new BreadcrumbItem("Administración de empresa", "/empresa"),
         new BreadcrumbItem("Usuarios y niveles", "/empresa/usuarios")
@@ -283,7 +283,7 @@ else
         _estado = TodosLosEstados;
     }
 
-    private static Color ColorRol(string rol) => rol switch
+    private Color ColorRol(string rol) => rol switch
     {
         Roles.AdminEmpresa => Color.Primary,
         Roles.Gerente => Color.Tertiary,
@@ -291,7 +291,7 @@ else
         _ => Color.Default
     };
 
-    private static string SupervisorDe(UsuarioVm usuario)
+    private string SupervisorDe(UsuarioVm usuario)
     {
         var planta = usuario.Plantas.FirstOrDefault();
         if (planta is null) return "el administrador de la empresa";

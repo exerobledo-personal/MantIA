@@ -202,24 +202,24 @@ else
     private string _rubro = TodosLosRubros;
     private string _estado = TodosLosEstados;
 
-    private static readonly List<BreadcrumbItem> Migas =
+    private readonly List<BreadcrumbItem> Migas =
     [
         new BreadcrumbItem("Plataforma MantIA", "/plataforma"),
         new BreadcrumbItem("Empresas cliente", "/plataforma/empresas")
     ];
 
-    private static List<string> Rubros => DatosDemo.Empresas
+    private List<string> Rubros => DatosDemo.Empresas
         .Select(e => e.Rubro)
         .Distinct()
         .OrderBy(r => r)
         .ToList();
 
-    private static List<EmpresaVm> CercaDelLimite => DatosDemo.Empresas
+    private List<EmpresaVm> CercaDelLimite => DatosDemo.Empresas
         .Where(e => e.Estado == EstadoGenerico.Activo && Uso(e) >= 80)
         .OrderByDescending(Uso)
         .ToList();
 
-    private static string NombresCercaDelLimite =>
+    private string NombresCercaDelLimite =>
         string.Join(", ", CercaDelLimite.Select(e => $"{e.RazonSocial} ({Uso(e)} %)"));
 
     private List<EmpresaVm> Filtradas => DatosDemo.Empresas
@@ -241,11 +241,11 @@ else
                || empresa.TenantId.Contains(texto, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static int Uso(EmpresaVm empresa) => empresa.MaxMaquinasHabilitadas <= 0
+    private int Uso(EmpresaVm empresa) => empresa.MaxMaquinasHabilitadas <= 0
         ? 0
         : (int)Math.Round(empresa.MaquinasRegistradas * 100d / empresa.MaxMaquinasHabilitadas);
 
-    private static Color ColorUso(int uso) => uso switch
+    private Color ColorUso(int uso) => uso switch
     {
         >= 90 => Color.Error,
         >= 80 => Color.Warning,

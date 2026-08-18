@@ -88,7 +88,7 @@ else
 }
 
 @code {
-    private static readonly List<BreadcrumbItem> Migas =
+    private readonly List<BreadcrumbItem> Migas =
     [
         new BreadcrumbItem("Administración de empresa", "/empresa"),
         new BreadcrumbItem("Plantas", "/empresa/plantas")
@@ -96,7 +96,7 @@ else
 
     protected override void OnInitialized() => RecalcularContadores();
 
-    private static void RecalcularContadores()
+    private void RecalcularContadores()
     {
         var alertas = DatosDemo.Alertas();
 
@@ -109,12 +109,12 @@ else
         }
     }
 
-    private static List<PlantaVm> Ordenadas => DatosDemo.Plantas
+    private List<PlantaVm> Ordenadas => DatosDemo.Plantas
         .OrderByDescending(p => p.Estado == EstadoGenerico.Activo)
         .ThenBy(p => p.Nombre)
         .ToList();
 
-    private static int UsuariosDe(PlantaVm planta) => DatosDemo.Usuarios
+    private int UsuariosDe(PlantaVm planta) => DatosDemo.Usuarios
         .Count(u => u.Estado == EstadoGenerico.Activo && u.Plantas.Contains(planta.Nombre));
 
     private async Task Desactivar(PlantaVm planta)

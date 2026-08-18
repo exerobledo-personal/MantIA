@@ -340,7 +340,7 @@ else
     private EmpresaVm? _empresa;
     private string _planElegido = "";
 
-    private static readonly List<BreadcrumbItem> Migas =
+    private readonly List<BreadcrumbItem> Migas =
     [
         new BreadcrumbItem("Plataforma MantIA", "/plataforma"),
         new BreadcrumbItem("Empresas cliente", "/plataforma/empresas"),
@@ -379,18 +379,18 @@ else
         }
     }
 
-    private static int Uso(EmpresaVm empresa) => empresa.MaxMaquinasHabilitadas <= 0
+    private int Uso(EmpresaVm empresa) => empresa.MaxMaquinasHabilitadas <= 0
         ? 0
         : (int)Math.Round(empresa.MaquinasRegistradas * 100d / empresa.MaxMaquinasHabilitadas);
 
-    private static Color ColorUso(int uso) => uso switch
+    private Color ColorUso(int uso) => uso switch
     {
         >= 90 => Color.Error,
         >= 80 => Color.Warning,
         _ => Color.Primary
     };
 
-    private static string Antiguedad(EmpresaVm empresa)
+    private string Antiguedad(EmpresaVm empresa)
     {
         var dias = (int)(DateTime.Today - empresa.FechaAlta).TotalDays;
         if (dias < 60) return $"{dias} días";
@@ -460,7 +460,7 @@ else
         Snackbar.Add($"{_empresa.RazonSocial} volvió a estar activa. Sus usuarios recuperan el acceso con las credenciales vigentes.", Severity.Success);
     }
 
-    private static void SincronizarPlanes()
+    private void SincronizarPlanes()
     {
         foreach (var plan in DatosDemo.Planes)
         {

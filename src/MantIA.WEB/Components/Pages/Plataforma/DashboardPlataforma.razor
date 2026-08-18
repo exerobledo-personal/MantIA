@@ -239,7 +239,7 @@
 </MudGrid>
 
 @code {
-    private static readonly List<BreadcrumbItem> Migas =
+    private readonly List<BreadcrumbItem> Migas =
     [
         new BreadcrumbItem("Plataforma MantIA", null, true),
         new BreadcrumbItem("Panel de plataforma", "/plataforma")
@@ -258,39 +258,39 @@
         ChartPalette = ["#0B6FA4", "#2E90C4", "#00909B", "#8FA8BC"]
     };
 
-    private static List<EmpresaVm> Activas => DatosDemo.Empresas
+    private List<EmpresaVm> Activas => DatosDemo.Empresas
         .Where(e => e.Estado == EstadoGenerico.Activo)
         .ToList();
 
-    private static List<EmpresaVm> EmpresasOrdenadas => DatosDemo.Empresas
+    private List<EmpresaVm> EmpresasOrdenadas => DatosDemo.Empresas
         .OrderByDescending(e => e.Estado == EstadoGenerico.Activo)
         .ThenByDescending(e => e.MaquinasRegistradas)
         .ToList();
 
-    private static List<EmpresaVm> PorMaquinas => DatosDemo.Empresas
+    private List<EmpresaVm> PorMaquinas => DatosDemo.Empresas
         .OrderByDescending(e => e.MaquinasRegistradas)
         .ToList();
 
-    private static int MaquinasGestionadas => DatosDemo.Empresas.Sum(e => e.MaquinasRegistradas);
+    private int MaquinasGestionadas => DatosDemo.Empresas.Sum(e => e.MaquinasRegistradas);
 
-    private static int CupoTotal => DatosDemo.Empresas.Sum(e => e.MaxMaquinasHabilitadas);
+    private int CupoTotal => DatosDemo.Empresas.Sum(e => e.MaxMaquinasHabilitadas);
 
-    private static int UsuariosTotales => DatosDemo.Empresas.Sum(e => e.UsuariosActivos);
+    private int UsuariosTotales => DatosDemo.Empresas.Sum(e => e.UsuariosActivos);
 
-    private static int OrdenesUltimoMes => DatosDemo.Empresas.Sum(e => e.OrdenesUltimoMes);
+    private int OrdenesUltimoMes => DatosDemo.Empresas.Sum(e => e.OrdenesUltimoMes);
 
-    private static int RecomendacionesProcesadas => DatosDemo.Empresas.Sum(e => e.RecomendacionesProcesadas);
+    private int RecomendacionesProcesadas => DatosDemo.Empresas.Sum(e => e.RecomendacionesProcesadas);
 
-    private static double PromedioUsuarios => DatosDemo.Empresas.Count == 0
+    private double PromedioUsuarios => DatosDemo.Empresas.Count == 0
         ? 0
         : (double)UsuariosTotales / DatosDemo.Empresas.Count;
 
-    private static decimal IngresoMensual => Activas.Sum(PrecioDe);
+    private decimal IngresoMensual => Activas.Sum(PrecioDe);
 
-    private static decimal PrecioDe(EmpresaVm empresa) =>
+    private decimal PrecioDe(EmpresaVm empresa) =>
         DatosDemo.Planes.FirstOrDefault(p => p.Nombre == empresa.Plan)?.Precio ?? 0;
 
-    private static List<ChartSeries<double>> SeriesMaquinas =>
+    private List<ChartSeries<double>> SeriesMaquinas =>
     [
         new ChartSeries<double>
         {
@@ -299,57 +299,57 @@
         }
     ];
 
-    private static string[] EtiquetasEmpresas => PorMaquinas.Select(e => Corto(e.RazonSocial)).ToArray();
+    private string[] EtiquetasEmpresas => PorMaquinas.Select(e => Corto(e.RazonSocial)).ToArray();
 
-    private static List<(string Plan, int Cantidad)> DistribucionPlanes => DatosDemo.Planes
+    private List<(string Plan, int Cantidad)> DistribucionPlanes => DatosDemo.Planes
         .Select(p => (Plan: p.Nombre, Cantidad: DatosDemo.Empresas.Count(e => e.Plan == p.Nombre)))
         .Where(x => x.Cantidad > 0)
         .ToList();
 
-    private static double[] DatosPlanes => DistribucionPlanes.Select(x => (double)x.Cantidad).ToArray();
+    private double[] DatosPlanes => DistribucionPlanes.Select(x => (double)x.Cantidad).ToArray();
 
-    private static string[] EtiquetasPlanes => DistribucionPlanes.Select(x => x.Plan).ToArray();
+    private string[] EtiquetasPlanes => DistribucionPlanes.Select(x => x.Plan).ToArray();
 
-    private static ServicioVm? ServicioComprometido => DatosDemo.Servicios
+    private ServicioVm? ServicioComprometido => DatosDemo.Servicios
         .FirstOrDefault(s => s.Estado != EstadoServicio.Operativo);
 
-    private static List<EventoBitacoraVm> EventosCriticos => DatosDemo.Bitacora
+    private List<EventoBitacoraVm> EventosCriticos => DatosDemo.Bitacora
         .Where(e => e.Nivel is NivelLog.Warning or NivelLog.Error)
         .OrderByDescending(e => e.Fecha)
         .Take(6)
         .ToList();
 
-    private static string Corto(string razonSocial)
+    private string Corto(string razonSocial)
     {
         var corte = razonSocial.IndexOf(" S.", StringComparison.Ordinal);
         var nombre = corte > 0 ? razonSocial[..corte] : razonSocial;
         return nombre.Length > 14 ? nombre[..13].TrimEnd() + "…" : nombre;
     }
 
-    private static string TextoServicio(EstadoServicio estado) => estado switch
+    private string TextoServicio(EstadoServicio estado) => estado switch
     {
         EstadoServicio.Operativo => "Operativo",
         EstadoServicio.Degradado => "Degradado",
         _ => "Caído"
     };
 
-    private static string EstiloServicio(ServicioVm servicio) => servicio.Estado switch
+    private string EstiloServicio(ServicioVm servicio) => servicio.Estado switch
     {
         EstadoServicio.Degradado => "border-left:3px solid #DE9021;padding-left:.75rem",
         EstadoServicio.Caido => "border-left:3px solid #D14343;padding-left:.75rem",
         _ => ""
     };
 
-    private static string NombreEmpresa(EventoBitacoraVm evento) =>
+    private string NombreEmpresa(EventoBitacoraVm evento) =>
         string.IsNullOrWhiteSpace(evento.Empresa) || evento.Empresa == "—"
             ? "Plataforma MantIA"
             : evento.Empresa;
 
-    private static int Uso(EmpresaVm empresa) => empresa.MaxMaquinasHabilitadas <= 0
+    private int Uso(EmpresaVm empresa) => empresa.MaxMaquinasHabilitadas <= 0
         ? 0
         : (int)Math.Round(empresa.MaquinasRegistradas * 100d / empresa.MaxMaquinasHabilitadas);
 
-    private static Color ColorUso(int uso) => uso switch
+    private Color ColorUso(int uso) => uso switch
     {
         >= 90 => Color.Error,
         >= 80 => Color.Warning,

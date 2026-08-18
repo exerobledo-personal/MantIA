@@ -24,6 +24,48 @@ public enum NivelLog { Debug, Info, Warning, Error }
 
 public enum EstadoServicio { Operativo, Degradado, Caido }
 
+/// <summary>
+/// Generador de identificadores para la maqueta.
+///
+/// Durante la siembra de <see cref="DatosDemo"/> entrega una secuencia deterministica,
+/// para que todas las sesiones compartan los mismos Id y los enlaces directos
+/// (/maquinas/{id}) y el F5 sigan funcionando aunque cada circuito tenga su propia
+/// copia de los datos. Fuera de la siembra vuelve a Guid.NewGuid(), asi todo lo que
+/// el usuario da de alta en pantalla recibe un Id unico de verdad.
+/// </summary>
+public static class IdDemo
+{
+    private sealed class Contador { public int Ultimo; }
+
+    private static readonly System.Threading.AsyncLocal<Contador?> EnSiembra = new();
+
+    public static Guid Nuevo() =>
+        EnSiembra.Value is { } contador ? Determinista(++contador.Ultimo) : Guid.NewGuid();
+
+    /// <summary>Abre un tramo de siembra deterministica. Se cierra al liberar el objeto.</summary>
+    public static IDisposable Sembrando()
+    {
+        var previo = EnSiembra.Value;
+        EnSiembra.Value = new Contador();
+        return new Tramo(previo);
+    }
+
+    private static Guid Determinista(int numero)
+    {
+        Span<byte> bytes = stackalloc byte[16];
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(bytes, numero);
+        // Marca fija para que un Id sembrado se reconozca de un vistazo en la URL.
+        bytes[8] = 0xDE;
+        bytes[9] = 0x30;
+        return new Guid(bytes);
+    }
+
+    private sealed class Tramo(Contador? previo) : IDisposable
+    {
+        public void Dispose() => EnSiembra.Value = previo;
+    }
+}
+
 public static class Roles
 {
     public const string Empleado = "Empleado";
@@ -45,7 +87,7 @@ public static class Roles
 
 public class PlanVm
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; } = IdDemo.Nuevo();
     public string Nombre { get; set; } = "";
     public int MaxMaquinas { get; set; }
     public decimal Precio { get; set; }
@@ -55,7 +97,7 @@ public class PlanVm
 
 public class EmpresaVm
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; } = IdDemo.Nuevo();
     public string RazonSocial { get; set; } = "";
     public string Dominio { get; set; } = "";
     public string TenantId { get; set; } = "";
@@ -73,7 +115,7 @@ public class EmpresaVm
 
 public class PlantaVm
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; } = IdDemo.Nuevo();
     public string Nombre { get; set; } = "";
     public string Direccion { get; set; } = "";
     public string Localidad { get; set; } = "";
@@ -88,7 +130,7 @@ public class PlantaVm
 
 public class CatalogoMaquinaVm
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; } = IdDemo.Nuevo();
     public string Marca { get; set; } = "";
     public string Modelo { get; set; } = "";
     public string Categoria { get; set; } = "";
@@ -104,7 +146,7 @@ public class CatalogoMaquinaVm
 
 public class MaquinaVm
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; } = IdDemo.Nuevo();
     public string Codigo { get; set; } = "";
     public string Nombre { get; set; } = "";
     public string NumeroSerie { get; set; } = "";
@@ -126,7 +168,7 @@ public class MaquinaVm
 
 public class RepuestoVm
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; } = IdDemo.Nuevo();
     public string Nombre { get; set; } = "";
     public string NumeroParte { get; set; } = "";
     public string ProveedorReferencia { get; set; } = "";
@@ -147,7 +189,7 @@ public class RepuestoVm
 
 public class OrdenTrabajoVm
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; } = IdDemo.Nuevo();
     public string Numero { get; set; } = "";
     public Guid MaquinaId { get; set; }
     public string Maquina { get; set; } = "";
@@ -179,7 +221,7 @@ public class ConsumoRepuestoVm
 
 public class AlertaStockVm
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; } = IdDemo.Nuevo();
     public Guid RepuestoId { get; set; }
     public string Repuesto { get; set; } = "";
     public string NumeroParte { get; set; } = "";
@@ -196,7 +238,7 @@ public class AlertaStockVm
 
 public class RecomendacionVm
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; } = IdDemo.Nuevo();
     public Guid RepuestoId { get; set; }
     public string Repuesto { get; set; } = "";
     public string NumeroParte { get; set; } = "";
@@ -220,7 +262,7 @@ public class RecomendacionVm
 
 public class NivelPermisoVm
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; } = IdDemo.Nuevo();
     public string Nombre { get; set; } = "";
     public string Descripcion { get; set; } = "";
     public int Usuarios { get; set; }
@@ -228,7 +270,7 @@ public class NivelPermisoVm
 
 public class UsuarioVm
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; } = IdDemo.Nuevo();
     public string Nombre { get; set; } = "";
     public string Apellido { get; set; } = "";
     public string Email { get; set; } = "";
@@ -255,7 +297,7 @@ public class PermisoVm
 
 public class ReporteVm
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; } = IdDemo.Nuevo();
     public string Nombre { get; set; } = "";
     public string TipoReporte { get; set; } = "";
     public string Parametros { get; set; } = "";
@@ -278,7 +320,7 @@ public class ReporteHistorialVm
 
 public class EventoBitacoraVm
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; } = IdDemo.Nuevo();
     public DateTime Fecha { get; set; }
     public string Usuario { get; set; } = "";
     public string Empresa { get; set; } = "";

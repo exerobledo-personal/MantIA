@@ -318,15 +318,183 @@ html, body {
     background: var(--mud-palette-background-gray);
 }
 
-/* ---------- Mapa de plantas ---------- */
+/* ---------- Mapa de plantas (Leaflet + OpenStreetMap) ---------- */
 
-.mantia-mapa { position: relative; width: 100%; border-radius: var(--mantia-radio); overflow: hidden; background: #0F2233; }
+.mantia-mapa {
+    position: relative;
+    width: 100%;
+    border-radius: var(--mantia-radio);
+    overflow: hidden;
+    background: var(--mud-palette-background-gray);
+    border: 1px solid var(--mud-palette-lines-default);
+}
 
-.mantia-mapa svg { display: block; width: 100%; height: auto; }
+.mantia-mapa__lienzo { width: 100%; height: 440px; z-index: 0; }
 
-.mantia-mapa__pin { cursor: pointer; transition: transform .15s ease; transform-origin: center; }
+.mantia-mapa__cargando,
+.mantia-mapa__sinmapa {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .55rem;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-secondary);
+    font-size: .9rem;
+    text-align: center;
+    padding: 1.5rem;
+}
 
-.mantia-mapa__pin:hover { filter: brightness(1.2); }
+.mantia-mapa__sinmapa p { margin: 0; font-weight: 600; color: var(--mud-palette-text-primary); }
+.mantia-mapa__sinmapa span { max-width: 24rem; }
+
+/* Chips de acceso rapido debajo del mapa */
+.mantia-mapa__leyenda {
+    position: absolute;
+    left: .75rem;
+    bottom: .75rem;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.mantia-mapa__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .32rem .7rem;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 999px;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    font: inherit;
+    font-size: .82rem;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgb(0 0 0 / .12);
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.mantia-mapa__chip:hover { border-color: var(--mud-palette-primary); }
+
+.mantia-mapa__chip--activo {
+    border-color: var(--mud-palette-primary);
+    box-shadow: 0 0 0 2px rgb(11 111 164 / .18);
+}
+
+.mantia-mapa__conteo {
+    padding: 0 .38rem;
+    border-radius: 999px;
+    background: var(--mud-palette-background-gray);
+    color: var(--mud-palette-text-secondary);
+    font-size: .74rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.mantia-mapa__punto { width: .55rem; height: .55rem; border-radius: 50%; }
+.mantia-mapa__punto--normal { background: #1E9E62; }
+.mantia-mapa__punto--atencion { background: #DE9021; }
+.mantia-mapa__punto--critico { background: #D14343; }
+
+/* Marcador: icono de fabrica con el nombre de la planta encima */
+.mantia-pin__contenedor { background: none; border: 0; }
+
+.mantia-pin {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    --pin-color: #1E9E62;
+}
+
+.mantia-pin--atencion { --pin-color: #DE9021; }
+.mantia-pin--critico { --pin-color: #D14343; }
+
+.mantia-pin__rotulo {
+    max-width: 11rem;
+    margin-bottom: .28rem;
+    padding: .16rem .5rem;
+    border-radius: 6px;
+    border: 1px solid var(--mud-palette-lines-default);
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    font-size: .78rem;
+    font-weight: 600;
+    line-height: 1.35;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgb(0 0 0 / .18);
+}
+
+.mantia-pin__marca {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--pin-color);
+    color: #FFF;
+    border: 2.5px solid var(--mud-palette-surface);
+    box-shadow: 0 2px 7px rgb(0 0 0 / .3);
+    transition: transform .15s ease;
+}
+
+.mantia-pin__punta {
+    width: 0;
+    height: 0;
+    margin-top: -3px;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 9px solid var(--pin-color);
+    filter: drop-shadow(0 1px 1px rgb(0 0 0 / .25));
+}
+
+.mantia-pin__contenedor:hover .mantia-pin__marca { transform: scale(1.12); }
+
+.mantia-pin--activo .mantia-pin__marca {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--pin-color) 28%, transparent), 0 2px 7px rgb(0 0 0 / .3);
+}
+
+/* Globo de informacion */
+.mantia-globo__caja .leaflet-popup-content-wrapper {
+    border-radius: var(--mantia-radio);
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+}
+
+.mantia-globo__caja .leaflet-popup-tip { background: var(--mud-palette-surface); }
+.mantia-globo__caja .leaflet-popup-content { margin: .7rem .9rem; }
+
+.mantia-globo__titulo { margin: 0; font-size: .95rem; font-weight: 600; }
+.mantia-globo__lugar { margin: .1rem 0 .55rem; color: var(--mud-palette-text-secondary); font-size: .8rem; }
+
+.mantia-globo__datos { display: flex; gap: 1.1rem; margin: 0; }
+.mantia-globo__datos dt { color: var(--mud-palette-text-secondary); font-size: .72rem; text-transform: uppercase; letter-spacing: .03em; }
+.mantia-globo__datos dd { margin: 0; font-size: 1.05rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mantia-globo__atencion { color: #DE9021; }
+.mantia-globo__critico { color: #D14343; }
+
+/* Controles de Leaflet alineados con el resto de la interfaz */
+.mantia-mapa .leaflet-control-zoom a {
+    border-radius: 6px;
+    color: var(--mud-palette-text-primary);
+    background: var(--mud-palette-surface);
+    border-color: var(--mud-palette-lines-default);
+}
+
+.mantia-mapa .leaflet-control-attribution {
+    background: color-mix(in srgb, var(--mud-palette-surface) 88%, transparent);
+    color: var(--mud-palette-text-secondary);
+    font-size: .68rem;
+}
+
+.mantia-mapa .leaflet-control-attribution a { color: var(--mud-palette-text-secondary); }
 
 /* ---------- Acceso ---------- */
 
