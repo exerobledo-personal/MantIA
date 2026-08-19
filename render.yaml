@@ -12,7 +12,7 @@ services:
     runtime: docker
     plan: free
     region: ohio                       # es la region mas cercana a Buenos Aires que ofrece Render
-    branch: feature/backend-mantia
+    branch: develop
     dockerfilePath: ./src/MantIA.WEB/Dockerfile
     dockerContext: .
     healthCheckPath: /

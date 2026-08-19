@@ -5,7 +5,13 @@
 @inject AuthenticationStateProvider AuthProvider
 @inject TenantResolver Resolver
 
-<h3>Perfil de sesion</h3>
+<PageTitle>Banco de pruebas · MantIA</PageTitle>
+
+<h3>Banco de pruebas</h3>
+<p style="color:#5B7286">
+    Pagina de diagnostico, fuera del menu. Sirve para inspeccionar la cadena
+    Auth0 → JWT → claims → tenant sin depender de ninguna pantalla del producto.
+</p>
 
 @if (claims is null)
 {
@@ -23,7 +29,17 @@ else
         <p style="color:red"><strong>@resultado!.Mensaje</strong></p>
     }
     <p><strong>Empresa (tenant) resuelta:</strong> @(resultado?.EmpresaId?.ToString() ?? "NINGUNA")</p>
+    @if (errorResolucion is not null)
+    {
+        <p style="color:#D14343">
+            <strong>No se pudo resolver el tenant:</strong> @errorResolucion
+        </p>
+        <p style="color:#5B7286">
+            Es lo esperado mientras no haya base de datos: el resolutor consulta PostgreSQL.
+        </p>
+    }
     <hr />
+    <p><strong>Claims del token (@claims.Count):</strong></p>
     <ul>
         @foreach (var c in claims)
         {
@@ -37,11 +53,24 @@ else
     private List<Claim>? claims;
     private ResultadoAcceso? resultado;
 
+    private string? errorResolucion;
+
     protected override async Task OnInitializedAsync()
     {
         var state = await AuthProvider.GetAuthenticationStateAsync();
         claims = state.User.Claims.ToList();
-        if (claims.Count > 0)
+
+        if (claims.Count == 0) return;
+
+        // La resolucion del tenant consulta la base. Mientras no exista, la pagina
+        // tiene que mostrar el error y seguir siendo util, no tumbar el circuito.
+        try
+        {
             resultado = await Resolver.ResolverAsync(state.User);
+        }
+        catch (Exception ex)
+        {
+            errorResolucion = $"{ex.GetType().Name}: {ex.Message}";
+        }
     }
 }

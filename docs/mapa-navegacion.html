@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MantIA · Mapa de navegación y revisión de la interfaz</title>
+<style>
+  :root {
+    --tinta: #14293C;
+    --tinta-2: #5B7286;
+    --tinta-3: #8FA8BC;
+    --linea: #DEE7EE;
+    --fondo: #F1F5F9;
+    --sup: #FFFFFF;
+    --azul: #0B6FA4;
+    --teal: #00909B;
+    --ambar: #DE9021;
+    --rojo: #D14343;
+    --verde: #1E9E62;
+    --naranja: #EE7A22;
+    --sombra: 0 1px 2px rgba(15,34,51,.05), 0 8px 24px -14px rgba(15,34,51,.25);
+    --fuente: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: var(--fuente);
+    background: var(--fondo);
+    color: var(--tinta);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .lienzo { max-width: 1220px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+
+  /* ---------- Encabezado ---------- */
+
+  header.tapa {
+    display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+    padding: 1.75rem 2rem;
+    border-radius: 16px;
+    background: radial-gradient(900px 400px at 8% 0%, #14547A 0%, transparent 62%),
+                linear-gradient(140deg, #0F2233 0%, #0B1A27 100%);
+    color: #E8F1F7;
+    margin-bottom: 2rem;
+  }
+
+  .logo {
+    display: grid; place-items: center;
+    width: 46px; height: 46px; border-radius: 13px;
+    background: linear-gradient(135deg, #0B6FA4, #00909B);
+    font-size: 1.35rem;
+  }
+
+  .tapa h1 { margin: 0; font-size: 1.5rem; font-weight: 640; letter-spacing: -.02em; }
+  .tapa p { margin: .15rem 0 0; font-size: .88rem; color: #9FBACE; }
+  .tapa .marca { font-size: 1.35rem; font-weight: 600; }
+  .tapa .marca b { font-weight: 800; color: #4FC3D9; }
+
+  /* ---------- Bloques ---------- */
+
+  h2 {
+    font-size: 1.12rem; font-weight: 650; letter-spacing: -.01em;
+    margin: 2.5rem 0 .35rem; display: flex; align-items: center; gap: .6rem;
+  }
+  h2 .num {
+    display: grid; place-items: center; width: 26px; height: 26px;
+    border-radius: 8px; background: var(--azul); color: #fff;
+    font-size: .8rem; font-weight: 700;
+  }
+  h2 + .sub { margin: 0 0 1.25rem 2.2rem; color: var(--tinta-2); font-size: .9rem; max-width: 80ch; }
+
+  /* ---------- Resumen ---------- */
+
+  .cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: .875rem; }
+  .cifra {
+    background: var(--sup); border: 1px solid var(--linea); border-radius: 12px;
+    padding: .9rem 1.1rem; box-shadow: var(--sombra);
+  }
+  .cifra b { display: block; font-size: 1.75rem; font-weight: 680; letter-spacing: -.03em; line-height: 1.15; }
+  .cifra span { font-size: .78rem; color: var(--tinta-2); }
+
+  /* ---------- Mapa ---------- */
+
+  .nivel {
+    background: var(--sup); border: 1px solid var(--linea); border-radius: 14px;
+    box-shadow: var(--sombra); margin-bottom: 1rem; overflow: hidden;
+  }
+  .nivel__cab {
+    display: flex; align-items: center; gap: .875rem; flex-wrap: wrap;
+    padding: .9rem 1.25rem; border-left: 5px solid var(--acento);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--acento) 9%, transparent), transparent 60%);
+  }
+  .nivel__cab h3 { margin: 0; font-size: 1rem; font-weight: 640; }
+  .nivel__cab .roles { font-size: .8rem; color: var(--tinta-2); }
+  .pill {
+    margin-left: auto; font-size: .72rem; font-weight: 700; letter-spacing: .04em;
+    padding: .2rem .6rem; border-radius: 999px;
+    background: color-mix(in srgb, var(--acento) 14%, transparent); color: var(--acento);
+  }
+
+  .rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px,1fr)); gap: .75rem; padding: 1rem 1.25rem 1.25rem; }
+
+  .pant {
+    border: 1px solid var(--linea); border-radius: 10px; padding: .7rem .85rem; background: #FBFDFE;
+  }
+  .pant__t { font-weight: 620; font-size: .9rem; display: flex; align-items: center; gap: .4rem; }
+  .pant__r { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .74rem; color: var(--azul); margin-top: .15rem; word-break: break-all; }
+  .pant__d { font-size: .78rem; color: var(--tinta-2); margin-top: .3rem; }
+  .pant ul { margin: .45rem 0 0; padding-left: 0; list-style: none; border-left: 2px solid var(--linea); }
+  .pant li { font-size: .78rem; color: var(--tinta-2); padding: .12rem 0 .12rem .6rem; }
+  .pant li code { font-family: ui-monospace, Consolas, monospace; font-size: .72rem; color: var(--azul); }
+
+  .tag {
+    font-size: .64rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    padding: .1rem .38rem; border-radius: 5px; white-space: nowrap;
+  }
+  .tag--abmc { background: rgba(11,111,164,.12); color: var(--azul); }
+  .tag--mc { background: rgba(0,144,155,.14); color: var(--teal); }
+  .tag--c { background: rgba(91,114,134,.14); color: var(--tinta-2); }
+  .tag--dlg { background: rgba(238,122,34,.14); color: var(--naranja); }
+
+  /* ---------- Flujos ---------- */
+
+  .flujo {
+    background: var(--sup); border: 1px solid var(--linea); border-radius: 14px;
+    box-shadow: var(--sombra); padding: 1.1rem 1.25rem; margin-bottom: .875rem;
+  }
+  .flujo h4 { margin: 0 0 .2rem; font-size: .97rem; font-weight: 640; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+  .flujo .cu { font-size: .68rem; font-weight: 700; padding: .12rem .42rem; border-radius: 5px; background: rgba(11,111,164,.12); color: var(--azul); }
+  .flujo .por { font-size: .82rem; color: var(--tinta-2); margin: 0 0 .85rem; }
+
+  .pasos { display: flex; flex-wrap: wrap; align-items: stretch; gap: .4rem; }
+  .paso {
+    flex: 1 1 158px; min-width: 148px;
+    border: 1px solid var(--linea); border-radius: 9px; padding: .55rem .7rem; background: #FBFDFE;
+    position: relative;
+  }
+  .paso__n { font-size: .64rem; font-weight: 800; color: var(--tinta-3); letter-spacing: .06em; }
+  .paso__t { font-size: .83rem; font-weight: 600; line-height: 1.3; }
+  .paso__d { font-size: .74rem; color: var(--tinta-2); margin-top: .18rem; }
+  .paso--fin { border-color: var(--verde); background: rgba(30,158,98,.06); }
+  .paso--fin .paso__n { color: var(--verde); }
+
+  .efecto {
+    margin-top: .8rem; padding: .65rem .85rem; border-radius: 9px;
+    background: rgba(30,158,98,.08); border: 1px solid rgba(30,158,98,.3);
+    font-size: .81rem;
+  }
+  .efecto b { color: var(--verde); }
+
+  /* ---------- Revisión ---------- */
+
+  .dos { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px,1fr)); gap: .875rem; }
+  .caja {
+    background: var(--sup); border: 1px solid var(--linea); border-radius: 14px;
+    box-shadow: var(--sombra); padding: 1.1rem 1.25rem;
+  }
+  .caja h4 { margin: 0 0 .6rem; font-size: .95rem; font-weight: 640; display: flex; align-items: center; gap: .5rem; }
+  .caja ul { margin: 0; padding-left: 1.05rem; }
+  .caja li { font-size: .85rem; margin-bottom: .5rem; }
+  .caja li b { font-weight: 620; }
+  .punto { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--linea); vertical-align: top; }
+  th { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--tinta-2); font-weight: 700; }
+  td code { font-family: ui-monospace, Consolas, monospace; font-size: .76rem; color: var(--azul); }
+
+  footer { margin-top: 2.5rem; text-align: center; font-size: .78rem; color: var(--tinta-3); }
+
+  @media print {
+    body { background: #fff; }
+    .nivel, .flujo, .caja, .cifra { box-shadow: none; break-inside: avoid; }
+    header.tapa { break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="lienzo">
+
+  <header class="tapa">
+    <span class="logo">◈</span>
+    <div>
+      <span class="marca">Mant<b>IA</b></span>
+      <h1>Mapa de navegación y revisión de la interfaz</h1>
+      <p>37 pantallas · 45 rutas · 4 diálogos modales · Rama <code style="color:#4FC3D9">feature/ui-mantia</code> · Agosto 2026</p>
+    </div>
+  </header>
+
+  <h2><span class="num">1</span>Cómo está organizada</h2>
+  <p class="sub">
+    La aplicación se recorre desde una única sesión de superadministrador. El selector
+    <b>“Ver la aplicación como”</b> de la barra superior recorta la navegación al perfil elegido,
+    de modo que cada nivel de acceso se puede mostrar por separado sin cambiar de usuario.
+  </p>
+
+  <div class="cifras">
+    <div class="cifra"><b>4</b><span>Niveles de acceso</span></div>
+    <div class="cifra"><b>37</b><span>Pantallas</span></div>
+    <div class="cifra"><b>12</b><span>Casos de uso cubiertos</span></div>
+    <div class="cifra"><b>5</b><span>Roles del sistema</span></div>
+    <div class="cifra"><b>4</b><span>Diálogos modales</span></div>
+  </div>
+
+  <h2><span class="num">2</span>Mapa de navegación</h2>
+  <p class="sub">
+    Cada bloque es un nivel de acceso. La etiqueta indica las operaciones disponibles:
+    <span class="tag tag--abmc">ABMC</span> alta, baja, modificación y consulta ·
+    <span class="tag tag--mc">M·C</span> modificación y consulta ·
+    <span class="tag tag--c">C</span> sólo consulta ·
+    <span class="tag tag--dlg">Diálogo</span> ventana modal.
+  </p>
+
+  <!-- ACCESO -->
+  <section class="nivel" style="--acento: #5B7286">
+    <div class="nivel__cab">
+      <div>
+        <h3>Acceso</h3>
+        <div class="roles">Sin sesión iniciada · Todos los perfiles</div>
+      </div>
+      <span class="pill">4 pantallas</span>
+    </div>
+    <div class="rejilla">
+      <div class="pant">
+        <div class="pant__t">Inicio de sesión <span class="tag tag--abmc">CU-001</span></div>
+        <div class="pant__r">/</div>
+        <div class="pant__d">Usuario y contraseña, o acceso con Google restringido al dominio corporativo.</div>
+      </div>
+      <div class="pant">
+        <div class="pant__t">Recuperar contraseña</div>
+        <div class="pant__r">/recuperar</div>
+        <div class="pant__d">Envío del enlace de restablecimiento por correo.</div>
+      </div>
+      <div class="pant">
+        <div class="pant__t">Acceso denegado</div>
+        <div class="pant__r">/acceso-denegado</div>
+        <div class="pant__d">Corte cuando el correo no pertenece al dominio de la empresa.</div>
+      </div>
+      <div class="pant">
+        <div class="pant__t">Página no encontrada</div>
+        <div class="pant__r">/not-found</div>
+        <div class="pant__d">Ruta inexistente.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OPERACIÓN -->
+  <section class="nivel" style="--acento: #0B6FA4">
+    <div class="nivel__cab">
+      <div>
+        <h3>Operación y mantenimiento</h3>
+        <div class="roles">Empleado · Supervisor · Gerente de ingeniería</div>
+      </div>
+      <span class="pill">13 pantallas</span>
+    </div>
+    <div class="rejilla">
+      <div class="pant">
+        <div class="pant__t">Panel operativo</div>
+        <div class="pant__r">/dashboard</div>
+        <div class="pant__d">Seis indicadores, órdenes por mes, estado del parque, alertas que requieren decisión y actividad reciente. Se recalcula con cada movimiento.</div>
+      </div>
+      <div class="pant">
+        <div class="pant__t">Máquinas <span class="tag tag--abmc">CU-002</span></div>
+        <div class="pant__r">/maquinas</div>
+        <ul>
+          <li>Alta y edición · <code>/maquinas/nueva</code></li>
+          <li>Ficha del activo · <code>/maquinas/{id}</code></li>
+          <li>Historial de fallas · <code>/{id}/historial</code></li>
+        </ul>
+      </div>
+      <div class="pant">
+        <div class="pant__t">Repuestos críticos <span class="tag tag--abmc">CU-003</span></div>
+        <div class="pant__r">/repuestos</div>
+        <ul>
+          <li>Alta y edición · <code>/repuestos/nuevo</code></li>
+          <li>Detalle · <code>/repuestos/{id}</code></li>
+          <li><span class="tag tag--dlg">Diálogo</span> Ajustar umbral mínimo</li>
+        </ul>
+      </div>
+      <div class="pant">
+        <div class="pant__t">Alertas de stock <span class="tag tag--mc">CU-003-002</span></div>
+        <div class="pant__r">/alertas</div>
+        <div class="pant__d">Agrupadas por criticidad, con días de cobertura restantes. Se generan y se resuelven solas según el stock.</div>
+      </div>
+      <div class="pant">
+        <div class="pant__t">Órdenes de trabajo <span class="tag tag--abmc">CU-004</span></div>
+        <div class="pant__r">/ordenes</div>
+        <ul>
+          <li>Alta y edición · <code>/ordenes/nueva</code></li>
+          <li>Detalle y cierre · <code>/ordenes/{id}</code></li>
+          <li><span class="tag tag--dlg">Diálogo</span> Cerrar orden con consumo</li>
+        </ul>
+      </div>
+      <div class="pant">
+        <div class="pant__t">Catálogo técnico <span class="tag tag--c">C</span></div>
+        <div class="pant__r">/catalogo</div>
+        <ul>
+          <li>Ficha del modelo · <code>/catalogo/{id}</code></li>
+        </ul>
+        <div class="pant__d">Base compartida por todos los clientes. Cada máquina registrada la enriquece.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INTELIGENCIA -->
+  <section class="nivel" style="--acento: #00909B">
+    <div class="nivel__cab">
+      <div>
+        <h3>Inteligencia y análisis</h3>
+        <div class="roles">Supervisor · Gerente de ingeniería · Administrador de empresa</div>
+      </div>
+      <span class="pill">5 pantallas</span>
+    </div>
+    <div class="rejilla">
+      <div class="pant" style="border-color:#00909B; background:rgba(0,144,155,.05)">
+        <div class="pant__t">Motor de recomendaciones <span class="tag tag--mc">CU-005</span></div>
+        <div class="pant__r">/recomendaciones</div>
+        <div class="pant__d"><b>Pantalla central del diferencial.</b> Cada sugerencia expone el origen (regla de negocio o modelo), la regla que se disparó, la evidencia usada y el nivel de confianza.</div>
+        <ul>
+          <li><span class="tag tag--dlg">Diálogo</span> Validar con trazabilidad</li>
+        </ul>
+      </div>
+      <div class="pant">
+        <div class="pant__t">Reportes <span class="tag tag--abmc">CU-006</span></div>
+        <div class="pant__r">/reportes</div>
+        <ul>
+          <li>Generar · <code>/reportes/nuevo</code></li>
+          <li>Detalle y exportación · <code>/reportes/{id}</code></li>
+        </ul>
+        <div class="pant__d">La eliminación es lógica: el historial de cambios queda visible para administración.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EMPRESA -->
+  <section class="nivel" style="--acento: #DE9021">
+    <div class="nivel__cab">
+      <div>
+        <h3>Administración de empresa</h3>
+        <div class="roles">Administrador de la empresa cliente</div>
+      </div>
+      <span class="pill">8 pantallas</span>
+    </div>
+    <div class="rejilla">
+      <div class="pant">
+        <div class="pant__t">Panel de empresa</div>
+        <div class="pant__r">/empresa</div>
+        <div class="pant__d">Consumo del plan, usuarios por rol, mapa de plantas y actividad administrativa.</div>
+      </div>
+      <div class="pant">
+        <div class="pant__t">Usuarios y niveles <span class="tag tag--abmc">CU-007-001</span></div>
+        <div class="pant__r">/empresa/usuarios</div>
+        <ul>
+          <li>Alta y edición · <code>/usuarios/nuevo</code></li>
+        </ul>
+        <div class="pant__d">Rol del sistema más nivel de confianza Jr o Sr.</div>
+      </div>
+      <div class="pant">
+        <div class="pant__t">Plantas <span class="tag tag--abmc">CU-007-002</span></div>
+        <div class="pant__r">/empresa/plantas</div>
+        <ul>
+          <li>Alta y edición · <code>/plantas/nueva</code></li>
+        </ul>
+      </div>
+      <div class="pant">
+        <div class="pant__t">Mapa de instalaciones <span class="tag tag--c">US-009</span></div>
+        <div class="pant__r">/empresa/mapa</div>
+        <div class="pant__d">Vista consolidada del estado operativo de cada planta.</div>
+      </div>
+      <div class="pant">
+        <div class="pant__t">Matriz de permisos <span class="tag tag--mc">CU-007-003</span></div>
+        <div class="pant__r">/empresa/permisos</div>
+        <div class="pant__d">Qué acción puede ejecutar cada combinación de rol y nivel sobre cada recurso.</div>
+      </div>
+      <div class="pant">
+        <div class="pant__t">Bitácora de empresa <span class="tag tag--c">C</span></div>
+        <div class="pant__r">/empresa/bitacora</div>
+        <div class="pant__d">Línea de tiempo de la actividad administrativa. Sólo lectura.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLATAFORMA -->
+  <section class="nivel" style="--acento: #D14343">
+    <div class="nivel__cab">
+      <div>
+        <h3>Plataforma MantIA</h3>
+        <div class="roles">Superadministrador · Operador del servicio</div>
+      </div>
+      <span class="pill">6 pantallas</span>
+    </div>
+    <div class="rejilla">
+      <div class="pant">
+        <div class="pant__t">Panel de plataforma</div>
+        <div class="pant__r">/plataforma</div>
+        <div class="pant__d">Cartera de clientes, ingreso mensual recurrente, consumo de planes y salud de los servicios.</div>
+      </div>
+      <div class="pant">
+        <div class="pant__t">Empresas cliente <span class="tag tag--abmc">CU-008-001</span></div>
+        <div class="pant__r">/plataforma/empresas</div>
+        <ul>
+          <li>Alta y edición · <code>/empresas/nueva</code></li>
+          <li>Ficha del tenant · <code>/empresas/{id}</code></li>
+        </ul>
+      </div>
+      <div class="pant">
+        <div class="pant__t">Planes de suscripción</div>
+        <div class="pant__r">/plataforma/planes</div>
+        <ul>
+          <li><span class="tag tag--dlg">Diálogo</span> Editar plan</li>
+        </ul>
+      </div>
+      <div class="pant">
+        <div class="pant__t">Panel de sistema <span class="tag tag--c">CU-008-002</span></div>
+        <div class="pant__r">/plataforma/sistema</div>
+        <div class="pant__d">Salud de servicios, bitácora de auditoría y bitácora de excepciones con nivel de log configurable.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRANSVERSAL -->
+  <section class="nivel" style="--acento: #8FA8BC">
+    <div class="nivel__cab">
+      <div>
+        <h3>Transversal</h3>
+        <div class="roles">Todos los perfiles</div>
+      </div>
+      <span class="pill">1 pantalla</span>
+    </div>
+    <div class="rejilla">
+      <div class="pant">
+        <div class="pant__t">Mi perfil</div>
+        <div class="pant__r">/mi-perfil</div>
+        <div class="pant__d">Datos de la cuenta, alcance funcional del rol, preferencias y sesiones activas.</div>
+      </div>
+    </div>
+  </section>
+
+  <h2><span class="num">3</span>Los cinco flujos para recorrer en la defensa</h2>
+  <p class="sub">
+    Cada flujo empieza y termina en una pantalla concreta, y produce un efecto observable en el
+    resto del sistema. Ese efecto es lo que conviene señalar en voz alta mientras se muestra.
+  </p>
+
+  <div class="flujo">
+    <h4>A · Alta de máquina con enriquecimiento del catálogo <span class="cu">CU-002-001</span></h4>
+    <p class="por">Demuestra el diferencial frente a un CMMS tradicional: el catálogo técnico se completa solo.</p>
+    <div class="pasos">
+      <div class="paso"><div class="paso__n">PASO 1</div><div class="paso__t">Máquinas</div><div class="paso__d">Botón “Nueva máquina”</div></div>
+      <div class="paso"><div class="paso__n">PASO 2</div><div class="paso__t">Nombre y número de serie</div><div class="paso__d">El código interno se asigna solo</div></div>
+      <div class="paso"><div class="paso__n">PASO 3</div><div class="paso__t">Marca y modelo</div><div class="paso__d">La ficha del catálogo aparece al instante</div></div>
+      <div class="paso"><div class="paso__n">PASO 4</div><div class="paso__t">Planta, línea y criticidad</div><div class="paso__d">Definen el alcance de las alertas</div></div>
+      <div class="paso paso--fin"><div class="paso__n">RESULTADO</div><div class="paso__t">Ficha del activo</div><div class="paso__d">Con fallas comunes y repuestos heredados</div></div>
+    </div>
+    <div class="efecto">
+      <b>Qué mostrar:</b> volver al panel principal. El contador de máquinas subió y el mapa de plantas
+      también. Elegir una marca que no esté en el catálogo muestra la rama contraria: el enriquecimiento
+      queda encolado y la ficha en estado Pendiente.
+    </div>
+  </div>
+
+  <div class="flujo">
+    <h4>B · Ciclo completo de una orden de trabajo <span class="cu">CU-004-001</span></h4>
+    <p class="por">Es el flujo más importante: encadena mantenimiento, inventario y alertas en un solo movimiento.</p>
+    <div class="pasos">
+      <div class="paso"><div class="paso__n">PASO 1</div><div class="paso__t">Órdenes de trabajo</div><div class="paso__d">Solapas por estado con conteo</div></div>
+      <div class="paso"><div class="paso__n">PASO 2</div><div class="paso__t">Abrir una orden</div><div class="paso__d">Contexto del activo al costado</div></div>
+      <div class="paso"><div class="paso__n">PASO 3</div><div class="paso__t">Cerrar orden</div><div class="paso__d">Resolución aplicada</div></div>
+      <div class="paso"><div class="paso__n">PASO 4</div><div class="paso__t">Declarar consumo</div><div class="paso__d">Muestra stock actual y resultante</div></div>
+      <div class="paso paso--fin"><div class="paso__n">RESULTADO</div><div class="paso__t">Orden cerrada</div><div class="paso__d">Con trazabilidad del consumo</div></div>
+    </div>
+    <div class="efecto">
+      <b>Qué mostrar:</b> el stock del repuesto bajó en el inventario, apareció o se profundizó una alerta,
+      las órdenes abiertas bajaron, el capital en riesgo subió y el tiempo medio de resolución se recalculó.
+      <b>Todo sin recargar y sin tocar nada más.</b>
+    </div>
+  </div>
+
+  <div class="flujo">
+    <h4>C · Del quiebre de stock a la decisión de compra <span class="cu">CU-003-002 · CU-005-001</span></h4>
+    <p class="por">Responde la pregunta que el profesor pidió profundizar: qué es regla de negocio y qué es modelo.</p>
+    <div class="pasos">
+      <div class="paso"><div class="paso__n">PASO 1</div><div class="paso__t">Alertas de stock</div><div class="paso__d">Agrupadas por criticidad</div></div>
+      <div class="paso"><div class="paso__n">PASO 2</div><div class="paso__t">Ajustar umbral</div><div class="paso__d">Anticipa la consecuencia mientras se escribe</div></div>
+      <div class="paso"><div class="paso__n">PASO 3</div><div class="paso__t">Recomendaciones</div><div class="paso__d">Regla y modelo separados y explicados</div></div>
+      <div class="paso"><div class="paso__n">PASO 4</div><div class="paso__t">Revisar evidencia</div><div class="paso__d">Qué datos sostienen la sugerencia</div></div>
+      <div class="paso paso--fin"><div class="paso__n">RESULTADO</div><div class="paso__t">Validación registrada</div><div class="paso__d">Con responsable y fecha</div></div>
+    </div>
+    <div class="efecto">
+      <b>Qué mostrar:</b> el diálogo de umbral cambia de ámbar a verde según el valor tipeado, anticipando si
+      la alerta se genera o se resuelve. En recomendaciones, contrastar una sugerencia por regla
+      (determinista y auditable) contra una del modelo (con nivel de confianza).
+    </div>
+  </div>
+
+  <div class="flujo">
+    <h4>D · Alta de una empresa cliente <span class="cu">CU-008-001</span></h4>
+    <p class="por">Muestra el modelo de negocio multi-tenant y el onboarding del producto.</p>
+    <div class="pasos">
+      <div class="paso"><div class="paso__n">PASO 1</div><div class="paso__t">Panel de plataforma</div><div class="paso__d">Cartera e ingreso mensual</div></div>
+      <div class="paso"><div class="paso__n">PASO 2</div><div class="paso__t">Nueva empresa</div><div class="paso__d">Razón social y dominio corporativo</div></div>
+      <div class="paso"><div class="paso__n">PASO 3</div><div class="paso__t">Plan de suscripción</div><div class="paso__d">Define el límite de máquinas</div></div>
+      <div class="paso"><div class="paso__n">PASO 4</div><div class="paso__t">Administrador inicial</div><div class="paso__d">Validado contra el dominio</div></div>
+      <div class="paso paso--fin"><div class="paso__n">RESULTADO</div><div class="paso__t">Tenant creado</div><div class="paso__d">Con planta por defecto</div></div>
+    </div>
+    <div class="efecto">
+      <b>Qué mostrar:</b> el formulario enumera la secuencia que dispara el alta — crear el tenant en el
+      proveedor de identidad, crear la planta por defecto, crear el administrador y enviarle sus credenciales.
+    </div>
+  </div>
+
+  <div class="flujo">
+    <h4>E · Diferenciación de perfiles y permisos <span class="cu">CU-007-001 · CU-007-003</span></h4>
+    <p class="por">Es la pregunta más probable del tribunal. Conviene mostrarla en vez de explicarla.</p>
+    <div class="pasos">
+      <div class="paso"><div class="paso__n">PASO 1</div><div class="paso__t">Matriz de permisos</div><div class="paso__d">Rol por nivel, recurso por acción</div></div>
+      <div class="paso"><div class="paso__n">PASO 2</div><div class="paso__t">Comparativa de perfiles</div><div class="paso__d">Jr siempre más restringido que Sr</div></div>
+      <div class="paso"><div class="paso__n">PASO 3</div><div class="paso__t">Cambiar de vista</div><div class="paso__d">Selector de la barra superior</div></div>
+      <div class="paso"><div class="paso__n">PASO 4</div><div class="paso__t">Elegir Operación</div><div class="paso__d">El menú se recorta en vivo</div></div>
+      <div class="paso paso--fin"><div class="paso__n">RESULTADO</div><div class="paso__t">Vista del supervisor</div><div class="paso__d">Sin módulos de administración</div></div>
+    </div>
+    <div class="efecto">
+      <b>Qué mostrar:</b> el menú pasa de veinte ítems a nueve, el avatar cambia de persona y aparece la barra
+      de contexto. Volver a la vista completa con un clic.
+      <b>Aclarar que la restricción es de presentación:</b> la autorización del lado del servidor es la etapa siguiente.
+    </div>
+  </div>
+
+  <h2><span class="num">4</span>Revisión general</h2>
+  <p class="sub">Evaluación honesta del estado de la interfaz, para saber qué defender y qué reconocer.</p>
+
+  <div class="dos">
+    <div class="caja">
+      <h4><span class="punto" style="background:var(--verde)"></span>Lo que está sólido</h4>
+      <ul>
+        <li><b>El encadenamiento entre módulos.</b> Cerrar una orden descuenta stock, dispara alertas y recalcula el panel. No son pantallas sueltas: es un sistema que reacciona.</li>
+        <li><b>El motor de recomendaciones se explica solo.</b> Separa regla de negocio y modelo, muestra la evidencia y el nivel de confianza. Era el punto que el docente pidió profundizar.</li>
+        <li><b>El catálogo compartido está bien contado.</b> Se ve que cada máquina registrada enriquece la base para todos los clientes, que es el activo acumulativo del negocio.</li>
+        <li><b>Consistencia visual.</b> Once componentes reutilizables y un tema propio hacen que las 37 pantallas se lean como un solo producto.</li>
+        <li><b>Trazabilidad.</b> Cada acción sensible registra responsable y fecha, y hay dos bitácoras de sólo lectura.</li>
+      </ul>
+    </div>
+
+    <div class="caja">
+      <h4><span class="punto" style="background:var(--ambar)"></span>Lo que hay que reconocer</h4>
+      <ul>
+        <li><b>No hay persistencia.</b> Los datos viven en memoria y se reinician con la aplicación. Es una entrega de interfaz.</li>
+        <li><b>La autorización es de presentación.</b> El menú se recorta, pero las rutas siguen accesibles. Falta la capa del servidor.</li>
+        <li><b>El multi-idioma está apenas iniciado.</b> El selector funciona y traduce el menú, la barra y el acceso; el resto sigue en español.</li>
+        <li><b>El mapa geográfico es una proyección propia,</b> no un servicio de mapas real. Se aclara en la pantalla.</li>
+        <li><b>Once entidades del diagrama no existen todavía</b> como clases de dominio. La interfaz usa modelos de vista propios.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2><span class="num">5</span>Qué falta para el producto completo</h2>
+  <p class="sub">En orden de dependencia: cada bloque habilita al siguiente.</p>
+
+  <div class="caja">
+    <table>
+      <thead>
+        <tr><th style="width:34px">#</th><th>Bloque</th><th>Qué incluye</th><th style="width:110px">Depende de</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>1</b></td>
+          <td><b>Modelo de dominio y persistencia</b></td>
+          <td>Las once entidades faltantes del diagrama entidad-relación, con migraciones y acceso a datos. Todo lo demás se apoya acá.</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><b>2</b></td>
+          <td><b>Contenedor de la aplicación</b></td>
+          <td><code>docker-compose.yml</code> ya levanta PostgreSQL con pgvector, MongoDB y N8N. Falta el <code>Dockerfile</code> de la aplicación y su servicio en el compose.</td>
+          <td>1</td>
+        </tr>
+        <tr>
+          <td><b>3</b></td>
+          <td><b>Reglas de negocio del motor</b></td>
+          <td>Umbral cruzado, plazo de reposición mayor que la cobertura y criticidad del activo. Son deterministas: no necesitan modelo.</td>
+          <td>1</td>
+        </tr>
+        <tr>
+          <td><b>4</b></td>
+          <td><b>Autorización real</b></td>
+          <td>Políticas por recurso y acción sobre el <code>IAuthorizationHandler</code> y la tabla de permisos que ya existen.</td>
+          <td>1</td>
+        </tr>
+        <tr>
+          <td><b>5</b></td>
+          <td><b>Pipeline de enriquecimiento</b></td>
+          <td>Flujo en N8N que recibe marca y modelo, consulta el modelo de lenguaje y persiste la ficha con su embedding.</td>
+          <td>1, 2</td>
+        </tr>
+        <tr>
+          <td><b>6</b></td>
+          <td><b>Modelo predictivo</b></td>
+          <td>Proyección de consumo sobre la frecuencia histórica y las horas de operación. Es el bloque con más incertidumbre.</td>
+          <td>1, 3</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer>
+    MantIA · Trabajo Final de Ingeniería · Universidad Abierta Interamericana · 2026
+  </footer>
+
+</div>
+</body>
+</html>
