@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using MantIA.BE.Auditoria;
 using MantIA.BE.Common;
@@ -113,12 +114,26 @@ public class MantIADbContext : DbContext
     }
 
     /// <summary>
+    /// Entidades de tenant que NO llevan clave foranea a <c>empresas</c>, con su motivo.
+    /// La lista es corta a proposito: cada excepcion es un lugar donde la base deja de verificar
+    /// algo, y tiene que poder justificarse.
+    /// </summary>
+    private static readonly HashSet<Type> SinClaveForaneaAEmpresa =
+    [
+        // El respaldo de bitacora guarda tambien eventos de plataforma, que no pertenecen a ninguna
+        // empresa. Una clave foranea los rechazaria justo cuando el sistema esta degradado, que es
+        // el unico momento en que esta tabla se usa.
+        typeof(EventoPendiente),
+    ];
+
+    /// <summary>
     /// Recorre el modelo ya construido y aplica lo que no debe depender de la memoria de
     /// quien agregue la proxima entidad.
     /// </summary>
     private void AplicarConvenciones(ModelBuilder modelBuilder)
     {
-        foreach (var entidad in modelBuilder.Model.GetEntityTypes())
+        // Se materializa la lista: adentro del bucle se agregan relaciones al modelo.
+        foreach (var entidad in modelBuilder.Model.GetEntityTypes().ToList())
         {
             var tipo = entidad.ClrType;
 
@@ -139,21 +154,28 @@ public class MantIADbContext : DbContext
 
             // 2. Cifrado por campo. Solo los que figuran en el catalogo: una tabla enteramente
             //    cifrada deja de ser una base de datos, porque no se puede filtrar, ordenar ni sumar.
-            if (_protector is not null)
+            //
+            //    Va en dos partes deliberadamente separadas:
+            //
+            //    - La FORMA de la columna la decide el catalogo, SIEMPRE, haya llave o no. El texto
+            //      cifrado ocupa bastante mas que el original —nonce, etiqueta y base64—, asi que la
+            //      columna no puede llevar el largo declarado en la entidad. Si esto dependiera de
+            //      que haya protector, la migracion se generaria con varchar(120) —en tiempo de
+            //      diseno no hay llaves— y la aplicacion fallaria al insertar el primer valor
+            //      cifrado. Es exactamente el modo de falla que el esquema no puede tener.
+            //
+            //    - El COMPORTAMIENTO, cifrar y descifrar, solo cuando hay protector.
+            foreach (var propiedad in entidad.GetProperties())
             {
-                foreach (var propiedad in entidad.GetProperties())
-                {
-                    if (propiedad.ClrType != typeof(string)) continue;
+                if (propiedad.ClrType != typeof(string)) continue;
 
-                    var nivel = CamposCifrados.De(tipo.Name, propiedad.Name);
-                    if (nivel == NivelCifrado.Ninguno) continue;
+                var nivel = CamposCifrados.De(tipo.Name, propiedad.Name);
+                if (nivel == NivelCifrado.Ninguno) continue;
 
+                propiedad.SetMaxLength(null);
+
+                if (_protector is not null)
                     propiedad.SetValueConverter(new ConversorCifrado(_protector, nivel));
-
-                    // El texto cifrado ocupa mas que el original: nonce, etiqueta y base64. Si se
-                    // dejara el largo declarado de la entidad, un valor al limite no entraria.
-                    propiedad.SetMaxLength(null);
-                }
             }
 
             // 3. Concurrencia optimista sobre xmin, la columna de sistema que PostgreSQL ya
@@ -172,11 +194,51 @@ public class MantIADbContext : DbContext
             var baja = typeof(IBajaLogica).IsAssignableFrom(tipo);
 
             if (tenant)
+            {
                 Invocar(nameof(FiltrarPorTenant), tipo, modelBuilder);
+                AsegurarClaveForaneaAEmpresa(modelBuilder, entidad, tipo);
+            }
 
             if (baja)
                 Invocar(nameof(FiltrarBajaLogica), tipo, modelBuilder);
         }
+    }
+
+    /// <summary>
+    /// Toda entidad de tenant apunta a su empresa con una clave foranea real, y nunca en cascada.
+    ///
+    /// <para><b>Por que la clave foranea.</b> Sin ella, <c>EmpresaId</c> es un uuid suelto: una fila
+    /// con una empresa inexistente es posible y nada la detecta. Con ella, la base rechaza el dato
+    /// mal formado en el momento, que es cuando todavia se puede arreglar. EF solo la habia
+    /// descubierto en dos de veinte entidades —las unicas con navegacion declarada desde
+    /// <c>Empresa</c>—, con lo cual la integridad dependia de un detalle de como se escribio la
+    /// entidad.</para>
+    ///
+    /// <para><b>Por que <see cref="DeleteBehavior.Restrict"/> y no cascada.</b> La cascada que EF
+    /// pone por convencion significa que borrar una fila de <c>empresas</c> borra todos sus usuarios
+    /// y sus plantas sin preguntar. Va en contra de todo lo demas: las bajas son logicas, la purga de
+    /// un tenant es manual y deliberada, y el historial tiene que sobrevivir. Con Restrict, ese
+    /// borrado falla, que es exactamente lo que tiene que pasar.</para>
+    /// </summary>
+    private static void AsegurarClaveForaneaAEmpresa(
+        ModelBuilder modelBuilder, IMutableEntityType entidad, Type tipo)
+    {
+        var existente = entidad.GetForeignKeys()
+            .FirstOrDefault(f => f.PrincipalEntityType.ClrType == typeof(Empresa));
+
+        if (existente is not null)
+        {
+            existente.DeleteBehavior = DeleteBehavior.Restrict;
+            return;
+        }
+
+        if (SinClaveForaneaAEmpresa.Contains(tipo)) return;
+
+        modelBuilder.Entity(tipo)
+            .HasOne(typeof(Empresa))
+            .WithMany()
+            .HasForeignKey(nameof(TenantEntity.EmpresaId))
+            .OnDelete(DeleteBehavior.Restrict);
     }
 
     private void Invocar(string metodo, Type tipoEntidad, ModelBuilder modelBuilder) =>

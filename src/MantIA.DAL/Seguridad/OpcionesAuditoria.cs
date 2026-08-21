@@ -1,37 +1,59 @@
 namespace MantIA.DAL.Seguridad;
 
 /// <summary>
-/// Llaves y politicas de la bitacora. Se enlaza desde la seccion <c>Auditoria</c> de la
-/// configuracion.
+/// Un conjunto de llaves versionadas para un proposito.
+/// <para>
+/// Una llave <b>nunca</b> se elimina del diccionario aunque se haya rotado: sin ella, lo firmado o
+/// cifrado con esa version queda inverificable o indescifrable, que a efectos practicos es lo mismo
+/// que haberlo perdido.
+/// </para>
+/// </summary>
+public class JuegoLlaves
+{
+    /// <summary>Version con la que se firma o cifra <b>de ahora en adelante</b>.</summary>
+    public string VersionActual { get; set; } = "v1";
+
+    /// <summary>Llaves por version, en base64. Cada una debe tener 32 bytes.</summary>
+    public Dictionary<string, string> Llaves { get; set; } = [];
+}
+
+/// <summary>
+/// Llaves y politicas de proteccion de datos. Se enlaza desde la seccion <c>Auditoria</c>.
+///
+/// <para><b>Dos juegos de llaves separados, y esa separacion es el punto.</b> Sellar la bitacora y
+/// cifrar campos son dos propositos distintos, con dos superficies de exposicion distintas. Con una
+/// sola llave, quien la obtenga por cualquier via —un volcado de configuracion, un descuido en un
+/// entorno de prueba— puede a la vez leer los datos cifrados y falsificar la cadena de auditoria que
+/// deberia delatarlo. Con dos, comprometer una no da la otra: puede leer pero no borrar sus huellas,
+/// o al reves.</para>
+///
+/// <para>Idealmente cada juego vive en un almacen distinto y con distinto responsable. Aunque hoy
+/// esten los dos en la misma configuracion, tenerlos separados desde el modelo es lo que permite
+/// moverlos despues sin tocar una linea de codigo.</para>
 ///
 /// <para><b>Las llaves no van en el repositorio ni en appsettings.json.</b> En desarrollo se cargan
 /// con <c>dotnet user-secrets</c>; en produccion, con variables de entorno o el almacen de secretos
-/// del proveedor. Una llave de sellado versionada en git no protege de nada: cualquiera que clone
-/// el repositorio puede reescribir la cadena entera.</para>
+/// del proveedor. Una llave de sellado versionada en git no protege de nada: cualquiera que clone el
+/// repositorio puede reescribir la cadena entera.</para>
 /// </summary>
 public class OpcionesAuditoria
 {
     public const string Seccion = "Auditoria";
 
     /// <summary>
-    /// Version de llave con la que se firma y se cifra <b>de ahora en adelante</b>. Los eventos
-    /// viejos conservan la suya y se siguen verificando con ella.
+    /// Llaves de sellado: la cadena de la bitacora. Protegen la <b>integridad</b> — que nadie
+    /// altere lo que quedo registrado.
     /// </summary>
-    public string VersionActual { get; set; } = "v1";
+    public JuegoLlaves Sello { get; set; } = new();
 
     /// <summary>
-    /// Llaves por version, en base64. Cada una debe tener 32 bytes: es lo que piden HMAC-SHA256
-    /// y AES-256.
-    /// <para>
-    /// Una llave <b>nunca</b> se elimina de este diccionario aunque se haya rotado: sin ella, los
-    /// eventos firmados con esa version pasan a ser inverificables, que a efectos practicos es lo
-    /// mismo que haberlos perdido.
-    /// </para>
+    /// Llaves de cifrado de campos. Protegen la <b>confidencialidad</b> — que quien lea la base sin
+    /// pasar por la aplicacion no vea ciertos valores.
     /// </summary>
-    public Dictionary<string, string> Llaves { get; set; } = [];
+    public JuegoLlaves Cifrado { get; set; } = new();
 
     /// <summary>
-    /// Cifra el estado anterior y posterior antes de guardarlos.
+    /// Cifra el estado anterior y posterior de los eventos antes de guardarlos.
     /// <para>
     /// El enmascarado y el cifrado resuelven cosas distintas y por eso conviven: el enmascarado
     /// protege de la exposicion cotidiana —una bitacora se exporta y se comparte—, y el cifrado

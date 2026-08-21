@@ -68,6 +68,17 @@ public static class CamposCifrados
             ["PermisoPorUsuario.Motivo"]           = NivelCifrado.Aleatorio,
             ["Recomendacion.MotivoRechazo"]        = NivelCifrado.Aleatorio,
 
+            // --- Historial de cambios ---
+            // Estos tres son OBLIGATORIOS y por un motivo que no es obvio: el historial guarda el
+            // valor anterior y el nuevo de cada campo modificado. Si "DescripcionProblema" se cifra
+            // en su tabla pero su valor viejo queda en claro aca, el cifrado no sirve de nada — se
+            // lee lo mismo, una tabla mas alla. Una tabla de auditoria hereda la sensibilidad de
+            // todo lo que audita, y ese es el criterio general: siempre que un campo copie valores
+            // de otro, tiene que estar al menos tan protegido como el original.
+            ["HistorialOrdenTrabajo.ValorAnterior"] = NivelCifrado.Aleatorio,
+            ["HistorialOrdenTrabajo.ValorNuevo"]    = NivelCifrado.Aleatorio,
+            ["HistorialOrdenTrabajo.Motivo"]        = NivelCifrado.Aleatorio,
+
             // --- Comercial ---
             // El proveedor y su precio son la relacion comercial del cliente. No se filtra ni se
             // agrupa por proveedor en ninguna pantalla, asi que puede ir aleatorio.

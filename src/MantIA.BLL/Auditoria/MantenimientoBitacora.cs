@@ -18,8 +18,8 @@ namespace MantIA.BLL.Auditoria;
 /// <item><b>Drena el respaldo.</b> Los eventos que quedaron en la base del cliente porque Mongo no
 /// estaba disponible se reflejan ahora. Va primero porque un evento sin reflejar es un hecho que
 /// todavía no está en la bitácora, y eso es peor que un eslabón sin sellar.</item>
-/// <item><b>Sella lo pendiente.</b> Cierra los eslabones que quedaron abiertos porque el pedido que
-/// los escribió se topó con un hueco.</item>
+/// <item><b>Numera y sella lo pendiente.</b> Asigna numero a los eventos que quedaron guardados
+/// sin numerar porque el pedido que los escribio no llego a hacerlo.</item>
 /// </list>
 ///
 /// <para>Es un ciclo, no una cola con estado: cada vuelta mira la realidad y hace lo que falta. Si
@@ -51,7 +51,7 @@ public class MantenimientoBitacora : BackgroundService
             {
                 using var alcance = _servicios.CreateScope();
                 await DrenarRespaldoAsync(alcance.ServiceProvider, ct);
-                await SellarPendientesAsync(alcance.ServiceProvider, ct);
+                await NumerarPendientesAsync(alcance.ServiceProvider, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -132,21 +132,21 @@ public class MantenimientoBitacora : BackgroundService
             _log.LogInformation("Se reflejaron {Cantidad} eventos del respaldo local en la bitacora.", reflejados);
     }
 
-    private async Task SellarPendientesAsync(IServiceProvider alcance, CancellationToken ct)
+    private async Task NumerarPendientesAsync(IServiceProvider alcance, CancellationToken ct)
     {
         var mongo = alcance.GetRequiredService<RepositorioBitacoraMongo>();
         var protector = alcance.GetRequiredService<IProtectorDatos>();
 
         foreach (var cadena in await mongo.CadenasConPendientesAsync(ct))
         {
-            var sellados = await mongo.SellarPendientesAsync(
+            var numerados = await mongo.NumerarYSellarAsync(
                 cadena,
                 (e, hashAnterior) => protector.Sellar(
                     CanonicalizacionEvento.Canonizar(e, hashAnterior), e.VersionLlave),
                 ct);
 
-            if (sellados > 0)
-                _log.LogDebug("Cadena {Cadena}: {Cantidad} eslabones sellados.", cadena, sellados);
+            if (numerados > 0)
+                _log.LogDebug("Cadena {Cadena}: {Cantidad} eventos numerados y sellados.", cadena, numerados);
         }
     }
 }

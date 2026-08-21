@@ -131,7 +131,15 @@ public class EventoBitacora
     /// </summary>
     public string VersionLlave { get; set; } = string.Empty;
 
-    /// <summary>Posicion en la cadena. Un salto de numero delata una eliminacion.</summary>
+    /// <summary>
+    /// Posicion en la cadena. Un salto de numero delata una eliminacion.
+    /// <para>
+    /// <b>Cero significa "guardado pero todavia sin numerar".</b> El numero se asigna despues de
+    /// insertar, nunca antes: reservarlo por adelantado dejaria un hueco permanente cada vez que
+    /// algo se cancela o el proceso muere en el medio. Un evento sin numerar ya es evidencia de que
+    /// la accion ocurrio; lo que le falta es su lugar en la cadena.
+    /// </para>
+    /// </summary>
     public long Secuencia { get; set; }
 
     /// <summary>

@@ -20,11 +20,16 @@ public interface INumeradorDocumentos
 /// número. El <c>UPDATE ... RETURNING</c> lo resuelve la base en una sola operación, tomando el
 /// bloqueo de fila el tiempo que dura, que es del orden de microsegundos.</para>
 ///
-/// <para><b>Sobre el hueco en la numeración.</b> Si la transacción que pidió el número después
-/// falla, ese número queda sin usar y la serie tiene un salto. Es el comportamiento correcto: la
-/// alternativa —devolver el número al contador— reintroduce exactamente la carrera que se estaba
-/// evitando. Una numeración con huecos es normal en cualquier sistema con comprobantes; una
-/// numeración con duplicados no lo es.</para>
+/// <para><b>Se llama DENTRO de la transacción que crea el documento, nunca antes.</b> Esa es la
+/// regla que hace que la serie no tenga huecos: el contador es una tabla, no una secuencia, así que
+/// su incremento participa de la transacción. Si la carga se cancela o algo falla después de pedir
+/// el número, el <c>ROLLBACK</c> deshace también el incremento y el número vuelve a estar
+/// disponible. Nunca se reserva un número para un registro que todavía no existe.</para>
+///
+/// <para>Una secuencia de PostgreSQL <c>no</c> serviría para esto: las secuencias quedan fuera de la
+/// transacción a propósito, precisamente para no serializar a quien las usa, y por eso dejan huecos.
+/// La tabla es más lenta —toma el bloqueo de fila mientras dura la transacción— y a cambio la serie
+/// es continua. Para un comprobante que se muestra al cliente, esa es la propiedad que importa.</para>
 /// </summary>
 public class NumeradorDocumentos : INumeradorDocumentos
 {

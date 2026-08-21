@@ -85,7 +85,7 @@ public class Bitacora : IBitacora
 
     public Task<EventoBitacora> RegistrarAsync(AccionAuditada accion, CancellationToken ct = default)
     {
-        var version = _protector.VersionActual;
+        var version = _protector.VersionSello;
         var alcance = CatalogoEventos.AlcanceDe(accion.Recurso);
         var empresaId = accion.EmpresaAfectadaId ?? _tenant.EmpresaId;
 
@@ -130,11 +130,11 @@ public class Bitacora : IBitacora
         //    texto libre o valores del dominio; lo que sirve para filtrar y ordenar queda en claro,
         //    porque si no la pantalla de bitacora tendria que traerse la coleccion completa a
         //    memoria para mostrar "lo critico de este mes".
-        evento.Descripcion = Proteger(evento.Descripcion, version);
-        evento.Motivo = Proteger(evento.Motivo, version);
-        evento.MotivoFallo = Proteger(evento.MotivoFallo, version);
-        evento.EstadoAnterior = Proteger(accion.EstadoAnterior, version);
-        evento.EstadoPosterior = Proteger(accion.EstadoPosterior, version);
+        evento.Descripcion = Proteger(evento.Descripcion);
+        evento.Motivo = Proteger(evento.Motivo);
+        evento.MotivoFallo = Proteger(evento.MotivoFallo);
+        evento.EstadoAnterior = Proteger(accion.EstadoAnterior);
+        evento.EstadoPosterior = Proteger(accion.EstadoPosterior);
 
         // 3. Sellar. El sello se calcula dentro del repositorio porque depende del numero de
         //    secuencia, y ese numero solo se conoce al insertar: si dos operaciones del mismo
@@ -146,10 +146,13 @@ public class Bitacora : IBitacora
             ct);
     }
 
-    private string? Proteger(string? valor, string version) =>
+    // Cifra con la llave de CIFRADO, distinta de la de sellado. El evento guarda la version de
+    // sellado en VersionLlave; la de cifrado no hace falta guardarla porque el protector prueba
+    // todas las que tenga configuradas.
+    private string? Proteger(string? valor) =>
         string.IsNullOrEmpty(valor) || !_opciones.CifrarEstados
             ? valor
-            : _protector.Cifrar(valor, version);
+            : _protector.Cifrar(valor);
 
     // NO se cifran: Alcance, Tipo, Nivel, Severidad, Recurso, Accion, EmpresaId, UsuarioId, Fecha.
     // Son los ejes por los que se consulta la bitacora. Cifrarlos convierte cada filtro en un

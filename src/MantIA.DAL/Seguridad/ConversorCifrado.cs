@@ -26,10 +26,9 @@ public class ConversorCifrado : ValueConverter<string?, string?>
     {
         if (string.IsNullOrEmpty(claro)) return claro;
 
-        var version = protector.VersionActual;
         return nivel == NivelCifrado.Determinista
-            ? protector.CifrarDeterminista(claro, version)
-            : protector.Cifrar(claro, version);
+            ? protector.CifrarDeterminista(claro)
+            : protector.Cifrar(claro);
     }
 
     private static string? Revelar(IProtectorDatos protector, string? guardado)
@@ -37,9 +36,9 @@ public class ConversorCifrado : ValueConverter<string?, string?>
         if (string.IsNullOrEmpty(guardado) || !protector.EstaCifrado(guardado))
             return guardado;
 
-        // La version con la que se cifro no viaja en la columna: se prueba con la vigente y, si no
-        // abre, con las anteriores. Es lo que permite rotar la llave sin reescribir la tabla entera
-        // el mismo dia.
-        return protector.DescifrarConCualquierLlave(guardado);
+        // La version con la que se cifro no viaja en la columna: el protector prueba con la vigente
+        // y, si no abre, con las anteriores. Es lo que permite rotar la llave sin reescribir la
+        // tabla entera el mismo dia.
+        return protector.Descifrar(guardado);
     }
 }

@@ -1,57 +1,47 @@
 using System.Runtime.CompilerServices;
 using MantIA.BE.Auditoria;
 using Microsoft.Extensions.Options;
-using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace MantIA.DAL.Bitacora;
 
-/// <summary>Contador atómico por cadena. Es la base que asigna los números, no la aplicación.</summary>
-public class ContadorCadena
-{
-    public string Id { get; set; } = string.Empty;   // la cadena
-    public long Secuencia { get; set; }
-}
-
 /// <summary>
 /// Bitácora sobre MongoDB.
 ///
-/// <para><b>El número de orden lo asigna la base, no nosotros.</b> Un contador con
-/// <c>$inc</c> atómico entrega el siguiente número en una sola operación: no hay leer-y-después-
-/// escribir, no hay carrera y no hay reintentos por colisión. Escala con la concurrencia en lugar
-/// de degradarse con ella.</para>
+/// <para><b>Por que Mongo y no PostgreSQL:</b> el volumen es de otro orden que el del dominio
+/// —cada accion de cada usuario deja un evento—, la escritura es secuencial y de solo agregado, y
+/// el esquema varia entre tipos de evento. Meterla en la base transaccional haria competir el log
+/// con las operaciones que esta registrando.</para>
 ///
-/// <para><b>La tensión que eso crea, y cómo se resuelve.</b> Una cadena de hashes es sequencial por
-/// naturaleza: cada eslabón contiene el hash del anterior. Si el número se entrega en paralelo, el
-/// evento número 7 puede llegar antes que el 6, y no puede sellarse hasta que el 6 exista. Se
-/// resuelve escribiendo en dos tiempos:</para>
-/// <list type="number">
-/// <item><b>Se guarda el hecho</b> con su número, sin sellar. La acción ya quedó registrada.</item>
-/// <item><b>Se sella</b> recorriendo desde el último eslabón cerrado hacia adelante, mientras los
-/// números estén completos. Lo hace el mismo pedido que escribió, así que en operación normal el
-/// evento queda sellado en el mismo instante.</item>
-/// </list>
+/// <para><b>El numero se asigna despues de insertar, nunca antes.</b> Reservar un numero y despues
+/// escribir deja un hueco permanente cada vez que algo se cancela o el proceso muere en el medio: el
+/// numero quedo consumido por un registro que no existe. Aca el orden es al reves —primero el hecho,
+/// despues el numero— y por construccion un numero solo se escribe sobre un documento que ya esta
+/// guardado. La numeracion no puede tener huecos porque nunca se entrega por adelantado.</para>
 ///
-/// <para>El sellado es idempotente y con carrera segura: la actualización solo aplica si el evento
-/// sigue sin sellar, de modo que dos pedidos que intenten sellar el mismo eslabón no se pisan.</para>
+/// <para>La contrapartida es que numerar es un paso corto y serializado por cadena, en lugar de una
+/// operacion paralela. No importa: esta fuera del camino critico. Lo que tiene que escalar es la
+/// escritura del evento, y esa sigue siendo un insert sin coordinacion con nadie.</para>
 /// </summary>
 public class RepositorioBitacoraMongo : IRepositorioBitacora
 {
+    /// <summary>Un evento con secuencia cero existe pero todavia no fue numerado.</summary>
+    private const long SinNumerar = 0;
+
     private readonly IMongoCollection<EventoBitacora> _eventos;
-    private readonly IMongoCollection<ContadorCadena> _contadores;
     private readonly OpcionesMongo _opciones;
 
     public RepositorioBitacoraMongo(IMongoClient cliente, IOptions<OpcionesMongo> opciones)
     {
         _opciones = opciones.Value;
-        var baseDatos = cliente.GetDatabase(_opciones.BaseDeDatos);
-        _eventos = baseDatos.GetCollection<EventoBitacora>(_opciones.Coleccion);
-        _contadores = baseDatos.GetCollection<ContadorCadena>(_opciones.ColeccionContadores);
+        _eventos = cliente
+            .GetDatabase(_opciones.BaseDeDatos)
+            .GetCollection<EventoBitacora>(_opciones.Coleccion);
     }
 
     public async Task<EventoBitacora?> UltimoAsync(string cadena, CancellationToken ct = default) =>
         await _eventos
-            .Find(e => e.Cadena == cadena)
+            .Find(e => e.Cadena == cadena && e.Secuencia > SinNumerar)
             .SortByDescending(e => e.Secuencia)
             .Limit(1)
             .FirstOrDefaultAsync(ct);
@@ -61,109 +51,108 @@ public class RepositorioBitacoraMongo : IRepositorioBitacora
         Func<EventoBitacora, string?, string> sellar,
         CancellationToken ct = default)
     {
-        evento.Secuencia = await SiguienteNumeroAsync(evento.Cadena, ct);
+        // 1. El hecho, primero y sin nada mas. Es la unica parte que esta en el camino critico de
+        //    la operacion de negocio, y no coordina con nadie.
+        evento.Secuencia = SinNumerar;
         evento.Sellado = false;
         evento.Hash = null;
         evento.HashAnterior = null;
 
         await _eventos.InsertOneAsync(evento, options: null, ct);
 
-        // Sellar es "mejor esfuerzo dentro del mismo pedido": si otro evento anterior todavia no
-        // llego, este queda pendiente y lo sella el proximo que pase o el trabajo de fondo. El
-        // hecho ya esta registrado; lo que falta es la prueba de que nadie lo movio.
-        await SellarPendientesAsync(evento.Cadena, sellar, ct);
+        // 2. Numerar y sellar lo que ya esta guardado. Si falla, el evento igual quedo registrado
+        //    y lo toma el trabajo de mantenimiento en la proxima vuelta.
+        await NumerarYSellarAsync(evento.Cadena, sellar, ct);
 
         return await _eventos.Find(e => e.Id == evento.Id).FirstOrDefaultAsync(ct) ?? evento;
     }
 
     /// <summary>
-    /// Un solo viaje a la base, atomico. <c>IsUpsert</c> crea el contador la primera vez, asi que
-    /// no hace falta sembrar nada al dar de alta una empresa.
+    /// Asigna numeros consecutivos a los eventos ya guardados de una cadena y los encadena por hash.
+    ///
+    /// <para>Los toma en orden de ocurrencia. La condicion <c>Secuencia == 0</c> en la actualizacion
+    /// es lo que hace segura la carrera: si dos pedidos numeran a la vez, el segundo no encuentra el
+    /// documento en ese estado y vuelve a empezar desde el ultimo numerado real.</para>
     /// </summary>
-    private async Task<long> SiguienteNumeroAsync(string cadena, CancellationToken ct)
-    {
-        var contador = await _contadores.FindOneAndUpdateAsync<ContadorCadena>(
-            Builders<ContadorCadena>.Filter.Eq(c => c.Id, cadena),
-            Builders<ContadorCadena>.Update.Inc(c => c.Secuencia, 1),
-            new FindOneAndUpdateOptions<ContadorCadena>
-            {
-                IsUpsert = true,
-                ReturnDocument = ReturnDocument.After
-            },
-            ct);
-
-        return contador.Secuencia;
-    }
-
-    /// <summary>
-    /// Cierra los eslabones que se puedan cerrar, desde el ultimo sellado hacia adelante.
-    /// Se corta al primer hueco: sellar salteando un numero produciria una cadena que no verifica.
-    /// </summary>
-    public async Task<int> SellarPendientesAsync(
+    public async Task<int> NumerarYSellarAsync(
         string cadena,
         Func<EventoBitacora, string?, string> sellar,
         CancellationToken ct = default)
     {
-        var ultimoSellado = await _eventos
-            .Find(e => e.Cadena == cadena && e.Sellado)
-            .SortByDescending(e => e.Secuencia)
-            .Limit(1)
-            .FirstOrDefaultAsync(ct);
+        var numerados = 0;
 
-        var hashAnterior = ultimoSellado?.Hash;
-        var siguiente = (ultimoSellado?.Secuencia ?? 0) + 1;
-        var sellados = 0;
-
-        // El tope evita que un pedido cualquiera termine sellando meses de atraso. Lo que quede
-        // afuera lo toma el proximo, o el trabajo de fondo.
-        for (var i = 0; i < _opciones.MaximoSelladoPorPasada; i++, siguiente++)
+        for (var reintento = 0; reintento < _opciones.ReintentosNumeracion; reintento++)
         {
-            var evento = await _eventos
-                .Find(e => e.Cadena == cadena && e.Secuencia == siguiente)
-                .FirstOrDefaultAsync(ct);
+            var ultimo = await UltimoAsync(cadena, ct);
+            var siguiente = (ultimo?.Secuencia ?? 0) + 1;
+            var hashAnterior = ultimo?.Hash;
 
-            if (evento is null) break;          // hueco: alguien tomo el numero y todavia no inserto
+            var pendientes = await _eventos
+                .Find(e => e.Cadena == cadena && e.Secuencia == SinNumerar)
+                .Sort(Builders<EventoBitacora>.Sort
+                    .Ascending(e => e.Fecha)
+                    .Ascending(e => e.Id))     // desempate estable si dos caen en el mismo instante
+                .Limit(_opciones.MaximoNumeradoPorPasada)
+                .ToListAsync(ct);
 
-            if (evento.Sellado)                  // otro pedido gano la carrera; se sigue desde su hash
+            if (pendientes.Count == 0) return numerados;
+
+            var colision = false;
+
+            foreach (var pendiente in pendientes)
             {
-                hashAnterior = evento.Hash;
-                continue;
+                pendiente.Secuencia = siguiente;
+                pendiente.HashAnterior = hashAnterior;
+                var hash = sellar(pendiente, hashAnterior);
+
+                try
+                {
+                    var resultado = await _eventos.UpdateOneAsync(
+                        Builders<EventoBitacora>.Filter.And(
+                            Builders<EventoBitacora>.Filter.Eq(e => e.Id, pendiente.Id),
+                            Builders<EventoBitacora>.Filter.Eq(e => e.Secuencia, SinNumerar)),
+                        Builders<EventoBitacora>.Update
+                            .Set(e => e.Secuencia, siguiente)
+                            .Set(e => e.HashAnterior, hashAnterior)
+                            .Set(e => e.Hash, hash)
+                            .Set(e => e.Sellado, true),
+                        cancellationToken: ct);
+
+                    if (resultado.ModifiedCount == 0)
+                    {
+                        // Otro pedido lo numero en el intermedio. Se recalcula todo desde el estado
+                        // real en lugar de seguir con numeros que ya no valen.
+                        colision = true;
+                        break;
+                    }
+
+                    siguiente++;
+                    hashAnterior = hash;
+                    numerados++;
+                }
+                catch (MongoWriteException ex)
+                    when (ex.WriteError.Category == ServerErrorCategory.DuplicateKey)
+                {
+                    // El indice unico (cadena, secuencia) rechazo el numero: otro se lo llevo.
+                    // Misma respuesta que arriba, releer y reintentar.
+                    colision = true;
+                    break;
+                }
             }
 
-            evento.HashAnterior = hashAnterior;
-            var hash = sellar(evento, hashAnterior);
-
-            var resultado = await _eventos.UpdateOneAsync(
-                Builders<EventoBitacora>.Filter.And(
-                    Builders<EventoBitacora>.Filter.Eq(e => e.Id, evento.Id),
-                    Builders<EventoBitacora>.Filter.Eq(e => e.Sellado, false)),
-                Builders<EventoBitacora>.Update
-                    .Set(e => e.HashAnterior, hashAnterior)
-                    .Set(e => e.Hash, hash)
-                    .Set(e => e.Sellado, true),
-                cancellationToken: ct);
-
-            if (resultado.ModifiedCount == 0)
-            {
-                // Lo sello otro en el intermedio. Se relee para continuar con SU hash, no con el
-                // que acabamos de calcular: los dos son validos pero solo uno esta guardado.
-                var recargado = await _eventos.Find(e => e.Id == evento.Id).FirstOrDefaultAsync(ct);
-                hashAnterior = recargado?.Hash ?? hash;
-                continue;
-            }
-
-            hashAnterior = hash;
-            sellados++;
+            if (!colision) return numerados;
         }
 
-        return sellados;
+        // Contencion anormal. No se pierde nada: los eventos estan guardados y sin numerar, y la
+        // proxima pasada del mantenimiento los toma.
+        return numerados;
     }
 
-    /// <summary>Cadenas con eslabones sin sellar. Lo consulta el trabajo de fondo.</summary>
+    /// <summary>Cadenas con eventos guardados y todavia sin numerar. Lo consulta el mantenimiento.</summary>
     public async Task<IReadOnlyList<string>> CadenasConPendientesAsync(CancellationToken ct = default) =>
         await _eventos.Distinct(
             new StringFieldDefinition<EventoBitacora, string>(nameof(EventoBitacora.Cadena)),
-            Builders<EventoBitacora>.Filter.Eq(e => e.Sellado, false),
+            Builders<EventoBitacora>.Filter.Eq(e => e.Secuencia, SinNumerar),
             cancellationToken: ct)
             .ToListAsync(ct);
 

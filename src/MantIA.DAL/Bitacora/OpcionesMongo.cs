@@ -9,14 +9,17 @@ public class OpcionesMongo
     public string BaseDeDatos { get; set; } = "mantia_bitacora";
     public string Coleccion { get; set; } = "eventos";
 
-    /// <summary>Contadores atomicos por cadena. Es la base la que asigna los numeros de orden.</summary>
-    public string ColeccionContadores { get; set; } = "contadores";
+    /// <summary>
+    /// Cuantos eventos numera y sella un mismo pedido. Evita que a un usuario cualquiera le toque
+    /// pagar el atraso acumulado; lo que quede afuera lo toma el trabajo de fondo.
+    /// </summary>
+    public int MaximoNumeradoPorPasada { get; set; } = 200;
 
     /// <summary>
-    /// Cuantos eslabones puede cerrar un mismo pedido. Evita que a un usuario cualquiera le toque
-    /// pagar el sellado de un atraso largo; lo que quede afuera lo toma el trabajo de fondo.
+    /// Reintentos ante colision de numeracion. Dos pedidos que numeran a la vez compiten por el
+    /// mismo numero; el que pierde relee el estado y vuelve a empezar.
     /// </summary>
-    public int MaximoSelladoPorPasada { get; set; } = 200;
+    public int ReintentosNumeracion { get; set; } = 5;
 
     /// <summary>Cada cuanto corre el trabajo que sella pendientes y drena el respaldo.</summary>
     public TimeSpan IntervaloMantenimiento { get; set; } = TimeSpan.FromSeconds(30);

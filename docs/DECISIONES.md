@@ -1,49 +1,16 @@
-# Bitácora de decisiones de lógica y arquitectura
+# Decisiones tomadas
 
-Registro de todo cambio que altere **cómo se comporta el sistema**, no solo cómo está escrito.
-Existe para que puedas revisar en un solo lugar lo que se decidió, y para separar con claridad lo
-que vos definiste de lo que se resolvió sin consultarte.
-
-## Cómo se usa
-
-Cada entrada tiene un estado:
+Registro de todo cambio que altera **cómo se comporta el sistema**, no solo cómo está escrito.
+Acá vive lo ya decidido; lo que falta definir está en `PENDIENTES.md`.
 
 | Estado | Significado |
 |---|---|
-| **Aprobado** | Lo decidiste vos explícitamente. No se cambia sin que lo pidas. |
-| **Revisar** | Se tomó sin consultarte porque no bloqueaba el avance. Está implementado y es reversible. Si alguna no te cierra, se revierte. |
-| **Pendiente** | **No** está implementado. Necesita que decidas antes de escribir código. |
+| **Aprobado** | Lo decidió Exequiel explícitamente. No se cambia sin que lo pida. |
+| *Revisar* | Se tomó sin consultar porque no bloqueaba el avance. Está implementado y es reversible. |
 
-Regla de trabajo: **nada que cambie una regla de negocio se implementa en estado Pendiente.** Lo que
+Regla de trabajo: **nada que cambie una regla de negocio se implementa sin estar decidido.** Lo que
 entra como *Revisar* es siempre reversible y está acotado a una capa; lo que toca el contrato del
 negocio se pregunta antes.
-
-Cuando revises una entrada, cambiale el estado a *Aprobado* o pedime que la revierta.
-
----
-
-## Índice de lo que necesita tu atención
-
-Si solo vas a leer una parte, leé esta.
-
-| # | Decisión | Estado |
-|---|---|---|
-| D-03 | La baja lógica oculta las filas por defecto en todo el sistema | **Aprobado** — 21/08 |
-| D-12 | Dos plantas de la misma empresa no pueden llamarse igual | **Aprobado** — 21/08 |
-| D-15 | Un permiso de nivel específico gana sobre el genérico del rol | **Aprobado** — 21/08, y se extendió a permisos por usuario (D-34) |
-| D-18 | Un usuario de una empresa dada de baja no puede entrar | **Aprobado** con modo suspendido (D-33) |
-| D-25 | Contenido concreto del piso de permisos irrevocables | Revisar — 14 celdas sin validar |
-| D-27 | Qué campos se omiten y cuáles se enmascaran en la bitácora | **Resuelto** — la clasificación ahora depende del alcance |
-| D-32 | Baja de usuarios: lógica con identidad liberada | **Aprobado** — 21/08 |
-| D-34 | Permisos nominales por usuario | Revisar — leé las tres reglas anti-filtración |
-| D-39 | Administración de permisos repartida por ámbito | **Aprobado** — 21/08 |
-| D-41 | La bitácora no vence nunca | **Aprobado** — revirtió mi retención por severidad |
-| D-44 | Respaldo en el tenant y cola de drenaje | **Aprobado** — 21/08 |
-| P-01 | Dimensión del vector de embeddings | **Resuelto: 768** |
-| P-02 | Umbral de promoción | **Resuelto: tres niveles** |
-| P-03 | Escala de máquinas por planta | Diferido — se ajusta con datos y se recalculan costos |
-| P-04 | Certificados de mantenimiento de proveedores | Diferido a etapa 2 |
-| P-10 | Hueco permanente en la cadena de sellos | **Pendiente** — leelo, es corto |
 
 ---
 
@@ -817,132 +784,208 @@ que nadie se dé cuenta. `MultiTenantTests` sigue necesitando base y quedó como
 
 ---
 
-## Pendientes: necesito que decidas
-
-### P-01 · Dimensión del vector de embeddings · **Resuelto: 768**
-
-Elegido `multilingual-e5-base` (768 dimensiones), corriendo local, sin tokens.
-
-**Por qué el más pesado y no el liviano de 384:** el trabajo que tiene que hacer el vector acá no es
-buscar, es *agrupar descripciones de la misma falla escritas distinto*. "Fuga entre placas por junta
-vencida" y "pérdida en el paquete de placas del sector de regeneración" tienen que caer juntas, y ahí
-es exactamente donde el modelo chico se queda corto en español técnico. Si el agrupamiento falla, el
-contador de frecuencia nunca llega al umbral y el catálogo compartido no se construye — que es el
-diferencial entero del producto.
-
-El costo del 768 es el doble de espacio y algo más de CPU por embedding. Eso es barato; un catálogo
-que no agrupa, no.
-
-**Sigue siendo revisable con datos reales:** cuando haya un puñado de órdenes cerradas de verdad, se
-mide cuántos pares que un técnico consideraría "la misma falla" quedan efectivamente juntos. Si 384
-alcanza, se baja y se ahorra. Antes de eso es especulación.
-
-### P-02 · Umbral de promoción · **Resuelto: tres niveles**
-
-Tu pedido fue un intermedio entre "lo que se replica en muchas fábricas" y "lo que el sistema relevó
-como problema conocido a nivel general". Eso da tres niveles, no dos:
-
-| Nivel | Umbral | Dónde se ve | Cómo se presenta |
-|---|---|---|---|
-| **Privado** | 1 evento | Solo la empresa que lo generó | Su propio historial |
-| **Observado** | 2 empresas y 3 eventos | Ficha del catálogo, etiquetado | "Reportado por 2 empresas — sin confirmar" |
-| **Confirmado** | 3 empresas y 5 eventos | Ficha del catálogo, como característica del modelo | "Falla común de este modelo" |
-
-**Por qué el nivel intermedio resuelve el problema.** Con dos niveles había que elegir entre un
-umbral bajo —que ensucia el catálogo con casos aislados— y uno alto, que no promueve nunca y deja el
-efecto de red sin arrancar. El nivel *observado* deja ver la señal temprano, **con la incertidumbre
-declarada en pantalla**, sin afirmar que es una característica del modelo. El usuario decide qué
-hacer con esa información; el sistema no le miente sobre cuánto la respalda.
-
-Los dos números siguen midiendo cosas distintas: las **empresas** evitan que un solo cliente con mal
-mantenimiento contamine el catálogo, los **eventos** evitan promover algo que pasó una vez de
-casualidad en cada lado.
-
-**Configurable y auditable**, las dos cosas: los umbrales viven en configuración de plataforma y cada
-promoción deja su evento en la bitácora, con cuántas empresas y cuántos eventos la respaldaban en ese
-momento. En la defensa vas a poder responder "porque tres empresas distintas lo reportaron cinco
-veces" en lugar de "porque el modelo lo decidió".
-
-**Falta decidir una sola cosa:** si el umbral es el mismo para todas las categorías. Un compresor
-tiene mucha más población instalada que una máquina especial, y con el mismo número la segunda no
-promueve nunca. Se puede resolver después, cuando haya datos para calibrar.
-
-### P-03 · Escala de máquinas por planta · *Diferido*
-
-Se ajusta con datos de los primeros clientes, recalculando los costos para que siga siendo rentable.
-
-Lo que hay que evitar desde ya, y esto sí es ahora: **no escribir consultas ni pantallas que solo
-funcionen con el extremo bajo del rango.** Concretamente, los listados de máquinas y de repuestos
-tienen que nacer con paginación y búsqueda del lado del servidor aunque hoy se prueben con quince
-filas. Reconvertir después una pantalla que carga todo en memoria es bastante más caro que hacerla
-bien la primera vez.
-
-Queda anotado que con volumen alto la unidad de trabajo deja de ser la máquina y pasa a ser la
-**línea de producción**, hoy un texto suelto en `Maquina`.
-
-### P-04 · Certificados de mantenimiento de proveedores · *Etapa 2*
-
-Fuera de alcance de esta etapa. Queda registrado el diseño para cuando se retome: documento adjunto
-a `Maquina` —y opcionalmente a una `OrdenTrabajo`— que entra a la capa semántica, con el texto
-vectorizado alimentando la misma normalización de fallas que hoy solo se nutre de órdenes cerradas.
-
-Falta definir en su momento: entidad `DocumentoMaquina`, dónde se guarda el binario (fuera de
-PostgreSQL), extracción de texto —muchos llegan escaneados— y si la vectorización es automática o
-requiere validación previa.
-
-### P-05 · Disparadores del estado suspendido
-
-D-33 dejó implementado el modo de solo lectura. Falta la parte comercial: qué lo dispara
-automáticamente (días de mora, aviso previo), si hay un plan económico de contención antes de
-suspender, y qué mensaje ve el usuario dentro de la aplicación explicando por qué no puede cargar
-nada. Sin ese mensaje, la suspensión se va a leer como que el sistema está roto.
-
-### P-08 · Bitácora no disponible en caliente · **Resuelto** — ver D-44
-
-Ni bloqueante ni best-effort: respaldo en la base del cliente y cola de drenaje. La operación nunca
-se frena mientras la base principal esté viva, y ningún evento se pierde.
-
-### P-09 · Administración de permisos repartida por ámbito · **Resuelto** — ver D-39 (revisión)
-
-### P-06 · Numeración de órdenes de trabajo · **Resuelto** — ver D-45
-
-### P-10 · Qué hacer con un hueco permanente en la cadena
-
-Consecuencia directa del contador atómico (D-40) y la única esquina que dejó abierta.
-
-Si un pedido toma el número 47 y muere antes de insertar el evento —el proceso se cae, el contenedor
-se reinicia—, el 47 nunca existe. El sellado se corta ahí y **todo lo posterior queda sin sellar para
-siempre**, esperando un eslabón que no va a llegar.
-
-Los eventos siguen guardados y siguen siendo legibles; lo que se pierde es la prueba de integridad
-del tramo. Tres salidas:
-
-| Salida | Comentario |
-|---|---|
-| **Lápida automática** | Pasados N minutos sin que aparezca, se inserta un evento "hueco confirmado" en esa posición y la cadena continúa. Queda registrado que hubo un salto y por qué |
-| **Lápida manual** | Igual, pero lo confirma una persona desde el módulo de superadministrador. Más control, y alguien tiene que estar mirando |
-| **Dejarlo abierto** | El tramo posterior nunca se sella. Honesto pero inútil: en la práctica anula la verificación de esa empresa desde ese punto |
-
-Me inclino por la primera con N alto —quince minutos, digamos— porque el caso normal es que el evento
-aparezca en milisegundos, y una lápida es en sí misma información de auditoría: dice que hubo una
-caída en ese momento. Pero es tu llamada.
-
-### P-07 · Usuario de demostración
-
-Quedó en buffer: credenciales que abran la versión de maqueta en lugar de la real. Se resolvería con
-un claim de Auth0 y registro condicional de servicios, pero no está diseñado.
 
 ---
 
-## Cambios que NO se hicieron y por qué
+## 21/08/2026 (cierre de jornada) — Confirmaciones y numeración sin huecos
 
-Para que quede constancia de lo que se evaluó y se descartó.
+### D-25 (revisión) · El piso de permisos queda confirmado · **Aprobado**
 
-| Qué | Por qué no |
+Confirmado el criterio: hace falta un perfil que pueda ejecutar cada operación de base. Asignar y
+desasignar permisos se resuelve después, sobre esa base ya existente.
+
+### D-50 · La numeración nunca se reserva por adelantado · **Aprobado**
+
+Resuelve lo que estaba anotado como P-10 (hueco permanente en la cadena) y corrige mi posición
+anterior, que era equivocada.
+
+**La regla, en tus palabras:** si alguien empieza a cargar algo y lo cancela a la mitad, no hay que
+guardar un buffer por si acaso. **El número se genera cuando está confirmado que el recurso debe
+existir**, nunca antes.
+
+Cambia dos cosas:
+
+**En PostgreSQL** —numeración de órdenes y reportes— la regla se cumple llamando al numerador
+**dentro de la misma transacción** que crea el documento. El contador es una tabla, no una secuencia,
+así que su incremento participa de la transacción: si algo falla o se cancela, el `ROLLBACK` deshace
+también el incremento y el número vuelve a estar disponible.
+
+> Una secuencia de PostgreSQL **no** serviría: quedan fuera de la transacción a propósito, para no
+> serializar a quien las usa, y por eso dejan huecos. La tabla es más lenta y a cambio la serie es
+> continua. Para un comprobante que ve el cliente, esa es la propiedad que importa.
+
+**En MongoDB** se dio vuelta el orden de la escritura:
+
+```
+antes:  pedir numero al contador  →  insertar          (si moría en el medio: hueco permanente)
+ahora:  insertar el evento        →  numerar y sellar  (el numero solo se escribe sobre algo que existe)
+```
+
+Un evento con secuencia cero está guardado pero sin numerar. La numeración es un paso corto,
+serializado por cadena y **fuera del camino crítico**: lo que tiene que escalar es la escritura del
+evento, y esa sigue siendo un insert sin coordinación con nadie.
+
+Desapareció la colección de contadores. Es un paso atrás respecto del autonumérico atómico que
+habíamos puesto, y es el correcto: el contador era justamente lo que hacía posible el hueco.
+
+### D-51 · Las pantallas muestran lo justo y filtran por campos no cifrados · *Revisar*
+
+Criterio de interfaz que se desprende del cifrado por campo: los listados traen las columnas
+necesarias y los filtros se ofrecen **solo sobre campos en claro**.
+
+No es una limitación que haya que disimular, es la consecuencia visible de una decisión de seguridad:
+sobre una columna cifrada no hay `WHERE`, `ORDER BY` ni índice. Diseñar las pantallas sabiendo eso
+evita el caso feo — un filtro que existe en la interfaz y se resuelve trayendo la tabla entera a
+memoria.
+
+### D-52 · Los documentos se separaron en dos · **Aprobado**
+
+`DECISIONES.md` guarda lo decidido y `PENDIENTES.md` lo que falta definir. El archivo único había
+llegado a mil líneas y buscar en él costaba más de lo que ayudaba.
+
+### D-53 · Dos juegos de llaves separados · **Aprobado**
+
+Sellar la bitácora y cifrar campos usan **llaves distintas**, en secciones de configuración distintas
+(`Auditoria:Sello` y `Auditoria:Cifrado`), cada una con su versión y su propia rotación.
+
+**Por qué importa.** Con una sola llave, quien la obtenga por cualquier vía —un volcado de
+configuración, un descuido en un entorno de prueba— puede a la vez leer los datos cifrados **y**
+falsificar la cadena de auditoría que debería delatarlo. Con dos, comprometer una no da la otra:
+puede leer, pero no borrar sus huellas.
+
+El protector **rechaza arrancar si las dos llaves son iguales**. Es el error que alguien va a cometer
+copiando y pegando, y falla ruidoso en vez de dar una falsa sensación de separación. Verificado:
+
+```
+con la llave de sello NO se descifra   : OK
+rechaza usar la misma llave para ambas : OK
+abre un valor cifrado con la llave vieja: True
+```
+
+Idealmente cada juego vive en un almacén distinto y con distinto responsable. Aunque hoy estén los
+dos en la misma configuración, tenerlos separados desde el modelo permite moverlos después sin tocar
+una línea de código.
+
+**Lo que esto NO resuelve, y quedó escrito en el código:** con la llave en la mano, ningún mecanismo
+con llave detiene a nadie. La defensa real contra ese caso es publicar periódicamente el hash de la
+punta de cada cadena fuera del sistema — se puede reescribir la base entera, pero no un hash que ya
+se publicó ayer en otro lado.
+
+### D-54 · Escala: 50 máquinas por planta en el plan base, 100 en el más alto · **Aprobado**
+
+Cierra lo que estaba como P-03. Las fábricas dividen sus activos, así que 50 por planta cubre el
+caso normal y 100 es el techo razonable.
+
+**Un detalle de modelado que hay que resolver al sembrar los planes:** hoy `Plan.MaxMaquinas` es un
+total, y vos definiste el límite **por planta**. Son cosas distintas: con `MaxPlantas = 3` y 50 por
+planta, el total es 150. Propongo renombrar a `MaxMaquinasPorPlanta` y que el total quede derivado —
+es más claro de explicar comercialmente y más fácil de verificar al dar de alta una máquina, porque
+la validación mira una sola planta en lugar de contar todo el tenant.
+
+**Lo que sigue vigente aunque los números bajen:** los listados de máquinas y repuestos nacen con
+paginación y búsqueda del lado del servidor. Con 50 filas no se nota, pero reconvertir después una
+pantalla que carga todo en memoria es bastante más caro que hacerla bien la primera vez.
+
+### D-55 · Escalonamiento de morosidad · **Aprobado**
+
+Cierra lo que estaba como P-05.
+
+| Mes de deuda | Estado | Qué puede hacer el cliente |
+|---|---|---|
+| 1 y 2 | `Activa` | Todo. Avisos dentro de la aplicación |
+| 3 | `Suspendida` | **Solo lectura**: consulta, ve gráficos, exporta reportes. No carga ni modifica nada |
+| 4 | `Baja` | Nada. Solo entra `SuperAdminMantIA` |
+| 5 | `Baja` | Los datos se conservan un mes más y después son elegibles para purga |
+
+El modo de solo lectura ya está implementado (D-33). Lo que falta construir es el proceso que mueve
+el estado según los meses de deuda, y eso depende del módulo de facturación, que no existe todavía.
+
+> **Una tensión que hay que resolver antes de purgar nada.** Dijimos que la bitácora no vence nunca
+> (D-41), y borrar los datos de un tenant borraría también su bitácora. Son dos reglas que chocan.
+> Mi recomendación: al purgar, **conservar la bitácora de plataforma** —altas, bajas y cambios sobre
+> la cuenta, que son registro de MantIA sobre su propia operación— y purgar solo los datos
+> operativos y la bitácora de empresa. Queda anotado para cuando llegue el momento; no hace falta
+> decidirlo ahora.
+
+### D-56 · Usuario de demostración sin credenciales · **Aprobado**
+
+Cierra lo que estaba como P-07. Un acceso de demostración **sin credenciales**, que entra
+directamente a la versión de maqueta con los datos que hoy están en `DatosDemo`.
+
+Es factible y es la opción más limpia de las dos: no hay usuario real que aprovisionar, no hay
+contraseña que rote ni se filtre, y no toca Auth0. La maqueta ya funciona entera con datos en
+memoria y su estado ya es por circuito de Blazor (`AddScoped`), así que dos visitantes simultáneos
+no se pisan.
+
+**Cómo se implementa:** una ruta propia —`/demo`— que arma un `ClaimsPrincipal` sintético con un rol
+de solo demostración y registra los servicios de maqueta en vez de los reales. **No pasa por
+`TenantResolver` ni toca la base**, así que no hay forma de que una sesión de demostración vea o
+escriba datos de un cliente: no es que esté prohibido, es que no tiene por dónde.
+
+Lo único a cuidar: que la aplicación muestre en todo momento que se está en modo demostración, para
+que nadie cargue datos reales ahí creyendo que quedan guardados.
+
+### D-57 · Toda entidad de tenant apunta a su empresa, y nunca en cascada · *Revisar*
+
+Detectado leyendo la base real, no el código. En la captura de `usuarios` aparecía esto:
+
+```
+fk_usuarios_empresas_empresa_id FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
+```
+
+Dos problemas de una:
+
+**1. Cascada donde no corresponde.** Borrar una fila de `empresas` borraba todos sus usuarios y sus
+plantas sin preguntar. Va en contra de todo lo demás: las bajas son lógicas (D-03), la purga de un
+tenant es manual y deliberada (D-55), y el historial tiene que sobrevivir. Ahora es `Restrict`: ese
+borrado falla, que es exactamente lo que tiene que pasar.
+
+**2. Solo dos de veinte entidades tenían clave foránea a `empresas`.** EF la había descubierto
+únicamente en `usuarios` y `plantas`, porque son las dos con navegación declarada desde `Empresa`.
+En las otras dieciocho, `empresa_id` era un uuid suelto: una fila con una empresa inexistente era
+posible y nada la detectaba.
+
+**Es el mismo patrón que D-02 y por eso se resolvió igual:** la clave foránea ahora la aplica el
+`DbContext` por convención sobre `TenantEntity`, no una línea escrita en cada entidad. La integridad
+dejó de depender de un detalle de cómo se escribió la clase.
+
+Resultado: 19 de 20 entidades con clave foránea `Restrict`. La única excepción es
+`eventos_pendientes`, con su motivo escrito en el código: el respaldo de bitácora guarda también
+eventos de plataforma, que no pertenecen a ninguna empresa, y una clave foránea los rechazaría justo
+cuando el sistema está degradado —el único momento en que esa tabla se usa—.
+
+Las cascadas que quedan son las nueve deliberadas de D-10, todas relaciones de composición.
+
+**Hay que regenerar la migración.**
+
+### D-58 · La purga de un tenant es manual · **Aprobado**
+
+Nada borra una empresa automáticamente. El mes 5 de D-55 no dispara una purga: marca que los datos
+**pueden** purgarse, y alguien decide. La cascada de D-57 hacía justamente lo contrario, y ahora la
+base lo impide.
+
+Cuando se purgue, la bitácora se trata así:
+
+| Qué | Se purga |
 |---|---|
-| **Capacidad offline con sincronización** | Decisión tuya: es un proyecto web, exigir acceso offline no tendría sentido. Contradice §2.1.4 del documento de visión, que además contradice a §1.9 — hay que corregir el texto |
-| **Bloqueo pesimista de recursos para el stock** | Se resolvió con libro mayor (D-30). Bloquear filas serializa las operaciones y no escala |
-| **Enums nativos de PostgreSQL** | Cada cambio exige SQL manual (`ALTER TYPE ... ADD VALUE`) que no corre dentro de una transacción. Demasiada fricción en la etapa donde más cambia el modelo |
-| **Matriz de permisos por defecto** | Decisión tuya: cada cliente define la suya. Se reemplazó por el piso irrevocable (D-25) |
-| **Bloqueo de rutas por URL** | Decisión tuya: sin autorización real en el servidor, una guarda del lado del cliente aparenta seguridad donde no la hay. Se implementa cuando esté la capa MVC |
-| **Cifrar la bitácora** | Ver D-26: la integridad importa más que la confidencialidad, y el cifrado en reposo es del motor |
+| Datos operativos del tenant | Sí |
+| Bitácora de empresa | Sí |
+| **Bitácora de plataforma** | **No** — altas, bajas y cambios sobre la cuenta son registro de MantIA sobre su propia operación, no del cliente |
+
+Así se respeta a la vez que la bitácora no vence (D-41) y que un cliente que se va deja de tener sus
+datos en el sistema.
+
+### D-59 · La demostración va por ruta, no por subdominio · **Aprobado**
+
+`/demo` en la misma aplicación. Un subdominio se puede agregar después como un `CNAME` que apunta al
+mismo lugar, y es puramente cosmético.
+
+**Por qué no separar la instancia**, que sería el argumento fuerte a favor del subdominio: se
+propone para aislar la demostración de los datos reales, y ese aislamiento ya está garantizado por
+construcción — la ruta no pasa por `TenantResolver` ni abre el contexto de datos. Una instancia
+aparte agregaría un despliegue, un certificado y una configuración más que mantener, para conseguir
+algo que ya se tiene.
+
+Navegarla es idéntico a la aplicación real: son las mismas pantallas con los servicios de maqueta en
+lugar de los reales. Lo único que cambia es una franja permanente indicando que se está en modo
+demostración.

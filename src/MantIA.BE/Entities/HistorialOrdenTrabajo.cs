@@ -44,7 +44,15 @@ public class HistorialOrdenTrabajo : TenantEntity
     public string? ValorAnterior { get; set; }
     public string? ValorNuevo { get; set; }
 
-    /// <summary>Texto para mostrar en la línea de tiempo: "Cerrada por Diego Ferrero".</summary>
+    /// <summary>
+    /// Texto para mostrar en la línea de tiempo: "Cerrada por Diego Ferrero".
+    /// <para>
+    /// <b>Queda en claro, así que no debe contener valores de campos.</b> Es un resumen que arma el
+    /// sistema para que la línea de tiempo se lea de un vistazo; lo que cambió va en
+    /// <see cref="ValorAnterior"/> y <see cref="ValorNuevo"/>, que sí están cifrados. Meter acá el
+    /// contenido de un campo sensible lo saca del cifrado por la puerta de atrás.
+    /// </para>
+    /// </summary>
     public string Descripcion { get; set; } = string.Empty;
 
     /// <summary>
