@@ -12,8 +12,15 @@ public interface IProtectorDatos
     /// <summary>Sella un texto con HMAC-SHA256. Devuelve el sello en base64.</summary>
     string Sellar(string contenido, string version);
 
-    /// <summary>Cifra un texto. El resultado incluye el nonce y la etiqueta de autenticacion.</summary>
-    string Cifrar(string texto);
+    /// <summary>
+    /// Cifra un texto, atandolo a su contexto.
+    /// <para>
+    /// El <paramref name="contexto"/> no se guarda: entra en el calculo de la etiqueta de
+    /// autenticacion. Un valor cifrado para un contexto no descifra en otro, de modo que copiar el
+    /// texto cifrado de una columna a otra deja de funcionar en lugar de pasar desapercibido.
+    /// </para>
+    /// </summary>
+    string Cifrar(string texto, string contexto);
 
     /// <summary>
     /// Cifra de forma que el mismo texto produzca siempre el mismo resultado, para poder buscar por
@@ -24,10 +31,13 @@ public interface IProtectorDatos
     /// correo se ven iguales en la base, aunque nadie sepa cual es. Se usa solo donde hay que buscar.
     /// </para>
     /// </summary>
-    string CifrarDeterminista(string texto);
+    string CifrarDeterminista(string texto, string contexto);
 
-    /// <summary>Descifra probando la llave vigente y despues las anteriores.</summary>
-    string Descifrar(string cifrado);
+    /// <summary>
+    /// Descifra probando la llave vigente y despues las anteriores. Falla si el
+    /// <paramref name="contexto"/> no es el mismo con el que se cifro.
+    /// </summary>
+    string Descifrar(string cifrado, string contexto);
 
     /// <summary>Verdadero si el texto tiene el prefijo que pone <see cref="Cifrar"/>.</summary>
     bool EstaCifrado(string? texto);
@@ -91,16 +101,17 @@ public class ProtectorDatos : IProtectorDatos
 
     // ------------------------------------------------------------------ confidencialidad
 
-    public string Cifrar(string texto) =>
-        CifrarCon(texto, _cifrado.VersionActual, RandomNumberGenerator.GetBytes(BytesNonce));
+    public string Cifrar(string texto, string contexto) =>
+        CifrarCon(texto, contexto, RandomNumberGenerator.GetBytes(BytesNonce));
 
-    public string CifrarDeterminista(string texto)
+    public string CifrarDeterminista(string texto, string contexto)
     {
-        // El nonce sale de un HMAC del propio texto con la llave de cifrado: repetible sin necesidad
-        // de guardarlo aparte, y sin que el nonce revele nada de lo que protege.
+        // El nonce sale de un HMAC del propio texto y su contexto: repetible sin necesidad de
+        // guardarlo aparte, y sin que el nonce revele nada de lo que protege. Incluir el contexto
+        // hace que el mismo correo en dos columnas distintas no produzca el mismo texto cifrado.
         using var hmac = new HMACSHA256(_cifrado.Llave(_cifrado.VersionActual));
-        var derivado = hmac.ComputeHash(Encoding.UTF8.GetBytes("nonce:" + texto));
-        return CifrarCon(texto, _cifrado.VersionActual, derivado[..BytesNonce]);
+        var derivado = hmac.ComputeHash(Encoding.UTF8.GetBytes($"nonce:{contexto}:{texto}"));
+        return CifrarCon(texto, contexto, derivado[..BytesNonce]);
     }
 
     /// <summary>
@@ -112,19 +123,20 @@ public class ProtectorDatos : IProtectorDatos
     /// despreciable.
     /// </para>
     /// </summary>
-    public string Descifrar(string cifrado)
+    public string Descifrar(string cifrado, string contexto)
     {
         if (!EstaCifrado(cifrado)) return cifrado;
 
         foreach (var version in _cifrado.VersionesPorPreferencia())
         {
-            try { return DescifrarCon(cifrado, _cifrado.Llave(version)); }
+            try { return DescifrarCon(cifrado, _cifrado.Llave(version), contexto); }
             catch (CryptographicException) { }
         }
 
         throw new CryptographicException(
-            "Ninguna de las llaves de cifrado configuradas descifra el valor. O falta una llave " +
-            "rotada, o el dato fue alterado.");
+            $"No se pudo descifrar el valor en el contexto '{contexto}'. Puede ser una llave " +
+            "rotada que falta, un dato alterado, o un valor cifrado que fue movido desde otra " +
+            "columna o tabla.");
     }
 
     public bool EstaCifrado(string? texto) =>
@@ -132,14 +144,17 @@ public class ProtectorDatos : IProtectorDatos
 
     // ------------------------------------------------------------------ mecanica
 
-    private string CifrarCon(string texto, string version, byte[] nonce)
+    private string CifrarCon(string texto, string contexto, byte[] nonce)
     {
         var claro = Encoding.UTF8.GetBytes(texto);
         var cifrado = new byte[claro.Length];
         var etiqueta = new byte[BytesEtiqueta];
+        var atadura = Encoding.UTF8.GetBytes(contexto);
 
-        using (var aes = new AesGcm(_cifrado.Llave(version), BytesEtiqueta))
-            aes.Encrypt(nonce, claro, cifrado, etiqueta);
+        // El contexto va como "dato autenticado adicional": no se cifra ni se guarda, pero sin el
+        // mismo valor la etiqueta no verifica y el descifrado falla.
+        using (var aes = new AesGcm(_cifrado.Llave(_cifrado.VersionActual), BytesEtiqueta))
+            aes.Encrypt(nonce, claro, cifrado, etiqueta, atadura);
 
         // Se concatena nonce + cifrado + etiqueta en un solo valor para que el almacenamiento sea
         // una sola columna y no haya forma de guardar las partes desapareadas.
@@ -151,7 +166,7 @@ public class ProtectorDatos : IProtectorDatos
         return Prefijo + Convert.ToBase64String(salida);
     }
 
-    private static string DescifrarCon(string cifrado, byte[] llave)
+    private static string DescifrarCon(string cifrado, byte[] llave, string contexto)
     {
         var datos = Convert.FromBase64String(cifrado[Prefijo.Length..]);
         if (datos.Length < BytesNonce + BytesEtiqueta)
@@ -162,9 +177,10 @@ public class ProtectorDatos : IProtectorDatos
         var cuerpo = datos.AsSpan(BytesNonce, datos.Length - BytesNonce - BytesEtiqueta);
         var claro = new byte[cuerpo.Length];
 
-        // Si alguien modifico el texto cifrado, Decrypt lanza en lugar de devolver basura.
+        // Si alguien modifico el texto cifrado —o lo movio a otra columna, con lo cual el contexto
+        // ya no coincide— Decrypt lanza en lugar de devolver basura.
         using (var aes = new AesGcm(llave, BytesEtiqueta))
-            aes.Decrypt(nonce, cuerpo, etiqueta, claro);
+            aes.Decrypt(nonce, cuerpo, etiqueta, claro, Encoding.UTF8.GetBytes(contexto));
 
         return Encoding.UTF8.GetString(claro);
     }

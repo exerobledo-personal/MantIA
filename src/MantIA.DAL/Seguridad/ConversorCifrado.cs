@@ -15,23 +15,34 @@ namespace MantIA.DAL.Seguridad;
 /// </summary>
 public class ConversorCifrado : ValueConverter<string?, string?>
 {
-    public ConversorCifrado(IProtectorDatos protector, NivelCifrado nivel)
-        : base(
-            claro => Proteger(protector, nivel, claro),
-            guardado => Revelar(protector, guardado))
+    public ConversorCifrado(IProtectorDatos protector, NivelCifrado nivel, string entidad, string campo)
+        : this(protector, nivel, Contexto(entidad, campo))
     {
     }
 
-    private static string? Proteger(IProtectorDatos protector, NivelCifrado nivel, string? claro)
+    private ConversorCifrado(IProtectorDatos protector, NivelCifrado nivel, string contexto)
+        : base(
+            claro => Proteger(protector, nivel, contexto, claro),
+            guardado => Revelar(protector, contexto, guardado))
+    {
+    }
+
+    /// <summary>
+    /// Ata el valor cifrado a la columna donde vive. Copiar el texto cifrado del correo de un
+    /// usuario a la columna de otra tabla deja de funcionar: la etiqueta ya no verifica.
+    /// </summary>
+    public static string Contexto(string entidad, string campo) => $"{entidad}.{campo}";
+
+    private static string? Proteger(IProtectorDatos protector, NivelCifrado nivel, string contexto, string? claro)
     {
         if (string.IsNullOrEmpty(claro)) return claro;
 
         return nivel == NivelCifrado.Determinista
-            ? protector.CifrarDeterminista(claro)
-            : protector.Cifrar(claro);
+            ? protector.CifrarDeterminista(claro, contexto)
+            : protector.Cifrar(claro, contexto);
     }
 
-    private static string? Revelar(IProtectorDatos protector, string? guardado)
+    private static string? Revelar(IProtectorDatos protector, string contexto, string? guardado)
     {
         if (string.IsNullOrEmpty(guardado) || !protector.EstaCifrado(guardado))
             return guardado;
@@ -39,6 +50,6 @@ public class ConversorCifrado : ValueConverter<string?, string?>
         // La version con la que se cifro no viaja en la columna: el protector prueba con la vigente
         // y, si no abre, con las anteriores. Es lo que permite rotar la llave sin reescribir la
         // tabla entera el mismo dia.
-        return protector.Descifrar(guardado);
+        return protector.Descifrar(guardado, contexto);
     }
 }

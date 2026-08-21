@@ -989,3 +989,29 @@ algo que ya se tiene.
 Navegarla es idéntico a la aplicación real: son las mismas pantallas con los servicios de maqueta en
 lugar de los reales. Lo único que cambia es una franja permanente indicando que se está en modo
 demostración.
+
+### D-60 · Cada valor cifrado queda atado a su columna · **Aprobado**
+
+Implementado el atado por contexto (AAD de AES-GCM). Al cifrar se pasa `Entidad.Campo`, que **no se
+guarda** pero entra en el cálculo de la etiqueta de autenticación. Un valor cifrado en una columna no
+descifra en otra.
+
+```
+descifra en su propia columna          : True
+movido a OTRA columna: rechazado       : OK
+mismo valor, otra columna, otro cifrado: True
+determinista movido: rechazado         : OK
+```
+
+Cero cambios de esquema — el contexto no ocupa un byte en la base—, así que no hace falta regenerar
+la migración.
+
+**Un efecto secundario que vale la pena:** en modo determinista, el mismo correo guardado en dos
+columnas distintas ahora produce dos textos cifrados distintos. Antes se veían iguales y eso filtraba
+información entre tablas.
+
+**Lo que sigue sin cubrir** —copiar un valor cifrado a otra fila de la misma columna— quedó en
+`PENDIENTES.md` con el motivo técnico: un conversor de EF Core recibe el valor y nada más, no sabe a
+qué fila pertenece. Atarlo a la fila obliga a mover el cifrado a interceptores, y para los campos
+deterministas es directamente imposible, porque la consulta que busca por igualdad todavía no conoce
+la fila.

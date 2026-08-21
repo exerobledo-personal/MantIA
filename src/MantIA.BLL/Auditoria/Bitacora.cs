@@ -130,11 +130,11 @@ public class Bitacora : IBitacora
         //    texto libre o valores del dominio; lo que sirve para filtrar y ordenar queda en claro,
         //    porque si no la pantalla de bitacora tendria que traerse la coleccion completa a
         //    memoria para mostrar "lo critico de este mes".
-        evento.Descripcion = Proteger(evento.Descripcion);
-        evento.Motivo = Proteger(evento.Motivo);
-        evento.MotivoFallo = Proteger(evento.MotivoFallo);
-        evento.EstadoAnterior = Proteger(accion.EstadoAnterior);
-        evento.EstadoPosterior = Proteger(accion.EstadoPosterior);
+        evento.Descripcion = Proteger(evento.Descripcion, nameof(evento.Descripcion));
+        evento.Motivo = Proteger(evento.Motivo, nameof(evento.Motivo));
+        evento.MotivoFallo = Proteger(evento.MotivoFallo, nameof(evento.MotivoFallo));
+        evento.EstadoAnterior = Proteger(accion.EstadoAnterior, nameof(evento.EstadoAnterior));
+        evento.EstadoPosterior = Proteger(accion.EstadoPosterior, nameof(evento.EstadoPosterior));
 
         // 3. Sellar. El sello se calcula dentro del repositorio porque depende del numero de
         //    secuencia, y ese numero solo se conoce al insertar: si dos operaciones del mismo
@@ -149,10 +149,10 @@ public class Bitacora : IBitacora
     // Cifra con la llave de CIFRADO, distinta de la de sellado. El evento guarda la version de
     // sellado en VersionLlave; la de cifrado no hace falta guardarla porque el protector prueba
     // todas las que tenga configuradas.
-    private string? Proteger(string? valor) =>
+    private string? Proteger(string? valor, string campo) =>
         string.IsNullOrEmpty(valor) || !_opciones.CifrarEstados
             ? valor
-            : _protector.Cifrar(valor);
+            : _protector.Cifrar(valor, $"{nameof(EventoBitacora)}.{campo}");
 
     // NO se cifran: Alcance, Tipo, Nivel, Severidad, Recurso, Accion, EmpresaId, UsuarioId, Fecha.
     // Son los ejes por los que se consulta la bitacora. Cifrarlos convierte cada filtro en un

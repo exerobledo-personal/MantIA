@@ -5,7 +5,7 @@ en `DECISIONES.md`.
 
 | # | Qué falta definir | Urgencia |
 |---|---|---|
-| P-11 | AAD contra reubicación, y el DV de tabla | **Antes de que haya datos reales** |
+| P-11 | Atado por fila: interceptores o DV de tabla | Se puede postergar — el atado por columna ya está |
 | P-04 | Certificados de proveedores: pantalla y flujo diseñados, falta construir | Después del MVP |
 
 Resueltos y movidos a `DECISIONES.md`: P-01 dimensión del vector, P-02 umbral de promoción,
@@ -14,27 +14,43 @@ P-08 bitácora caída, P-09 permisos por ámbito, P-10 huecos en la cadena.
 
 ---
 
-### P-11 · Integridad de datos cifrados — queda el punto 2
+### P-11 · Integridad de datos cifrados — falta el atado por fila
 
-Los otros dos puntos ya se resolvieron y están en `DECISIONES.md` (D-53).
+**Ya implementado: el atado por columna.** Cada valor cifrado va atado a `Entidad.Campo`, y ese
+contexto entra en el cálculo de la etiqueta de autenticación sin guardarse en ningún lado. Mover un
+texto cifrado a otra columna o a otra tabla deja de funcionar. Verificado:
 
-**Lo que falta: que alguien mueva un valor cifrado de una fila a otra.** Hoy las dos filas
-descifran perfecto — GCM protege el contenido, no la posición.
+```
+descifra en su propia columna          : True
+movido a OTRA columna: rechazado       : OK
+mismo valor, otra columna, otro cifrado: True
+```
 
-Dos caminos, no excluyentes, y conviene hacer los dos en este orden:
+**Lo que falta: atarlo también al identificador de la fila.** Hoy, copiar la descripción cifrada de
+la OT #5 sobre la OT #9 sigue funcionando: misma tabla, misma columna, mismo contexto.
 
-| Camino | Cómo funciona | Qué cuesta |
-|---|---|---|
-| **AAD** (*additional authenticated data*) | Al cifrar se pasa un contexto —tabla, columna, id de fila— que no se guarda pero entra en la etiqueta. Mover el valor hace fallar el descifrado | Ninguna columna nueva. Hay que resolver que el conversor de EF conozca el id de la fila al cifrar, que hoy no lo tiene a mano |
-| **DV vertical y horizontal en tabla** | Un dígito por fila —que incluye el id— y otro por columna sobre el conjunto. Modificar una celda obliga a recalcular los dos, y la inconsistencia delata el cambio | Una tabla extra y recálculo del DV de columna en cada escritura, que es la parte cara |
+**Por qué no se hizo junto con lo anterior.** El cifrado se aplica con un conversor de EF Core, y un
+conversor recibe únicamente el valor: no sabe a qué fila pertenece. Para incluir el identificador
+hace falta mover el cifrado a interceptores de guardado y materialización, lo que implica:
 
-El DV horizontal cubre además los campos **no cifrados**, que AAD no toca. Acotado a las tres tablas
-donde una alteración tiene consecuencia económica directa: `movimientos_stock`,
-`ordenes_trabajo_repuesto` y `repuestos`.
+- Recorrer las entidades en cada `SaveChanges`, cifrar, y **restaurar el texto en claro después**, o
+  el objeto en memoria del que llamó queda con el texto cifrado adentro.
+- Un camino de lectura separado que descifre al materializar.
+- Unas 150 líneas que se meten en cada lectura y cada escritura del dominio.
 
-**Advertencia:** aplicar AAD sobre datos ya escritos los vuelve indescifrables. Hay que hacerlo
-**antes de que exista el primer dato real**, o migrar descifrando con el esquema viejo y recifrando
-con el nuevo. Hoy la base está vacía, así que la ventana está abierta.
+**Y hay una limitación que ningún diseño evita:** los campos **deterministas** —`Usuario.Email` y
+`Auth0UserId`— no pueden atarse a la fila. Se cifran así justamente para poder buscarlos por
+igualdad, y una consulta como "traeme el usuario con este correo" no conoce todavía la fila. Para
+esos dos, el atado por columna es el techo.
+
+**Alternativa que cubre lo mismo y más:** el DV vertical y horizontal en tabla aparte. Un dígito por
+fila que incluya el identificador detecta la reubicación igual que el AAD, y además cubre los campos
+**no cifrados**, que el AAD no toca. Acotado a `movimientos_stock`, `ordenes_trabajo_repuesto` y
+`repuestos`.
+
+**Mi recomendación:** hacer el DV de tabla y no los interceptores. Se consigue la misma protección
+contra reubicación, se suma la de los campos en claro, y el mecanismo queda afuera del camino de
+lectura y escritura del dominio en lugar de atravesarlo entero.
 
 ### P-04 · Certificados de mantenimiento de proveedores — diseñado, falta construir
 

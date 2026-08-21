@@ -175,7 +175,7 @@ public class MantIADbContext : DbContext
                 propiedad.SetMaxLength(null);
 
                 if (_protector is not null)
-                    propiedad.SetValueConverter(new ConversorCifrado(_protector, nivel));
+                    propiedad.SetValueConverter(new ConversorCifrado(_protector, nivel, tipo.Name, propiedad.Name));
             }
 
             // 3. Concurrencia optimista sobre xmin, la columna de sistema que PostgreSQL ya
