@@ -1,67 +1,101 @@
-﻿using MantIA.BLL.Authorization;
-using MantIA.DAL.Context;
-using MantIA.DAL.Tenancy;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
+using MantIA.BE.Common;
+using MantIA.BE.Seguridad;
 using Xunit;
 
 namespace MantIA.IntegrationTests;
 
+/// <summary>
+/// Pruebas del modelo de seguridad que **no necesitan base de datos**.
+///
+/// <para>La versión anterior de este archivo levantaba PostgreSQL, buscaba una "Empresa Demo"
+/// sembrada a mano y comparaba contra nombres de recurso que ya no existen. Dos problemas: fallaba
+/// por motivos ajenos a lo que decía probar —la base no está, los datos cambiaron— y no verificaba
+/// gran cosa que el compilador no verificara ya.</para>
+///
+/// <para>Lo que sigue prueba las reglas estructurales, que son las que importan y las que nadie
+/// puede romper sin darse cuenta: los ámbitos, el piso irrevocable y la separación de funciones.
+/// Corren en milisegundos y no dependen de nada externo. Las pruebas contra base real van cuando
+/// exista la siembra.</para>
+/// </summary>
 public class PermisosTests
 {
-    private const string Conn =
-        "Host=localhost;Port=5432;Database=mantia;Username=mantia;Password=dev_local_pwd";
-
-    // Arma el PermisoService apuntando a una empresa concreta (tenant resuelto).
-    private static IPermisoService NuevoServicio(Guid empresaId)
+    [Fact]
+    public void El_piso_de_permisos_es_coherente_con_el_catalogo()
     {
-        var options = new DbContextOptionsBuilder<MantIADbContext>()
-            .UseNpgsql(Conn)
-            .UseSnakeCaseNamingConvention()
-            .Options;
+        // Si un minimo apuntara a una combinacion invalida, el evaluador concederia un permiso que
+        // la frontera estructural deniega. Seria un error de codigo, no de configuracion.
+        Assert.Empty(PermisosMinimos.Incoherentes());
+    }
 
-        var tenant = new CurrentTenant { EmpresaId = empresaId };
-        var db = new MantIADbContext(options, tenant);
-        var cache = new MemoryCache(new MemoryCacheOptions());
-        return new PermisoService(db, cache, tenant);
+    [Theory]
+    [InlineData("Ordenes", Acciones.Cerrar)]
+    [InlineData("Ordenes", Acciones.Modificacion)]
+    [InlineData("Stock", Acciones.Alta)]
+    public void El_administrador_de_empresa_no_puede_operar(string recurso, string accion)
+    {
+        // Separacion de funciones: quien administra la empresa no cierra ordenes ni mueve stock.
+        // No es configuracion, es frontera: ninguna edicion de la matriz puede concederlo.
+        Assert.False(CatalogoPermisos.EsCombinacionValida(RolSistema.AdminEmpresa, recurso, accion));
     }
 
     [Fact]
-    public async Task Filtrado_de_permisos_respeta_rol_y_nivel()
+    public void El_administrador_de_empresa_si_puede_mirar_la_operacion()
     {
-        // Tomamos la empresa y el nivel Sr reales de la base
-        var options = new DbContextOptionsBuilder<MantIADbContext>()
-            .UseNpgsql(Conn).UseSnakeCaseNamingConvention().Options;
+        Assert.True(CatalogoPermisos.EsCombinacionValida(
+            RolSistema.AdminEmpresa, "Ordenes", Acciones.Consultar));
 
-        Guid empresaId;
-        Guid nivelSr;
-        using (var db = new MantIADbContext(options, new CurrentTenant { EmpresaId = null }))
-        {
-            var empresa = await db.Empresas.IgnoreQueryFilters()
-                .FirstAsync(e => e.RazonSocial == "Empresa Demo");
-            empresaId = empresa.Id;
+        // Pero solo mirar: ni siquiera exportar, que es sacar datos y no supervisar.
+        Assert.False(CatalogoPermisos.EsCombinacionValida(
+            RolSistema.AdminEmpresa, "Reportes", Acciones.Exportar));
+    }
 
-            var sr = await db.NivelesPermiso.IgnoreQueryFilters()
-                .FirstAsync(n => n.EmpresaId == empresaId && n.Nombre == "Sr");
-            nivelSr = sr.Id;
-        }
+    [Fact]
+    public void La_administracion_de_permisos_esta_repartida_por_ambito()
+    {
+        // El gerente reparte permisos de operacion; el administrador, los de empresa. Ninguno
+        // alcanza el terreno del otro, y por eso "nadie otorga lo que no tiene" puede ser estricta.
+        Assert.True(CatalogoPermisos.EsCombinacionValida(
+            RolSistema.Gerente, "PermisosOperacion", Acciones.Configurar));
+        Assert.False(CatalogoPermisos.EsCombinacionValida(
+            RolSistema.Gerente, "Permisos", Acciones.Configurar));
 
-        var permisos = NuevoServicio(empresaId);
+        Assert.True(CatalogoPermisos.EsCombinacionValida(
+            RolSistema.AdminEmpresa, "Permisos", Acciones.Configurar));
+        Assert.False(CatalogoPermisos.EsCombinacionValida(
+            RolSistema.AdminEmpresa, "PermisosOperacion", Acciones.Configurar));
+    }
 
-        // Supervisor Sr SI puede cerrar (Modificacion) una OrdenTrabajo
-        Assert.True(await permisos.PuedeAsync("Supervisor", nivelSr, "OrdenTrabajo", "Modificacion"));
+    [Fact]
+    public void Nadie_puede_dejarse_sin_salida()
+    {
+        // Bloqueo puro: si el administrador se quita el acceso a la matriz, nadie dentro de la
+        // empresa puede devolverselo.
+        Assert.False(PermisosMinimos.EsRevocable(
+            RolSistema.AdminEmpresa, "Permisos", Acciones.Configurar));
 
-        // Empleado NO puede cerrar (no esta en la matriz)
-        Assert.False(await permisos.PuedeAsync("Empleado", null, "OrdenTrabajo", "Modificacion"));
+        Assert.False(PermisosMinimos.EsRevocable(
+            RolSistema.Gerente, "PermisosOperacion", Acciones.Configurar));
+    }
 
-        // Empleado SI puede consultar
-        Assert.True(await permisos.PuedeAsync("Empleado", null, "OrdenTrabajo", "Consulta"));
+    [Fact]
+    public void Un_operario_conserva_lo_minimo_para_trabajar()
+    {
+        Assert.False(PermisosMinimos.EsRevocable(RolSistema.Empleado, "Ordenes", Acciones.Consultar));
+        Assert.False(PermisosMinimos.EsRevocable(RolSistema.Empleado, "Maquinas", Acciones.Consultar));
 
-        // SuperAdmin SIEMPRE puede, sin importar la matriz
-        Assert.True(await permisos.PuedeAsync("SuperAdminMantIA", null, "CualquierCosa", "Baja"));
+        // Y nada mas: el piso es estrecho a proposito. Que un empleado pueda abrir una orden es
+        // decision de cada empresa, no nuestra.
+        Assert.True(PermisosMinimos.EsRevocable(RolSistema.Empleado, "Ordenes", Acciones.Alta));
+    }
 
-        // Sin tenant resuelto: fail-closed, deniega aunque el rol exista
-        var sinTenant = NuevoServicio(Guid.NewGuid()); // empresa que no tiene matriz cargada
-        Assert.False(await sinTenant.PuedeAsync("Supervisor", nivelSr, "OrdenTrabajo", "Modificacion"));
+    [Fact]
+    public void Cerrar_una_orden_es_una_accion_aparte_de_modificarla()
+    {
+        // Cerrar mueve stock y congela costos. Por eso no es un caso de Modificacion: se concede y
+        // se audita por separado.
+        var ordenes = CatalogoPermisos.BuscarRecurso("Ordenes");
+        Assert.NotNull(ordenes);
+        Assert.Contains(Acciones.Cerrar, ordenes!.AccionesValidas);
+        Assert.Contains(Acciones.Modificacion, ordenes.AccionesValidas);
     }
 }

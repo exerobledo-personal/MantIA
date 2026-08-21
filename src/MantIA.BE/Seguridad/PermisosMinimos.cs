@@ -80,6 +80,13 @@ public static class PermisosMinimos
         new(RolSistema.Gerente, "Recomendaciones", C, MotivoMinimo.RazonDeSer,
             "La decision de compra anticipada de un repuesto critico se toma en este nivel. "
           + "Ocultarle las recomendaciones deja al motor sin destinatario."),
+        new(RolSistema.Gerente, "PermisosOperacion", C, MotivoMinimo.Bloqueo,
+            "Sin lectura de los permisos de su area no puede diagnosticar por que alguien no puede "
+          + "hacer su trabajo."),
+        new(RolSistema.Gerente, "PermisosOperacion", Acciones.Configurar, MotivoMinimo.Bloqueo,
+            "Es el unico rol que puede repartir permisos operativos: el administrador de empresa no "
+          + "alcanza ese ambito. Si se le quita, nadie dentro de la empresa puede volver a "
+          + "concederlo y la operacion queda congelada tal como haya quedado configurada."),
 
         // ---------- AdminEmpresa ----------
         new(RolSistema.AdminEmpresa, "Permisos", C, MotivoMinimo.Bloqueo,

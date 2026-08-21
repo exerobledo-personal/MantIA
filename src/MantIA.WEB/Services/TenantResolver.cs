@@ -39,9 +39,12 @@ public class TenantResolver
         if (string.IsNullOrEmpty(sub))
             return new ResultadoAcceso { Estado = EstadoAcceso.NoAutenticado };
 
-        // Lookup por sub ANTES de conocer el tenant: excepcion controlada al filtro.
+        // Busqueda por sub ANTES de conocer el tenant: es la unica excepcion legitima al filtro
+        // de empresa, porque justamente estamos averiguando cual es. Se ignora SOLO ese filtro,
+        // por nombre: con IgnoreQueryFilters() sin argumentos tambien se apagaria el de baja
+        // logica y un usuario dado de baja podria volver a entrar.
         var usuario = await _db.Usuarios
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters([MantIADbContext.FiltroTenant])
             .FirstOrDefaultAsync(u => u.Auth0UserId == sub);
 
         if (usuario is null)
@@ -51,8 +54,11 @@ public class TenantResolver
                 Mensaje = "El usuario no esta dado de alta en ninguna empresa."
             };
 
-        // Empresa no lleva filtro de tenant (es BaseEntity), se consulta directo.
+        // Empresa no lleva filtro de tenant (es BaseEntity). Si lleva el de baja logica, y aca
+        // se ignora a proposito para poder distinguir "no existe" de "esta dada de baja": son
+        // dos problemas distintos y el usuario merece saber cual de los dos le toco.
         var empresa = await _db.Empresas
+            .IgnoreQueryFilters([MantIADbContext.FiltroBaja])
             .FirstOrDefaultAsync(e => e.Id == usuario.EmpresaId);
 
         if (empresa is null)
@@ -60,6 +66,13 @@ public class TenantResolver
             {
                 Estado = EstadoAcceso.UsuarioNoAprovisionado,
                 Mensaje = "La empresa del usuario no existe."
+            };
+
+        if (empresa.FechaBaja is not null)
+            return new ResultadoAcceso
+            {
+                Estado = EstadoAcceso.UsuarioNoAprovisionado,
+                Mensaje = $"La cuenta de {empresa.RazonSocial} esta dada de baja. Contactate con MantIA."
             };
 
         // Validacion de dominio corporativo
@@ -74,8 +87,10 @@ public class TenantResolver
             };
         }
 
-        // Acceso OK: recien aca se setea el tenant real.
+        // Acceso OK: recien aca se setea el contexto real. El usuario se guarda ademas de la
+        // empresa porque el contexto de datos lo usa para sellar quien creo o modifico cada fila.
         _tenant.EmpresaId = empresa.Id;
+        _tenant.UsuarioId = usuario.Id;
         return new ResultadoAcceso { Estado = EstadoAcceso.Autorizado, EmpresaId = empresa.Id };
     }
 

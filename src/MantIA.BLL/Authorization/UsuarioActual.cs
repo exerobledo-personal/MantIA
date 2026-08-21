@@ -1,4 +1,4 @@
-﻿using MantIA.DAL.Context;
+using MantIA.DAL.Context;
 using Microsoft.EntityFrameworkCore;
 
 namespace MantIA.BLL.Authorization;
@@ -16,12 +16,19 @@ public class UsuarioActual : IUsuarioActual
 
     public async Task<bool> PuedeAsync(string authUserId, string recurso, string accion)
     {
+        // Sin ignorar filtros a proposito: si el usuario esta dado de baja la consulta no lo
+        // encuentra y el permiso se deniega. Sale gratis y es el comportamiento correcto.
         var usuario = await _db.Usuarios
-            .FirstOrDefaultAsync(u => u.Auth0UserId == authUserId);
+            .AsNoTracking()
+            .Where(u => u.Auth0UserId == authUserId)
+            .Select(u => new { u.Id, u.Rol, u.NivelPermisoId })
+            .FirstOrDefaultAsync();
 
         if (usuario is null)
             return false;
 
-        return await _permisos.PuedeAsync(usuario.Rol, usuario.NivelPermisoId, recurso, accion);
+        return await _permisos.PuedeAsync(
+            new ContextoPermiso(usuario.Rol, usuario.NivelPermisoId, usuario.Id),
+            recurso, accion);
     }
 }

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\MantIA.BE\MantIA.BE.csproj" />
@@ -6,8 +6,35 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.9" />
+
+    <!-- Explicita a proposito, aunque venga como dependencia: Pgvector.EntityFrameworkCore la pide
+         en 10.0.4 y sin esta linea MSBuild resuelve el conflicto eligiendo la version vieja
+         (warning MSB3277). Declararla fuerza la unificacion en 10.0.9. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.9" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
     <PackageReference Include="Pgvector.EntityFrameworkCore" Version="0.3.0" />
+
+    <!-- Bitacora. Va en la capa de datos junto al resto de la persistencia; la capa de negocio
+         solo conoce la interfaz IRepositorioBitacora. Si el restore se queja de la version,
+         correr: dotnet add src/MantIA.DAL package MongoDB.Driver -->
+    <PackageReference Include="MongoDB.Driver" Version="3.4.0" />
+
+    <!-- La DAL registra sus propios servicios (RegistroBitacora), asi que necesita el enlace de
+         configuracion. Configure<T>(IConfiguration) vive en Options.ConfigurationExtensions y
+         IConfigurationSection.Get<T>() en Configuration.Binder: ninguno de los dos viene con EF Core. -->
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.9" />
+
+    <!-- La convencion de nombres tiene que estar en este proyecto y no solo en los de arranque:
+         la fabrica de diseno la aplica al generar migraciones, y si difiriera de lo que registra
+         la aplicacion, las columnas de la base no coincidirian con las que busca el runtime. -->
+    <PackageReference Include="EFCore.NamingConventions" Version="10.0.1" />
+
+    <!-- Necesario para que "dotnet ef" pueda trabajar directamente contra este proyecto. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
 
   <PropertyGroup>

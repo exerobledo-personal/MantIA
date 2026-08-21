@@ -58,12 +58,17 @@ public static class CatalogoPermisos
         new("Catalogo",        "Catalogo tecnico",        Ambito.Operacion, [C]),
         new("Recomendaciones", "Recomendaciones",         Ambito.Operacion, [C, Acciones.Decidir]),
         new("Reportes",        "Reportes operativos",     Ambito.Operacion, [C, A, M, B, Acciones.Exportar]),
+        // Administrar los permisos DE OPERACION es una tarea de operacion, no de administracion.
+        // Quien reparte permisos de mantenimiento es el jefe de mantenimiento, no el administrativo:
+        // es el unico que sabe quien esta capacitado para cerrar una orden. Ver "Permisos", que es
+        // su equivalente para el ambito Empresa.
+        new("PermisosOperacion","Permisos de operacion",  Ambito.Operacion, [C, Acciones.Configurar]),
 
         // ---------- Ambito Empresa ----------
         new("Usuarios",        "Usuarios",                Ambito.Empresa,   [C, A, M, B]),
         new("Niveles",         "Niveles de permiso",      Ambito.Empresa,   [C, A, M, B]),
         new("Plantas",         "Plantas",                 Ambito.Empresa,   [C, A, M, B]),
-        new("Permisos",        "Matriz de permisos",      Ambito.Empresa,   [C, Acciones.Configurar]),
+        new("Permisos",        "Permisos de empresa",     Ambito.Empresa,   [C, Acciones.Configurar]),
         new("BitacoraEmpresa", "Bitacora de la empresa",  Ambito.Empresa,   [C, Acciones.Exportar]),
 
         // ---------- Ambito Plataforma ----------

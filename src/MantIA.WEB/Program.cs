@@ -1,4 +1,5 @@
 using Auth0.AspNetCore.Authentication;
+using MantIA.DAL.Bitacora;
 using MantIA.WEB.Components;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
@@ -22,8 +23,10 @@ builder.Services
                 var db = context.HttpContext.RequestServices
                     .GetRequiredService<MantIA.DAL.Context.MantIADbContext>();
 
+                // Se ignora solo el filtro de empresa, que todavia no se resolvio. El de baja
+                // logica sigue activo: un usuario dado de baja no debe poder volver a entrar.
                 var usuario = await db.Usuarios
-                    .IgnoreQueryFilters()
+                    .IgnoreQueryFilters([MantIA.DAL.Context.MantIADbContext.FiltroTenant])
                     .FirstOrDefaultAsync(u => u.Auth0UserId == sub);
 
                 bool autorizado = false;
@@ -47,9 +50,14 @@ builder.Services
             }
         };
     }); 
+// UseVector habilita el mapeo del tipo vector de pgvector. Tiene que estar tambien aca y no
+// solo en la fabrica de diseno: sin el, la aplicacion genera la tabla bien pero falla al leer
+// la columna de embeddings en tiempo de ejecucion.
 builder.Services.AddDbContext<MantIA.DAL.Context.MantIADbContext>(options =>
     options
-        .UseNpgsql(builder.Configuration.GetConnectionString("MantIADb"))
+        .UseNpgsql(
+            builder.Configuration.GetConnectionString("MantIADb"),
+            npgsql => npgsql.UseVector())
         .UseSnakeCaseNamingConvention());
 
 builder.Services.AddScoped<MantIA.DAL.Tenancy.ICurrentTenant, MantIA.DAL.Tenancy.CurrentTenant>();
@@ -69,6 +77,22 @@ builder.Services.AddScoped<MantIA.WEB.Demo.Sesion>();
 builder.Services.AddScoped<MantIA.WEB.Demo.Idioma>();
 builder.Services.AddScoped<MantIA.BLL.Authorization.IPermisoService, MantIA.BLL.Authorization.PermisoService>();
 builder.Services.AddScoped<MantIA.BLL.Authorization.IUsuarioActual, MantIA.BLL.Authorization.UsuarioActual>();
+builder.Services.AddScoped<MantIA.BLL.Authorization.IGestorPermisos, MantIA.BLL.Authorization.GestorPermisos>();
+
+// Bitacora. Las llaves de sellado y cifrado NO van en appsettings.json: en desarrollo se cargan
+// con "dotnet user-secrets set Auditoria:Llaves:v1 <base64>" y en produccion por variable de
+// entorno. Se generan con: openssl rand -base64 32
+builder.Services.Configure<MantIA.DAL.Seguridad.OpcionesAuditoria>(
+    builder.Configuration.GetSection(MantIA.DAL.Seguridad.OpcionesAuditoria.Seccion));
+builder.Services.AddSingleton<MantIA.DAL.Seguridad.IProtectorDatos, MantIA.DAL.Seguridad.ProtectorDatos>();
+builder.Services.AddScoped<MantIA.BLL.Auditoria.IBitacora, MantIA.BLL.Auditoria.Bitacora>();
+builder.Services.AddScoped<MantIA.BLL.Auditoria.IVerificadorCadena, MantIA.BLL.Auditoria.VerificadorCadena>();
+builder.Services.AgregarBitacora(builder.Configuration);
+builder.Services.AddScoped<MantIA.DAL.Numeracion.INumeradorDocumentos, MantIA.DAL.Numeracion.NumeradorDocumentos>();
+
+// Trabajo de fondo: refleja en MongoDB lo que quedo en el respaldo local y cierra los eslabones
+// que quedaron sin sellar. Corre cada 30 segundos y no hace nada si no hay nada pendiente.
+builder.Services.AddHostedService<MantIA.BLL.Auditoria.MantenimientoBitacora>();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<MantIA.WEB.Services.TenantResolver>();
 
@@ -76,6 +100,19 @@ builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 
 var app = builder.Build();
+
+// Indices de la bitacora. Si Mongo no esta arriba se avisa y se sigue: dejar la aplicacion sin
+// arrancar por un indice que se puede crear despues convierte una falla parcial en una total.
+try
+{
+    await app.Services.PrepararBitacoraAsync();
+}
+catch (Exception ex)
+{
+    app.Logger.LogError(ex, "No se pudieron preparar los indices de la bitacora. " +
+        "La aplicacion arranca igual, pero revisar la conexion a MongoDB.");
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 

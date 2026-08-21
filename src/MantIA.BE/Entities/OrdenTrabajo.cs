@@ -33,4 +33,14 @@ public class OrdenTrabajo : TenantEntity, IConcurrencia
     public uint Version { get; set; }
 
     public ICollection<OrdenTrabajoRepuesto> Repuestos { get; set; } = [];
+
+    /// <summary>
+    /// Linea de tiempo de la orden. Cada modificacion agrega una fila: el update esta permitido,
+    /// pero queda registrado que cambio, de que a que y quien lo hizo.
+    /// <para>
+    /// La fecha de creacion y la de ultima modificacion vienen de <c>BaseEntity</c> y las sella el
+    /// contexto en cada guardado; el historial cuenta lo que paso en el medio.
+    /// </para>
+    /// </summary>
+    public ICollection<HistorialOrdenTrabajo> Historial { get; set; } = [];
 }
