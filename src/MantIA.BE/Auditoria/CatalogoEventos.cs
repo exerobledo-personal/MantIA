@@ -56,6 +56,12 @@ public static class CatalogoEventos
         ["Sesion.Salida"]           = Severidad.Rutina,
         ["Sesion.Rechazo"]          = Severidad.Sensible,   // un rechazo dice mucho mas que un ingreso
 
+        // --- Integridad de los datos ---
+        // El barrido exitoso es rutina y se anota igual: la serie de verificaciones sin hallazgos es
+        // parte de la evidencia. Cuando encuentra algo, el evento va como fallido y la agravante lo
+        // sube a critico, que es donde tiene que estar.
+        ["Integridad.Verificar"]    = Severidad.Sensible,
+
         // --- Reversion ---
         ["Rollback.Alta"]           = Severidad.Critica,
         ["Rollback.Decidir"]        = Severidad.Critica,

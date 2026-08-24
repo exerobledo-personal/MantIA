@@ -32,6 +32,21 @@ builder.Services.AddScoped<MantIA.DAL.Numeracion.INumeradorDocumentos, MantIA.DA
 // que quedaron sin sellar. Corre cada 30 segundos y no hace nada si no hay nada pendiente.
 builder.Services.AddHostedService<MantIA.BLL.Auditoria.MantenimientoBitacora>();
 
+// Digitos verificadores de fila y de tabla. Usan un TERCER juego de llaves, distinto del de sellado
+// y del de cifrado: "Auditoria:Verificacion:Llaves:v1". La aplicacion no arranca si dos juegos
+// comparten una llave. Generar con: openssl rand -base64 32
+builder.Services.AddScoped<MantIA.BLL.Auditoria.IVerificadorDigitos, MantIA.BLL.Auditoria.VerificadorDigitos>();
+builder.Services.Configure<MantIA.DAL.Seguridad.OpcionesVerificacion>(
+    builder.Configuration.GetSection(MantIA.DAL.Seguridad.OpcionesVerificacion.Seccion));
+builder.Services.AddHostedService<MantIA.BLL.Auditoria.VerificacionIntegridad>();
+
+// Documentos adjuntos a las maquinas. El almacen local guarda por hash de contenido; la raiz tiene
+// que quedar FUERA de wwwroot, o los archivos serian descargables sin pasar por permisos.
+builder.Services.Configure<MantIA.DAL.Documentos.OpcionesDocumentos>(
+    builder.Configuration.GetSection(MantIA.DAL.Documentos.OpcionesDocumentos.Seccion));
+builder.Services.AddSingleton<MantIA.DAL.Documentos.IAlmacenDocumentos, MantIA.DAL.Documentos.AlmacenDocumentosLocal>();
+builder.Services.AddScoped<MantIA.BLL.Documentos.IServicioDocumentos, MantIA.BLL.Documentos.ServicioDocumentos>();
+
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();

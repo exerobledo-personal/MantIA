@@ -53,6 +53,18 @@ public class OpcionesAuditoria
     public JuegoLlaves Cifrado { get; set; } = new();
 
     /// <summary>
+    /// Llaves de los digitos verificadores de fila y de tabla. Protegen la <b>integridad de los
+    /// datos operativos</b> — que nadie cambie una cantidad o un costo por fuera de la aplicacion.
+    ///
+    /// <para><b>Por que un tercer juego y no el de sellado.</b> La bitacora y los datos son dos
+    /// superficies distintas: la bitacora vive en Mongo y los digitos en PostgreSQL, y no siempre
+    /// los administra la misma persona. Con una sola llave para las dos cosas, quien pueda tocar el
+    /// motor operativo puede ademas rehacer los sellos de la bitacora que deberian delatarlo, que es
+    /// justo lo que este mecanismo intenta impedir.</para>
+    /// </summary>
+    public JuegoLlaves Verificacion { get; set; } = new();
+
+    /// <summary>
     /// Cifra el estado anterior y posterior de los eventos antes de guardarlos.
     /// <para>
     /// El enmascarado y el cifrado resuelven cosas distintas y por eso conviven: el enmascarado

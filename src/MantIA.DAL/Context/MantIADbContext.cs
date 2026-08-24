@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using MantIA.BE.Auditoria;
@@ -36,6 +37,14 @@ public class MantIADbContext : DbContext
     private readonly ICurrentTenant _tenant;
     private readonly IProtectorDatos? _protector;
 
+    /// <summary>
+    /// Calculador de digitos verificadores. Se arma acá y no se inyecta por una razon concreta: vive
+    /// y muere con el protector, y pedirlo por constructor obligaria a registrarlo tambien en tiempo
+    /// de diseno, donde no hay llaves. Es una clase sin estado, asi que tener una por contexto no
+    /// cuesta nada.
+    /// </summary>
+    private readonly ISelladorFilas? _sellador;
+
     /// <param name="protector">
     /// Cifra los campos marcados en <see cref="CamposCifrados"/>. Es opcional a proposito: en tiempo
     /// de diseno —generar migraciones— no hay llaves configuradas y tampoco hacen falta, porque el
@@ -49,6 +58,7 @@ public class MantIADbContext : DbContext
     {
         _tenant = tenant;
         _protector = protector;
+        _sellador = protector is null ? null : new SelladorFilas(protector);
     }
 
     /// <summary>
@@ -84,6 +94,16 @@ public class MantIADbContext : DbContext
     /// </summary>
     public DbSet<EventoPendiente> EventosPendientes => Set<EventoPendiente>();
 
+    /// <summary>
+    /// Digitos verificadores de fila. No se escriben desde la capa de negocio: los mantiene este
+    /// mismo contexto al guardar. Un alta o una edicion manual sobre esta tabla es, por definicion,
+    /// un intento de tapar algo.
+    /// </summary>
+    public DbSet<SelloFila> SellosFila => Set<SelloFila>();
+
+    /// <summary>Fotos verticales encadenadas. Las escribe el trabajo de fondo de verificacion.</summary>
+    public DbSet<SelloTabla> SellosTabla => Set<SelloTabla>();
+
     // --- Operacion ---
     public DbSet<Maquina> Maquinas => Set<Maquina>();
     public DbSet<Repuesto> Repuestos => Set<Repuesto>();
@@ -92,6 +112,7 @@ public class MantIADbContext : DbContext
     public DbSet<OrdenTrabajo> OrdenesTrabajo => Set<OrdenTrabajo>();
     public DbSet<OrdenTrabajoRepuesto> OrdenesTrabajoRepuesto => Set<OrdenTrabajoRepuesto>();
     public DbSet<HistorialOrdenTrabajo> HistorialOrdenesTrabajo => Set<HistorialOrdenTrabajo>();
+    public DbSet<DocumentoMaquina> DocumentosMaquina => Set<DocumentoMaquina>();
     public DbSet<AlertaStock> AlertasStock => Set<AlertaStock>();
     public DbSet<Recomendacion> Recomendaciones => Set<Recomendacion>();
     public DbSet<Reporte> Reportes => Set<Reporte>();
@@ -274,14 +295,139 @@ public class MantIADbContext : DbContext
     public override int SaveChanges()
     {
         Sellar();
+
+        var pendientes = FilasASellar();
+        AplicarDigitos(pendientes, DigitosGuardados(pendientes));
+
         return base.SaveChanges();
     }
 
-    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         Sellar();
-        return base.SaveChangesAsync(cancellationToken);
+
+        var pendientes = FilasASellar();
+        AplicarDigitos(pendientes, await DigitosGuardadosAsync(pendientes, cancellationToken));
+
+        return await base.SaveChangesAsync(cancellationToken);
     }
+
+    #region Digitos verificadores
+
+    /// <summary>
+    /// Filas de esta tanda que estan bajo el regimen de digito verificador.
+    /// <para>
+    /// Corre <b>despues</b> de <see cref="Sellar"/> y no antes: ahi es donde se completa
+    /// <c>EmpresaId</c> de las altas, y la empresa entra en el calculo del digito. Invertir el orden
+    /// produciria digitos calculados sobre un uuid vacio que nunca volverian a verificar.
+    /// </para>
+    /// </summary>
+    private List<EntityEntry> FilasASellar()
+    {
+        if (_sellador is null) return [];
+
+        return ChangeTracker.Entries()
+            .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+            .Where(e => _sellador.Protege(e.Metadata.ClrType.Name))
+            .ToList();
+    }
+
+    private List<SelloFila> DigitosGuardados(List<EntityEntry> pendientes) =>
+        pendientes.Count == 0 ? [] : ConsultaDigitos(pendientes).ToList();
+
+    private async Task<List<SelloFila>> DigitosGuardadosAsync(
+        List<EntityEntry> pendientes, CancellationToken ct) =>
+        pendientes.Count == 0 ? [] : await ConsultaDigitos(pendientes).ToListAsync(ct);
+
+    /// <summary>
+    /// Trae de una sola vez los digitos ya existentes de las filas de la tanda. Una consulta por
+    /// fila convertiria un alta de veinte movimientos en veintiun viajes a la base.
+    /// </summary>
+    private IQueryable<SelloFila> ConsultaDigitos(List<EntityEntry> pendientes)
+    {
+        var ids = pendientes.Select(SelladorFilas.IdDe).Distinct().ToList();
+
+        // Sin IgnoreQueryFilters: el filtro de empresa tiene que seguir valiendo tambien aca. Un
+        // digito de otro tenant no deberia poder ni leerse desde este contexto.
+        return SellosFila.Where(s => ids.Contains(s.FilaId));
+    }
+
+    /// <summary>
+    /// Crea, actualiza o elimina el digito de cada fila de la tanda, dentro de la misma
+    /// transaccion que la escritura que lo origina.
+    ///
+    /// <para><b>Por que en la misma transaccion y no despues.</b> Si el digito se escribiera aparte,
+    /// existiria una ventana en la que la fila esta guardada y su digito no, y toda verificacion que
+    /// cayera en esa ventana reportaria una manipulacion inexistente. Peor: un corte en el momento
+    /// justo dejaria esa inconsistencia para siempre. Aca, o entran las dos cosas o no entra
+    /// ninguna.</para>
+    /// </summary>
+    private void AplicarDigitos(List<EntityEntry> pendientes, List<SelloFila> guardados)
+    {
+        if (_sellador is null || pendientes.Count == 0) return;
+
+        var version = _sellador.VersionActual;
+        var ahora = DateTimeOffset.UtcNow;
+
+        // Se indexa tambien lo que ya esta en memoria: dos escrituras sobre la misma fila dentro de
+        // la misma unidad de trabajo tienen que actualizar el mismo digito, no crear dos.
+        var indice = guardados
+            .Concat(SellosFila.Local)
+            .GroupBy(s => (s.Tabla, s.FilaId))
+            .ToDictionary(g => g.Key, g => g.First());
+
+        foreach (var entrada in pendientes)
+        {
+            var tabla = entrada.Metadata.ClrType.Name;
+            var filaId = SelladorFilas.IdDe(entrada);
+            indice.TryGetValue((tabla, filaId), out var sello);
+
+            if (entrada.State == EntityState.Deleted)
+            {
+                // Estas tres tablas no se borran fisicamente en ningun flujo del sistema. Si alguna
+                // vez pasa, el digito se va con la fila: dejarlo huerfano solo produciria ruido en
+                // cada verificacion. La desaparicion la detecta la foto vertical, que para eso esta.
+                if (sello is not null) SellosFila.Remove(sello);
+                continue;
+            }
+
+            var digito = _sellador.Calcular(entrada, version);
+
+            if (sello is null)
+            {
+                SellosFila.Add(new SelloFila
+                {
+                    // La empresa se toma de la propia fila y no del contexto: hay trabajos de fondo
+                    // que escriben sin un tenant activo, y el digito tiene que quedar del lado de
+                    // los datos que protege.
+                    EmpresaId = EmpresaDe(entrada),
+                    Tabla = tabla,
+                    FilaId = filaId,
+                    Digito = digito,
+                    VersionLlave = version,
+                    VersionFormato = CanonicalizacionFila.Version,
+                    CalculadoEn = ahora,
+                    FechaCreacion = ahora,
+                    CreadoPorUsuarioId = _tenant.UsuarioId,
+                });
+                continue;
+            }
+
+            sello.Digito = digito;
+            sello.VersionLlave = version;
+            sello.VersionFormato = CanonicalizacionFila.Version;
+            sello.CalculadoEn = ahora;
+        }
+    }
+
+    private static Guid EmpresaDe(EntityEntry entrada) =>
+        entrada.Entity is TenantEntity tenant
+            ? tenant.EmpresaId
+            : throw new InvalidOperationException(
+                $"{entrada.Metadata.ClrType.Name} figura en el catalogo de filas selladas pero no " +
+                "pertenece a ninguna empresa. El digito verificador no tiene donde vivir.");
+
+    #endregion
 
     /// <summary>
     /// Completa empresa y campos de auditoria antes de escribir.

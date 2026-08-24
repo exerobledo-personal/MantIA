@@ -83,6 +83,15 @@ public static class CamposCifrados
             // El proveedor y su precio son la relacion comercial del cliente. No se filtra ni se
             // agrupa por proveedor en ninguna pantalla, asi que puede ir aleatorio.
             ["Repuesto.Proveedor"] = NivelCifrado.Aleatorio,
+
+            // --- Documentos adjuntos ---
+            // Mismo criterio que arriba, aplicado al papel: el emisor de un certificado ES el
+            // proveedor de mantenimiento del cliente, y su numero identifica una relacion comercial
+            // concreta. La descripcion es texto libre y por lo tanto termina teniendo de todo.
+            // El titulo queda en claro porque es por lo que se busca en la lista de la maquina.
+            ["DocumentoMaquina.Emisor"]          = NivelCifrado.Aleatorio,
+            ["DocumentoMaquina.NumeroDocumento"] = NivelCifrado.Aleatorio,
+            ["DocumentoMaquina.Descripcion"]     = NivelCifrado.Aleatorio,
         };
 
     public static NivelCifrado De(string entidad, string campo) =>

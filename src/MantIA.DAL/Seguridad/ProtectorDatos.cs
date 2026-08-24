@@ -12,6 +12,17 @@ public interface IProtectorDatos
     /// <summary>Sella un texto con HMAC-SHA256. Devuelve el sello en base64.</summary>
     string Sellar(string contenido, string version);
 
+    /// <summary>Version de llave de verificacion vigente, para los digitos de fila y de tabla.</summary>
+    string VersionDigito { get; }
+
+    /// <summary>
+    /// Calcula el digito verificador de un contenido. Es el mismo HMAC-SHA256 que
+    /// <see cref="Sellar"/> pero con el juego de llaves de <b>verificacion</b>, que es otro a
+    /// proposito: comprometer la llave de la bitacora no debe alcanzar para falsificar los digitos
+    /// de los datos, ni al reves.
+    /// </summary>
+    string Digito(string contenido, string version);
+
     /// <summary>
     /// Cifra un texto, atandolo a su contexto.
     /// <para>
@@ -76,26 +87,46 @@ public class ProtectorDatos : IProtectorDatos
 
     private readonly Juego _sello;
     private readonly Juego _cifrado;
+    private readonly Juego _verificacion;
 
     public ProtectorDatos(IOptions<OpcionesAuditoria> opciones)
     {
         _sello = new Juego("Auditoria:Sello", opciones.Value.Sello);
         _cifrado = new Juego("Auditoria:Cifrado", opciones.Value.Cifrado);
+        _verificacion = new Juego("Auditoria:Verificacion", opciones.Value.Verificacion);
 
-        if (_sello.MismaLlaveQue(_cifrado))
-            throw new InvalidOperationException(
-                "Las llaves de sellado y de cifrado son iguales. Tienen que ser distintas: con una " +
-                "sola, quien la obtenga puede leer los datos y ademas falsificar la bitacora que " +
-                "deberia delatarlo. Generar dos con: openssl rand -base64 32");
+        // Se comparan los tres juegos entre si, y no solo el par original. Repetir una llave anula
+        // exactamente la separacion que justifica tenerlos separados, y es un error de configuracion
+        // silencioso: todo funciona igual de bien el dia que se comete.
+        Distintos(_sello, _cifrado);
+        Distintos(_sello, _verificacion);
+        Distintos(_cifrado, _verificacion);
+    }
+
+    private static void Distintos(Juego uno, Juego otro)
+    {
+        if (!uno.MismaLlaveQue(otro)) return;
+
+        throw new InvalidOperationException(
+            $"Los juegos de llaves {uno.Nombre} y {otro.Nombre} comparten al menos una llave. " +
+            "Tienen que ser distintas: con una sola, quien la obtenga puede a la vez leer o alterar " +
+            "los datos y falsificar el mecanismo que deberia delatarlo. " +
+            "Generar una por juego con: openssl rand -base64 32");
     }
 
     public string VersionSello => _sello.VersionActual;
 
+    public string VersionDigito => _verificacion.VersionActual;
+
     // ------------------------------------------------------------------ integridad
 
-    public string Sellar(string contenido, string version)
+    public string Sellar(string contenido, string version) => Hmac(_sello, contenido, version);
+
+    public string Digito(string contenido, string version) => Hmac(_verificacion, contenido, version);
+
+    private static string Hmac(Juego juego, string contenido, string version)
     {
-        using var hmac = new HMACSHA256(_sello.Llave(version));
+        using var hmac = new HMACSHA256(juego.Llave(version));
         return Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(contenido)));
     }
 
@@ -190,6 +221,8 @@ public class ProtectorDatos : IProtectorDatos
     {
         private readonly Dictionary<string, byte[]> _llaves;
         private readonly string _nombre;
+
+        public string Nombre => _nombre;
 
         public Juego(string nombre, JuegoLlaves configuracion)
         {

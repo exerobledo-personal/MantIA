@@ -344,6 +344,109 @@ else
                 </SectionCard>
             }
         </MudTabPanel>
+
+        <MudTabPanel Text="Documentos" Icon="@Icons.Material.Filled.Description"
+                     BadgeData="@(PorVencer.Count == 0 ? null : PorVencer.Count)"
+                     BadgeColor="Color.Warning">
+            @* El certificado del proveedor es el caso que motiva esta pestaña: hoy vive en el correo
+               de quien lo recibió y se pierde con la persona. Colgado del activo, queda. *@
+
+            @if (PorVencer.Count > 0)
+            {
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4"
+                          Icon="@Icons.Material.Filled.EventBusy">
+                    <MudText Typo="Typo.body2">
+                        @PorVencer.Count @(PorVencer.Count == 1 ? "documento vencido o por vencer" : "documentos vencidos o por vencer")
+                        en los próximos 30 días. Una habilitación caída se descubre en una inspección
+                        si nadie avisa antes.
+                    </MudText>
+                </MudAlert>
+            }
+
+            @if (Documentos.Count == 0)
+            {
+                <EmptyState Titulo="Sin documentos adjuntos"
+                            Descripcion="Certificados de mantenimiento, habilitaciones, manuales y fotos del equipo se cargan acá y quedan asociados al activo."
+                            Icono="@Icons.Material.Filled.Description">
+                    <Accion>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.UploadFile" OnClick="Adjuntar">
+                            Adjuntar el primer documento
+                        </MudButton>
+                    </Accion>
+                </EmptyState>
+            }
+            else
+            {
+                <SectionCard Titulo="Documentación del activo"
+                             Bajada="Certificados, habilitaciones y manuales asociados a este equipo"
+                             SinPadding="true">
+                    <Acciones>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.UploadFile" OnClick="Adjuntar">
+                            Adjuntar documento
+                        </MudButton>
+                    </Acciones>
+                    <ChildContent>
+                    <MudTable Items="@Documentos" Dense="true" Hover="true" Elevation="0" Class="mantia-tabla"
+                              Breakpoint="Breakpoint.Sm" Striped="false">
+                        <HeaderContent>
+                            <MudTh>Documento</MudTh>
+                            <MudTh>Tipo</MudTh>
+                            <MudTh>Emisor</MudTh>
+                            <MudTh>Emitido</MudTh>
+                            <MudTh>Vencimiento</MudTh>
+                            <MudTh Style="text-align:right">Archivo</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Documento">
+                                <div class="d-flex flex-column">
+                                    <strong>@context.Titulo</strong>
+                                    <span class="mud-text-secondary">
+                                        @(string.IsNullOrWhiteSpace(context.NumeroDocumento) ? "Sin número" : context.NumeroDocumento)
+                                    </span>
+                                </div>
+                            </MudTd>
+                            <MudTd DataLabel="Tipo">
+                                <StatusChip Texto="@SubirDocumentoDialog.Texto(context.Tipo)"
+                                            ChipColor="Color.Default" Variante="Variant.Outlined" />
+                            </MudTd>
+                            <MudTd DataLabel="Emisor">@(context.Emisor ?? "—")</MudTd>
+                            <MudTd DataLabel="Emitido">
+                                @(context.FechaDocumento?.ToString("dd/MM/yyyy") ?? "—")
+                            </MudTd>
+                            <MudTd DataLabel="Vencimiento">
+                                @if (!context.Vence)
+                                {
+                                    <span class="mud-text-secondary">No vence</span>
+                                }
+                                else if (context.Vencido)
+                                {
+                                    <StatusChip Texto="@($"Vencido el {context.FechaVencimiento:dd/MM/yyyy}")"
+                                                ChipColor="Color.Error" Icono="@Icons.Material.Filled.EventBusy" />
+                                }
+                                else if (context.DiasParaVencer <= 30)
+                                {
+                                    <StatusChip Texto="@($"Vence en {context.DiasParaVencer} días")"
+                                                ChipColor="Color.Warning" Icono="@Icons.Material.Filled.Schedule" />
+                                }
+                                else
+                                {
+                                    <span>@context.FechaVencimiento?.ToString("dd/MM/yyyy")</span>
+                                }
+                            </MudTd>
+                            <MudTd DataLabel="Archivo" Style="text-align:right">
+                                <div class="d-flex flex-column align-end">
+                                    <span>@context.NombreArchivo</span>
+                                    <span class="mud-text-secondary">@context.TamanioLegible</span>
+                                </div>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                    </ChildContent>
+                </SectionCard>
+            }
+        </MudTabPanel>
     </MudTabs>
 }
 
@@ -418,4 +521,29 @@ else
         _maquina.Estado = EstadoMaquina.Inactiva;
         Snackbar.Add($"{_maquina.Codigo} quedó inactiva en el parque de equipos", Severity.Success);
     }
+
+    private List<DocumentoVm> Documentos => DatosDemo.DocumentosDe(Id);
+
+    /// <summary>Los que ya vencieron y los que vencen dentro de 30 dias. Es lo que se destaca.</summary>
+    private List<DocumentoVm> PorVencer => Documentos
+        .Where(d => d.DiasParaVencer is { } q && q <= 30)
+        .ToList();
+
+    private async Task Adjuntar()
+    {
+        if (_maquina is null) return;
+
+        var parametros = new DialogParameters { { "Maquina", _maquina } };
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+
+        var dialogo = await DialogService.ShowAsync<SubirDocumentoDialog>(
+            "Adjuntar documento", parametros, opciones);
+        var resultado = await dialogo.Result;
+
+        if (resultado is null || resultado.Canceled || resultado.Data is not DocumentoVm documento) return;
+
+        DatosDemo.Documentos.Add(documento);
+        Snackbar.Add($"Se adjuntó \"{documento.Titulo}\" a {_maquina.Codigo}", Severity.Success);
+    }
+
 }

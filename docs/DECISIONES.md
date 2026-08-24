@@ -1015,3 +1015,102 @@ información entre tablas.
 qué fila pertenece. Atarlo a la fila obliga a mover el cifrado a interceptores, y para los campos
 deterministas es directamente imposible, porque la consulta que busca por igualdad todavía no conoce
 la fila.
+
+### D-61 · Dígito verificador de fila en tabla aparte (DV horizontal) · **Aprobado — implementado**
+
+Lo que pediste en P-11, construido. Tres tablas bajo el régimen: `movimientos_stock`,
+`ordenes_trabajo_repuesto` y `repuestos`. El catálogo de qué campos entran está en
+`CamposSellados.cs`, una línea por tabla.
+
+**Cómo funciona.** Al guardar, el contexto calcula un HMAC-SHA256 sobre la forma canónica de la fila
+y lo escribe en `sellos_fila`, **dentro de la misma transacción**. Si se escribiera después, existiría
+una ventana donde la fila está y su dígito no, y toda verificación que cayera ahí reportaría una
+manipulación inexistente.
+
+**Por qué en tabla aparte y no en una columna.** Tres razones: editar una fila a mano obliga a tocar
+dos tablas en vez de una; la tabla de dígitos puede tener permisos propios —hasta otro esquema con
+otro rol de base— mientras las operativas siguen abiertas; y sumar o sacar una tabla del régimen es
+una línea en el catálogo, no una migración.
+
+**Se sella el valor del dominio, no el de la columna.** Un campo cifrado se sella por su contenido en
+claro. Lo que hay que proteger es el significado —que la cantidad diga 4 y no 40—, no la
+representación; y además un campo con cifrado aleatorio produce texto distinto en cada escritura, así
+que sellar lo almacenado daría un dígito nuevo cada vez aunque nada haya cambiado.
+
+**Esto cubre lo que quedó abierto en D-60:** el identificador de la fila entra en el cálculo, así que
+copiar un valor de la OT #5 a la OT #9 rompe el dígito. Cubre además los campos **no cifrados**
+—cantidad, costo, saldo—, que son justamente los que alguien tocaría para inflar un presupuesto y que
+el AAD no alcanzaba.
+
+### D-62 · Foto vertical encadenada por tabla (DV vertical) · **Aprobado — implementado**
+
+El dígito de fila detecta que una fila cambió; no detecta que **desapareció**. Quien borre el
+movimiento y su dígito juntos deja las dos tablas perfectamente consistentes. Por eso `sellos_tabla`:
+cada pasada resume todas las filas de una tabla de una empresa —cuántas son y cuáles son— y encadena
+esa foto con la anterior, igual que la bitácora.
+
+**Es una foto periódica y no un valor que se mantiene al día.** Recalcular el resumen de una tabla
+entera en cada escritura es carísimo y serializa todas las escrituras contra una misma fila. Corre en
+un trabajo de fondo cada 6 horas (configurable en `Verificacion:Intervalo`).
+
+**Lo que el intervalo significa.** Entre dos fotos, un cambio legítimo y uno ilegítimo se ven igual.
+Lo que los separa es la bitácora de ese rato. El vertical prueba que *algo* pasó y acota *cuándo*; la
+bitácora dice si eso fue una operación real. Achicar el intervalo mejora la precisión del "cuándo" y
+cuesta un recorrido completo por empresa.
+
+**Los hallazgos van a la bitácora**, no solo al log del servidor: el log rota, no está encadenado y
+no lo lee el cliente. Se registran como acción fallida de `Integridad.Verificar`, que la escala de
+severidad sube a **crítica**.
+
+### D-63 · Tercer juego de llaves: `Auditoria:Verificacion` · **Aprobado — implementado**
+
+Los dígitos verificadores usan una llave propia, distinta de la de sellado de bitácora y de la de
+cifrado. La bitácora vive en Mongo y los dígitos en PostgreSQL, y no siempre los administra la misma
+persona: con una sola llave, quien pueda tocar el motor operativo puede además rehacer los sellos de
+la bitácora que deberían delatarlo.
+
+El arranque **falla** si dos de los tres juegos comparten una llave. Repetirla anula exactamente la
+separación que justifica tenerlos separados, y es un error de configuración silencioso: el día que se
+comete, todo funciona igual de bien.
+
+### D-64 · Documentos adjuntos a las máquinas · **Aprobado — implementado**
+
+Entidad `DocumentoMaquina`, colgada de la máquina y no de la orden. Muchos de estos documentos no
+tienen orden que los origine —una habilitación, un manual, la foto de la placa— y los que sí la tienen
+igual se buscan por equipo. La orden queda como referencia opcional.
+
+**El archivo no va en la base.** Va a `IAlmacenDocumentos`, direccionado por el SHA-256 de su
+contenido. Guardar binarios en PostgreSQL infla las copias de respaldo, castiga cada consulta que
+traiga la fila entera y complica cualquier mudanza posterior. Como la ruta sale del hash y no del
+nombre, dos personas que suben el mismo certificado escriben un solo archivo, y el nombre original
+—que puede traer acentos o barras— nunca toca el disco.
+
+**El hash es su dígito verificador.** Un archivo no se edita, se reemplaza. Antes de entregar una
+descarga se recalcula el SHA-256 y se compara: si no coincide, no se entrega y queda registrado. El
+sistema no puede ser el que distribuye el certificado falso.
+
+**Vencimientos.** Certificados, habilitaciones y garantías vencen. `FechaVencimiento` con índice, y
+la pestaña destaca lo vencido y lo que vence dentro de 30 días. Una habilitación caída se descubre en
+una inspección si nadie avisa antes.
+
+**Cifrado:** `Emisor`, `NumeroDocumento` y `Descripcion` entran en `CamposCifrados` como aleatorios
+—el emisor de un certificado ES el proveedor del cliente—. El `Titulo` queda en claro porque es por
+lo que se busca en la lista.
+
+### D-65 · Control de tipo de archivo por firma, no por extensión · **Aprobado — implementado**
+
+Lista **blanca**: pdf, jpg, png, webp, docx, xlsx. Enumerar lo prohibido es una carrera que se pierde
+siempre; enumerar lo permitido falla del lado correcto.
+
+**Ni la extensión ni el tipo declarado se creen**: los dos los elige quien sube. Se comprueban los
+primeros bytes del contenido. Un archivo cuya firma no coincide con su extensión se rechaza aunque
+las dos cosas por separado estén permitidas —eso no es un error de tipeo— y el rechazo **queda
+anotado en la bitácora**, porque el que lo intenta no lo va a mencionar.
+
+Nada comprimido, nada con macros (`.docm`, `.xlsm`), nada ejecutable. Un ZIP hace que el control de
+tipos deje de significar algo: lo que importa es lo que hay adentro y eso no se ve desde afuera.
+Tope de 20 MB por archivo.
+
+**Límite conocido:** docx y xlsx son ZIP por dentro, así que su firma es la de ZIP. Distingue un
+documento real de un ejecutable renombrado, no de otro ZIP. Por eso las variantes con macros están
+fuera de la lista y no adentro con una excepción.

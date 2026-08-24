@@ -351,3 +351,56 @@ public class HistorialFallaVm
     public double HorasResolucion { get; set; }
     public string Tecnico { get; set; } = "";
 }
+
+/// <summary>
+/// Un archivo adjunto a una máquina, en la maqueta.
+///
+/// El caso que le da sentido es el certificado del proveedor: cuando un tercero interviene un
+/// equipo deja un papel, y ese papel hoy termina en el correo de alguien. Colgado de la máquina
+/// pasa a ser parte de su historia y sobrevive a la persona que lo recibió.
+///
+/// El tipo es el enum real de <c>MantIA.BE.Entities</c> y no una copia: es el mismo conjunto de
+/// valores que va a la base, así la pantalla no queda desfasada de la entidad.
+/// </summary>
+public class DocumentoVm
+{
+    public Guid Id { get; set; } = IdDemo.Nuevo();
+    public Guid MaquinaId { get; set; }
+
+    public MantIA.BE.Entities.TipoDocumentoMaquina Tipo { get; set; }
+        = MantIA.BE.Entities.TipoDocumentoMaquina.CertificadoMantenimiento;
+
+    public string Titulo { get; set; } = "";
+    public string? Descripcion { get; set; }
+    public string? Emisor { get; set; }
+    public string? NumeroDocumento { get; set; }
+
+    public DateTime? FechaDocumento { get; set; }
+    public DateTime? FechaVencimiento { get; set; }
+
+    public string NombreArchivo { get; set; } = "";
+    public string TipoContenido { get; set; } = "";
+    public long TamanioBytes { get; set; }
+
+    /// <summary>SHA-256 del contenido. En la maqueta se calcula igual: es lo que verifica al bajar.</summary>
+    public string Hash { get; set; } = "";
+
+    public DateTime FechaCarga { get; set; } = DateTime.Now;
+    public string CargadoPor { get; set; } = "";
+
+    public bool Vence => FechaVencimiento.HasValue;
+
+    public bool Vencido => FechaVencimiento is { } v && v <= DateTime.Now;
+
+    public int? DiasParaVencer => FechaVencimiento is { } v
+        ? (int)Math.Ceiling((v - DateTime.Now).TotalDays)
+        : null;
+
+    /// <summary>Tamaño legible. Los bytes crudos no le dicen nada a nadie en una tabla.</summary>
+    public string TamanioLegible => TamanioBytes switch
+    {
+        < 1024 => $"{TamanioBytes} B",
+        < 1024 * 1024 => $"{TamanioBytes / 1024.0:0.#} KB",
+        _ => $"{TamanioBytes / 1024.0 / 1024.0:0.#} MB"
+    };
+}

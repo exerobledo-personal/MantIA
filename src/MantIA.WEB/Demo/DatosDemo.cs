@@ -29,6 +29,7 @@ public class DatosDemo
         Acciones = ConstruirAcciones();
         Permisos = ConstruirPermisos();
         UsuarioActual = ConstruirUsuarioActual();
+        Documentos = ConstruirDocumentos();
 
         SincronizarPlantas();
     }
@@ -770,6 +771,83 @@ public class DatosDemo
                                                         && o.Estado is EstadoOrden.Abierta or EstadoOrden.EnCurso);
         }
     }
+
+    // ------------------------------------------------------------------ documentos adjuntos
+
+    /// <summary>
+    /// Archivos colgados de una maquina. El caso que motiva todo esto es el certificado del
+    /// proveedor: hoy vive en el correo de quien lo recibio y se pierde con la persona.
+    /// </summary>
+    public List<DocumentoVm> Documentos { get; }
+
+    private List<DocumentoVm> ConstruirDocumentos()
+    {
+        var tipos = MantIA.BE.Entities.TipoDocumentoMaquina.CertificadoMantenimiento;
+
+        DocumentoVm Nuevo(MaquinaVm maquina, MantIA.BE.Entities.TipoDocumentoMaquina tipo,
+            string titulo, string emisor, string numero, string archivo, long bytes,
+            int diasDesdeEmision, int? diasParaVencer) => new()
+        {
+            MaquinaId = maquina.Id,
+            Tipo = tipo,
+            Titulo = titulo,
+            Emisor = emisor,
+            NumeroDocumento = numero,
+            NombreArchivo = archivo,
+            TipoContenido = archivo.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)
+                ? "application/pdf"
+                : "image/jpeg",
+            TamanioBytes = bytes,
+            FechaDocumento = Hoy.AddDays(-diasDesdeEmision),
+            FechaVencimiento = diasParaVencer is { } d ? Hoy.AddDays(d) : null,
+            FechaCarga = DateTime.Now.AddDays(-diasDesdeEmision + 1),
+            CargadoPor = "Exequiel Robledo",
+            // En la maqueta no hay archivo real: el hash es de relleno y se ve igual que uno de
+            // verdad para que la pantalla no mienta sobre su formato.
+            Hash = Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(archivo + maquina.Codigo))).ToLowerInvariant()
+        };
+
+        if (Maquinas.Count == 0) return [];
+
+        var primera = Maquinas[0];
+        var segunda = Maquinas.Count > 1 ? Maquinas[1] : Maquinas[0];
+
+        return
+        [
+            // Vigente, con vencimiento lejos: el caso normal.
+            Nuevo(primera, tipos, "Mantenimiento preventivo semestral",
+                  "Servicios Industriales del Sur S.R.L.", "CERT-2026-0418",
+                  "certificado-preventivo-semestral.pdf", 1_284_310, 40, 140),
+
+            // Por vencer: es el que justifica la columna de vencimiento y el aviso.
+            Nuevo(primera, MantIA.BE.Entities.TipoDocumentoMaquina.Habilitacion,
+                  "Habilitacion de equipo a presion", "Ente regulador provincial", "HAB-88712",
+                  "habilitacion-equipo-presion.pdf", 642_180, 320, 18),
+
+            // Ya vencido: tiene que verse distinto de un dia para el otro.
+            Nuevo(segunda, tipos, "Mantenimiento correctivo compresor",
+                  "TecnoAire Mantenimiento", "CERT-2025-1190",
+                  "certificado-correctivo-compresor.pdf", 903_442, 400, -35),
+
+            // Sin vencimiento, para que la columna admita el vacio sin romperse.
+            Nuevo(segunda, MantIA.BE.Entities.TipoDocumentoMaquina.Manual,
+                  "Manual del fabricante", "Atlas Copco", "MAN-GA37",
+                  "manual-fabricante.pdf", 8_412_006, 700, null)
+        ];
+    }
+
+    public List<DocumentoVm> DocumentosDe(Guid maquinaId) => Documentos
+        .Where(d => d.MaquinaId == maquinaId)
+        .OrderByDescending(d => d.FechaDocumento ?? d.FechaCarga)
+        .ToList();
+
+    /// <summary>Documentos que ya vencieron o vencen dentro de los proximos dias indicados.</summary>
+    public List<DocumentoVm> DocumentosPorVencer(int dias = 30) => Documentos
+        .Where(d => d.DiasParaVencer is { } q && q <= dias)
+        .OrderBy(d => d.FechaVencimiento)
+        .ToList();
 
     public string SiguienteNumeroOrden() => $"OT-2026-{Ordenes.Count + 1:D4}";
 

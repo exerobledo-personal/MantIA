@@ -363,3 +363,6 @@ MigrationBackup/
 FodyWeavers.xsd
 
 src/MantIA.WEB/appsettings.json
+
+_reemplazar/
+almacen/

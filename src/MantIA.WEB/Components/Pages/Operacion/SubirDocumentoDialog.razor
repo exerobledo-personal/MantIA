@@ -1,0 +1,243 @@
+@using System.Security.Cryptography
+@using MantIA.BE.Documentos
+@using TipoDoc = MantIA.BE.Entities.TipoDocumentoMaquina
+
+@* Alta de un archivo adjunto a una maquina.
+
+   La validacion NO es de la pantalla: se llama a PoliticaArchivos, que es la misma clase que usa el
+   servicio del lado del servidor. Una validacion escrita aparte para el formulario se desincroniza
+   a la tercera vez que alguien toca la lista de formatos, y ademas la del navegador no cuenta como
+   control: lo unico que hace es evitarle a la persona subir 8 MB para que se los rechacen. *@
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center" style="gap:.5rem">
+            <MudIcon Icon="@Icons.Material.Filled.UploadFile" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Adjuntar documento</MudText>
+        </div>
+    </TitleContent>
+
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+            @Maquina.Codigo · @Maquina.Nombre. El archivo queda colgado del activo y forma parte de su
+            historia: sigue estando cuando la persona que lo recibió ya no esté.
+        </MudText>
+
+        <MudFileUpload T="IBrowserFile" FilesChanged="Seleccionar"
+                       Accept="@Aceptados" MaximumFileCount="1" Class="mb-4">
+            <ActivatorContent>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.AttachFile" FullWidth="true">
+                    @(_archivo is null ? "Elegir archivo" : _archivo.Name)
+                </MudButton>
+            </ActivatorContent>
+        </MudFileUpload>
+
+        @if (_rechazo is not null)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4"
+                      Icon="@Icons.Material.Filled.Block">
+                <MudText Typo="Typo.body2">@_rechazo</MudText>
+            </MudAlert>
+        }
+        else if (_archivo is not null)
+        {
+            <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Class="mb-4"
+                      Icon="@Icons.Material.Filled.CheckCircle">
+                <MudText Typo="Typo.body2">
+                    @_archivo.Name · @Legible(_archivo.Size) · verificado como @_tipoContenido.
+                    Huella SHA-256 @(_hash.Length >= 12 ? _hash[..12] : _hash)…
+                </MudText>
+            </MudAlert>
+        }
+
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="6">
+                <MudSelect T="TipoDoc" @bind-Value="_tipo" Label="Tipo de documento"
+                           Variant="Variant.Outlined" Dense="true">
+                    @foreach (var tipo in Enum.GetValues<TipoDoc>())
+                    {
+                        <MudSelectItem Value="@tipo">@Texto(tipo)</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_emisor" Label="Emisor" Variant="Variant.Outlined"
+                              Placeholder="Proveedor que hizo el trabajo" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_titulo" Label="Título" Variant="Variant.Outlined"
+                              Required="true" Immediate="true"
+                              Placeholder="Mantenimiento preventivo semestral" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_numero" Label="Número del documento"
+                              Variant="Variant.Outlined" Placeholder="CERT-2026-0418" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudDatePicker @bind-Date="_fechaDocumento" Label="Fecha del documento"
+                               Variant="Variant.Outlined" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudDatePicker @bind-Date="_fechaVencimiento" Label="Vence el"
+                               Variant="Variant.Outlined"
+                               HelperText="@AyudaVencimiento" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_descripcion" Label="Descripción" Lines="2"
+                              Variant="Variant.Outlined" />
+            </MudItem>
+        </MudGrid>
+
+        <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-3">
+            Formatos aceptados: @PoliticaArchivos.Aceptadas(). Máximo
+            @(PoliticaArchivos.TamanioMaximoBytes / 1024 / 1024) MB por archivo. No se aceptan
+            comprimidos ni documentos con macros: lo que hay adentro de un ZIP no se puede controlar
+            desde afuera.
+        </MudText>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="@(() => Dialogo.Cancel())" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton OnClick="Confirmar" Variant="Variant.Filled" Color="Color.Primary"
+                   Disabled="@(!PuedeGuardar)" StartIcon="@Icons.Material.Filled.Save">
+            Adjuntar
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialogo { get; set; } = null!;
+
+    [Parameter, EditorRequired] public MaquinaVm Maquina { get; set; } = null!;
+
+    private static readonly string Aceptados = string.Join(",", PoliticaArchivos.Extensiones());
+
+    private IBrowserFile? _archivo;
+    private string? _rechazo;
+    private string _tipoContenido = "";
+    private string _hash = "";
+    private long _tamanio;
+
+    private TipoDoc _tipo = TipoDoc.CertificadoMantenimiento;
+    private string _titulo = "";
+    private string? _descripcion;
+    private string? _emisor;
+    private string? _numero;
+    private DateTime? _fechaDocumento = DateTime.Today;
+    private DateTime? _fechaVencimiento;
+
+    private bool Vence => _fechaVencimiento.HasValue;
+
+    // Como texto y no inline en el atributo: las comillas dobles anidadas adentro de un atributo
+    // rompen el parseo de Razor y el error que tira no se parece en nada a la causa.
+    private string AyudaVencimiento =>
+        Vence ? "Se avisa antes de que se caiga" : "Vacío si no vence";
+
+    private bool PuedeGuardar =>
+        _archivo is not null && _rechazo is null && !string.IsNullOrWhiteSpace(_titulo);
+
+    /// <summary>
+    /// Lee el archivo una sola vez, valida la firma y calcula la huella. Se lee entero porque el
+    /// hash lo exige, y el tamaño ya está acotado por la política antes de tocar un byte.
+    /// </summary>
+    private async Task Seleccionar(IBrowserFile? archivo)
+    {
+        _archivo = archivo;
+        _rechazo = null;
+        _tipoContenido = "";
+        _hash = "";
+
+        if (archivo is null) return;
+
+        // Primero nombre y tamaño, que no requieren leer nada. Si el archivo pesa de más, se rechaza
+        // sin abrirlo: abrirlo sería exactamente el gasto que el límite existe para evitar.
+        var previa = PoliticaArchivos.Validar(archivo.Name, archivo.Size, ReadOnlySpan<byte>.Empty);
+
+        if (!previa.Valido && previa.Motivo != RechazoArchivo.ContenidoNoCoincide)
+        {
+            _rechazo = previa.Detalle;
+            _archivo = null;
+            return;
+        }
+
+        try
+        {
+            using var memoria = new MemoryStream();
+            await using (var entrada = archivo.OpenReadStream(PoliticaArchivos.TamanioMaximoBytes))
+                await entrada.CopyToAsync(memoria);
+
+            var bytes = memoria.ToArray();
+
+            var validacion = PoliticaArchivos.Validar(
+                archivo.Name, bytes.LongLength,
+                bytes.AsSpan(0, Math.Min(PoliticaArchivos.BytesDeFirma, bytes.Length)));
+
+            if (!validacion.Valido)
+            {
+                _rechazo = validacion.Detalle;
+                _archivo = null;
+                return;
+            }
+
+            _tipoContenido = validacion.TipoContenido;
+            _tamanio = bytes.LongLength;
+            _hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+
+            if (string.IsNullOrWhiteSpace(_titulo))
+                _titulo = Path.GetFileNameWithoutExtension(archivo.Name).Replace('-', ' ').Replace('_', ' ');
+        }
+        catch (IOException)
+        {
+            _rechazo = "No se pudo leer el archivo completo. Puede superar el tamaño máximo.";
+            _archivo = null;
+        }
+    }
+
+    private void Confirmar()
+    {
+        if (!PuedeGuardar) return;
+
+        Dialogo.Close(DialogResult.Ok(new DocumentoVm
+        {
+            MaquinaId = Maquina.Id,
+            Tipo = _tipo,
+            Titulo = _titulo.Trim(),
+            Descripcion = string.IsNullOrWhiteSpace(_descripcion) ? null : _descripcion!.Trim(),
+            Emisor = string.IsNullOrWhiteSpace(_emisor) ? null : _emisor!.Trim(),
+            NumeroDocumento = string.IsNullOrWhiteSpace(_numero) ? null : _numero!.Trim(),
+            FechaDocumento = _fechaDocumento,
+            FechaVencimiento = _fechaVencimiento,
+            NombreArchivo = _archivo!.Name,
+            TipoContenido = _tipoContenido,
+            TamanioBytes = _tamanio,
+            Hash = _hash,
+            CargadoPor = $"{Sesion.UsuarioVisible.Nombre} {Sesion.UsuarioVisible.Apellido}".Trim()
+        }));
+    }
+
+    // Con patrones relacionales (< 1024 => ...) no compila: dentro de un bloque @code, un "<" al
+    // principio de una linea lo lee Razor como apertura de etiqueta y el archivo entero se parte.
+    private static string Legible(long bytes) =>
+        bytes < 1024 ? $"{bytes} B"
+        : bytes < 1024 * 1024 ? $"{bytes / 1024.0:0.#} KB"
+        : $"{bytes / 1024.0 / 1024.0:0.#} MB";
+
+    public static string Texto(TipoDoc tipo) => tipo switch
+    {
+        TipoDoc.CertificadoMantenimiento => "Certificado de mantenimiento",
+        TipoDoc.Habilitacion => "Habilitación",
+        TipoDoc.Manual => "Manual o ficha técnica",
+        TipoDoc.Garantia => "Garantía",
+        TipoDoc.Comprobante => "Comprobante",
+        TipoDoc.Informe => "Informe técnico",
+        TipoDoc.Fotografia => "Fotografía",
+        _ => "Otro"
+    };
+}
