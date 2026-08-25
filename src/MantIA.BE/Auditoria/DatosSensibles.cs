@@ -45,7 +45,13 @@ public static class DatosSensibles
             ["Usuario.Auth0UserId"] = new(Sensibilidad.Omitido,     Sensibilidad.Omitido),
 
             // --- Datos de la empresa cliente ---
-            ["Empresa.Dominio"]     = new(Sensibilidad.Publico,     Sensibilidad.Publico),
+            ["DominioEmpresa.Dominio"] = new(Sensibilidad.Publico,  Sensibilidad.Publico),
+
+            // --- Invitaciones ---
+            // El correo invitado es un dato personal de alguien que todavia no es usuario del
+            // sistema, asi que se enmascara en las dos bitacoras. Saber que se invito a "j***@x.com"
+            // alcanza para auditar quien dio de alta a quien.
+            ["InvitacionUsuario.Email"] = new(Sensibilidad.Enmascarado, Sensibilidad.Enmascarado),
             ["Empresa.TenantId"]    = new(Sensibilidad.Omitido,     Sensibilidad.Omitido),
 
             // --- Informacion economica ---

@@ -79,6 +79,15 @@ public class MantIADbContext : DbContext
     public DbSet<EvidenciaModelo> EvidenciasModelo => Set<EvidenciaModelo>();
 
     // --- Empresa ---
+    /// <summary>Dominios de correo habilitados por empresa. Acotan a quien se puede invitar.</summary>
+    public DbSet<DominioEmpresa> DominiosEmpresa => Set<DominioEmpresa>();
+
+    /// <summary>
+    /// Habilitaciones nominales de acceso. Es la unica puerta de entrada al sistema: una identidad
+    /// sin invitacion vigente no entra, y el intento queda auditado.
+    /// </summary>
+    public DbSet<InvitacionUsuario> Invitaciones => Set<InvitacionUsuario>();
+
     public DbSet<Planta> Plantas => Set<Planta>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();
     public DbSet<UsuarioAlcance> UsuariosAlcance => Set<UsuarioAlcance>();

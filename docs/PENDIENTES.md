@@ -8,6 +8,8 @@ en `DECISIONES.md`.
 | P-12 | Dónde viven los archivos en producción: disco o almacenamiento de objetos | Antes del primer cliente real |
 | P-13 | ¿`Documentos` es un recurso propio de permisos o va con `Maquinas`? | Antes de la demo |
 | P-14 | Extracción OCR de los certificados (etapa 2, ya diseñada en D-64) | Después del MVP |
+| P-15 | Construir el panel de plataforma como aplicación aparte (D-70) | Antes del primer cliente real |
+| P-16 | Envío del correo de invitación | Antes de que un cliente sume gente solo |
 
 Resueltos y movidos a `DECISIONES.md`: P-01 dimensión del vector, P-02 umbral de promoción,
 P-03 escala por planta, P-05 estados de morosidad, P-06 numeración, P-07 usuario de demostración,
@@ -51,6 +53,30 @@ si decís que sí, lo hago; si no, queda como está y se documenta el criterio.
 Lo mismo aplica a `Integridad`: hoy los hallazgos se registran en la bitácora con ese recurso pero no
 existe como recurso protegible, así que **no hay pantalla para verlos**. Cuando la haya, necesita una
 celda de permiso, y el candidato natural es que solo la vea AdminEmpresa y el SuperAdmin.
+
+### P-15 · Construir el panel de plataforma
+
+D-70 fijó el dónde: aplicación aparte, subdominio propio, fuera de internet público, doble factor
+obligatorio y sin sesión compartida con la web de clientes. Falta construirlo.
+
+Lo que tiene que poder hacer, y nada más que eso: dar de alta empresas con su Usuario 0 —el servicio
+ya está, `IServicioAltaEmpresa`—, suspender y reactivar clientes, ver la bitácora de plataforma,
+verificar la integridad de los dígitos, e ingerir el catálogo compartido. **No** opera datos de
+clientes: para eso está el bypass, que ya se audita como crítico.
+
+Queda por definir la infraestructura: si va VPN o lista blanca de IP, y si el subdominio se resuelve
+con el mismo despliegue o con uno separado. Depende de dónde termine hosteado.
+
+### P-16 · Envío del correo de invitación
+
+Hoy la invitación se crea en la base y no le llega nada a la persona: hay que avisarle por afuera.
+Para probar alcanza, pero un cliente que sume diez personas necesita que el sistema mande el correo.
+
+Falta elegir el proveedor —el candidato natural es el mismo por el que salgan las alertas de stock,
+para no sumar dos— y decidir si el correo lleva un enlace con token de un solo uso o simplemente
+avisa "ya podés entrar con tu cuenta de Google". **Lo segundo es más seguro y más simple**: no hay
+token que robar ni que expirar, porque la habilitación ya vive en la base y la identidad la prueba
+Google.
 
 ### P-14 · Extracción OCR de los certificados
 

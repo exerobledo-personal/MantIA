@@ -33,13 +33,14 @@ public class EmpresaConfiguration : IEntityTypeConfiguration<Empresa>
         b.HasKey(e => e.Id);
 
         b.Property(e => e.RazonSocial).HasMaxLength(200).IsRequired();
-        b.Property(e => e.Dominio).HasMaxLength(120).IsRequired();
         b.Property(e => e.TenantId).HasMaxLength(120).IsRequired();
 
-        // El dominio corporativo es lo que restringe el acceso con Google al personal de la
-        // empresa: si se repitiera entre dos clientes, el aislamiento se cae en el login.
-        b.HasIndex(e => e.Dominio).IsUnique();
         b.HasIndex(e => e.TenantId).IsUnique();
+
+        b.HasMany(e => e.Dominios)
+            .WithOne()
+            .HasForeignKey(d => d.EmpresaId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         b.HasOne(e => e.Plan)
             .WithMany()

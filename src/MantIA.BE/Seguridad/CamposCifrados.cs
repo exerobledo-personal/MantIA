@@ -56,6 +56,14 @@ public static class CamposCifrados
             ["Usuario.Auth0UserId"] = NivelCifrado.Determinista,
             ["Usuario.Email"]       = NivelCifrado.Determinista,
 
+            // El correo invitado se busca por igualdad en cada primer ingreso, asi que tiene que
+            // ser determinista por el mismo motivo que el del usuario. Con cifrado aleatorio habria
+            // que traer todas las invitaciones y descifrarlas una por una para resolver un login.
+            ["InvitacionUsuario.Email"] = NivelCifrado.Determinista,
+
+            // Texto libre escrito por quien revoca.
+            ["InvitacionUsuario.MotivoRevocacion"] = NivelCifrado.Aleatorio,
+
             // --- Texto libre de operacion ---
             // Es donde la gente escribe de verdad, y donde termina apareciendo lo que no deberia:
             // nombres de terceros, precios negociados, comentarios sobre companeros. Se lee entero

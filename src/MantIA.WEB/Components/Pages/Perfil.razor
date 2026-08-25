@@ -2,6 +2,7 @@
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
 @using MantIA.WEB.Services
+@using MantIA.BLL.Acceso
 @inject AuthenticationStateProvider AuthProvider
 @inject TenantResolver Resolver
 
@@ -51,7 +52,7 @@ else
 
 @code {
     private List<Claim>? claims;
-    private ResultadoAcceso? resultado;
+    private AccesoResuelto? resultado;
 
     private string? errorResolucion;
 

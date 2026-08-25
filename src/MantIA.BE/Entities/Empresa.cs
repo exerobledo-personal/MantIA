@@ -6,9 +6,6 @@ namespace MantIA.BE.Entities;
 public class Empresa : BaseEntity, IBajaLogica
 {
     public string RazonSocial { get; set; } = string.Empty;
-    /// <summary>Dominio corporativo. Restringe el acceso con Google al personal de la empresa.</summary>
-    public string Dominio { get; set; } = string.Empty;
-
     /// <summary>Identificador de organizacion en Auth0. Distinto de la clave primaria interna.</summary>
     public string TenantId { get; set; } = string.Empty;
 
@@ -20,6 +17,12 @@ public class Empresa : BaseEntity, IBajaLogica
 
     public EstadoEmpresa Estado { get; set; } = EstadoEmpresa.Activa;
     public DateTimeOffset? FechaBaja { get; set; }
+
+    /// <summary>
+    /// Dominios de correo habilitados. Acotan a quien se puede invitar; no dan acceso por si solos.
+    /// El principal sale del correo del Usuario 0 al dar de alta el cliente.
+    /// </summary>
+    public ICollection<DominioEmpresa> Dominios { get; set; } = [];
 
     public ICollection<Planta> Plantas { get; set; } = [];
     public ICollection<Usuario> Usuarios { get; set; } = [];

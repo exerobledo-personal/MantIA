@@ -91,3 +91,63 @@ public class SelloTablaConfiguration : IEntityTypeConfiguration<SelloTabla>
         b.HasIndex(s => new { s.EmpresaId, s.Tabla, s.CalculadoEn });
     }
 }
+
+// Acceso: dominios habilitados e invitaciones nominales. Nadie entra sin una invitacion, asi que
+// estas dos tablas son la frontera real del sistema y sus indices no son opcionales.
+
+public class DominioEmpresaConfiguration : IEntityTypeConfiguration<DominioEmpresa>
+{
+    public void Configure(EntityTypeBuilder<DominioEmpresa> b)
+    {
+        b.HasKey(d => d.Id);
+
+        b.Property(d => d.Dominio).HasMaxLength(180).IsRequired();
+
+        // Un dominio no se repite dentro de una empresa. Entre empresas SI puede repetirse, y es
+        // deliberado: dos clientes chicos pueden operar los dos con correo personal. No rompe el
+        // aislamiento porque el dominio no resuelve el tenant, lo resuelve la invitacion.
+        b.HasIndex(d => new { d.EmpresaId, d.Dominio }).IsUnique();
+
+        // Para la validacion del login, que pregunta por dominio sin conocer todavia la empresa.
+        b.HasIndex(d => d.Dominio);
+    }
+}
+
+public class InvitacionUsuarioConfiguration : IEntityTypeConfiguration<InvitacionUsuario>
+{
+    public void Configure(EntityTypeBuilder<InvitacionUsuario> b)
+    {
+        b.HasKey(i => i.Id);
+
+        b.Property(i => i.Nombre).HasMaxLength(100).IsRequired();
+        b.Property(i => i.Apellido).HasMaxLength(100).IsRequired();
+        b.Property(i => i.MotivoRevocacion).HasMaxLength(500);
+
+        // Una sola invitacion pendiente por correo en TODO el sistema, no por empresa. Es lo que
+        // hace estructural la regla de que una identidad pertenece a una sola empresa: sin esto,
+        // dos empresas podrian invitar al mismo correo y cual gana dependeria de quien entre
+        // primero. El filtro parcial deja convivir las aceptadas y revocadas del mismo correo, que
+        // son historia y tienen que quedar.
+        b.HasIndex(i => i.Email)
+            .IsUnique()
+            .HasFilter("estado = 'Pendiente'");
+
+        // Listado de invitaciones de una empresa por estado: la pantalla del administrador.
+        b.HasIndex(i => new { i.EmpresaId, i.Estado });
+
+        // Barrido de vencidas.
+        b.HasIndex(i => i.FechaVencimiento);
+
+        b.HasOne(i => i.NivelPermiso)
+            .WithMany()
+            .HasForeignKey(i => i.NivelPermisoId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // El usuario que nacio de la invitacion. Restrict y no cascada: si algun dia se borra
+        // fisicamente un usuario, la constancia de quien lo invito y cuando tiene que sobrevivir.
+        b.HasOne(i => i.Usuario)
+            .WithMany()
+            .HasForeignKey(i => i.UsuarioId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}

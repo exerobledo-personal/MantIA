@@ -15,38 +15,30 @@ builder.Services
         options.Scope = "openid profile email";
         options.OpenIdConnectEvents = new Microsoft.AspNetCore.Authentication.OpenIdConnect.OpenIdConnectEvents
         {
+            // Se decide el acceso ANTES de crear la sesion. Si no esta habilitado, el pipeline se
+            // detiene aca y nunca llega a existir una cookie: dejarlo entrar y bloquearlo despues
+            // en cada pagina seria confiar en que ninguna pantalla se olvide de preguntar.
+            //
+            // La decision NO vive aca. Vive en IServicioAcceso, que es tambien el que usa el
+            // resolvedor de tenant. Antes habia dos copias de estas reglas y basta con que una se
+            // desactualice para que deje entrar a quien no debe.
             OnTicketReceived = async context =>
             {
-                var sub = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-                var email = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+                var acceso = context.HttpContext.RequestServices
+                    .GetRequiredService<MantIA.BLL.Acceso.IServicioAcceso>();
 
-                var db = context.HttpContext.RequestServices
-                    .GetRequiredService<MantIA.DAL.Context.MantIADbContext>();
+                var resultado = await acceso.ResolverAsync(
+                    context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                    context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value,
+                    context.HttpContext.RequestAborted);
 
-                // Se ignora solo el filtro de empresa, que todavia no se resolvio. El de baja
-                // logica sigue activo: un usuario dado de baja no debe poder volver a entrar.
-                var usuario = await db.Usuarios
-                    .IgnoreQueryFilters([MantIA.DAL.Context.MantIADbContext.FiltroTenant])
-                    .FirstOrDefaultAsync(u => u.Auth0UserId == sub);
+                if (resultado.Autorizado) return;
 
-                bool autorizado = false;
-                if (usuario is not null && email is not null)
-                {
-                    var empresa = await db.Empresas.FirstOrDefaultAsync(e => e.Id == usuario.EmpresaId);
-                    if (empresa is not null)
-                    {
-                        var dominioEmail = email.Contains('@') ? email[(email.LastIndexOf('@') + 1)..] : null;
-                        autorizado = string.Equals(dominioEmail, empresa.Dominio, StringComparison.OrdinalIgnoreCase);
-                    }
-                }
-
-                if (!autorizado)
-                {
-                    // Cancela la creacion de la sesion y redirige a acceso denegado.
-                    context.Response.Redirect("/acceso-denegado?mensaje=" +
-                        Uri.EscapeDataString("Tu correo no pertenece al dominio corporativo de tu empresa."));
-                    context.HandleResponse(); // detiene el pipeline de login
-                }
+                // El mensaje que ve la persona sale del servicio y no de aca: es el mismo que quedo
+                // escrito en la bitacora, asi que soporte y usuario hablan del mismo hecho.
+                context.Response.Redirect("/acceso-denegado?mensaje=" +
+                    Uri.EscapeDataString(resultado.Mensaje ?? "No tenes acceso al sistema."));
+                context.HandleResponse();
             }
         };
     }); 
@@ -79,6 +71,12 @@ builder.Services.AddScoped<MantIA.BLL.Authorization.IPermisoService, MantIA.BLL.
 builder.Services.AddScoped<MantIA.BLL.Authorization.IUsuarioActual, MantIA.BLL.Authorization.UsuarioActual>();
 builder.Services.AddScoped<MantIA.BLL.Authorization.IGestorPermisos, MantIA.BLL.Authorization.GestorPermisos>();
 
+// Acceso. Es el unico lugar donde se decide quien entra, y lo usan tanto el evento de login de
+// Auth0 como el resolvedor de tenant.
+builder.Services.AddScoped<MantIA.BLL.Acceso.IServicioAcceso, MantIA.BLL.Acceso.ServicioAcceso>();
+builder.Services.AddScoped<MantIA.BLL.Acceso.IServicioInvitaciones, MantIA.BLL.Acceso.ServicioInvitaciones>();
+builder.Services.AddScoped<MantIA.BLL.Plataforma.IServicioAltaEmpresa, MantIA.BLL.Plataforma.ServicioAltaEmpresa>();
+
 // Bitacora. Las llaves de sellado y cifrado NO van en appsettings.json: en desarrollo se cargan
 // con "dotnet user-secrets set Auditoria:Llaves:v1 <base64>" y en produccion por variable de
 // entorno. Se generan con: openssl rand -base64 32
@@ -101,6 +99,12 @@ builder.Services.AddScoped<MantIA.BLL.Auditoria.IVerificadorDigitos, MantIA.BLL.
 builder.Services.Configure<MantIA.DAL.Seguridad.OpcionesVerificacion>(
     builder.Configuration.GetSection(MantIA.DAL.Seguridad.OpcionesVerificacion.Seccion));
 builder.Services.AddHostedService<MantIA.BLL.Auditoria.VerificacionIntegridad>();
+
+// Siembra minima, SOLO en desarrollo. Doble cerrojo: el registro esta dentro de este if y ademas
+// el propio servicio vuelve a comprobar el entorno. Sembrar usuarios administradores en produccion
+// es la clase de accidente que no se descubre hasta que alguien entra con ellos.
+if (builder.Environment.IsDevelopment())
+    builder.Services.AddHostedService<MantIA.BLL.Siembra.SiembraInicial>();
 
 // Documentos adjuntos a las maquinas. El almacen local guarda por hash de contenido; la raiz tiene
 // que quedar FUERA de wwwroot, o los archivos serian descargables sin pasar por permisos.

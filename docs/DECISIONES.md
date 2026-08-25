@@ -1114,3 +1114,80 @@ Tope de 20 MB por archivo.
 **Límite conocido:** docx y xlsx son ZIP por dentro, así que su firma es la de ZIP. Distingue un
 documento real de un ejecutable renombrado, no de otro ZIP. Por eso las variantes con macros están
 fuera de la lista y no adentro con una excepción.
+
+### D-66 · Nadie entra sin invitación nominal · **Aprobado — implementado**
+
+No hay registro público ni alta automática por dominio. La única forma de existir en una empresa es
+que alguien con autoridad haya emitido una invitación a un correo concreto. El Usuario 0 de cada
+cliente incluido: su invitación la emite MantIA al dar de alta la empresa.
+
+**Por qué hay una tabla de invitaciones y no se crea el usuario directo.** El acceso se controla
+contra el identificador que asigna el proveedor de identidad, y ese identificador **no se conoce
+hasta el primer ingreso**. Un administrador sabe el correo de su empleado, no su `sub` de Google.
+Sin este paso intermedio, aprovisionar a alguien sería adivinar un dato que todavía no existe — o
+sea que, tal como estaba, no se podía dar de alta a nadie.
+
+Entonces: se invita por correo, y en el primer ingreso el correo se cruza con la invitación y recién
+ahí nace la fila en `usuarios` con el identificador real ya atado. `invitaciones` significa "quién
+está habilitado a entrar" y `usuarios` significa "quién efectivamente entró".
+
+Las invitaciones **vencen a los 14 días**. Una invitación abierta para siempre es una llave que quedó
+puesta: la persona que se fue antes de entrar, el correo mal escrito, el alta que nunca se completó.
+
+### D-67 · El dominio acota a quién se puede invitar, no da acceso · **Aprobado — implementado**
+
+`Empresa.Dominio` se reemplaza por la tabla `dominios_empresa`, con uno marcado como principal.
+
+**Tres cosas cambian y las tres importan.** Una empresa puede tener más de un dominio, que es el caso
+de la fábrica que se fusionó y arrastra dos. Dos empresas distintas pueden tener el **mismo** dominio,
+que antes el índice único global impedía. Y el dominio dejó de resolver el tenant: ahora solo limita
+a qué direcciones se les puede emitir una invitación, y se vuelve a comprobar en cada ingreso por si
+la empresa lo dio de baja después.
+
+**Esto es lo que hace viable `gmail.com` como dominio de una empresa**, que era el pedido. Con el
+modelo anterior habría significado que cualquier cuenta de Gmail del mundo resuelve a ese tenant. Con
+invitación nominal obligatoria no abre nada: sigue sin entrar nadie que el administrador no haya
+invitado por su dirección exacta.
+
+Sin dominios cargados no entra nadie. Es la respuesta correcta para una empresa a medio configurar.
+
+### D-68 · Una identidad pertenece a una sola empresa · **Aprobado**
+
+Se mantiene el índice único global sobre `usuarios.auth0_user_id`, y se agrega uno equivalente sobre
+`invitaciones.email` filtrado a las pendientes. Sin ese segundo índice, dos empresas podrían invitar
+al mismo correo y cuál gana dependería de quién entre primero.
+
+**El costo, asumido:** para probar dos empresas hacen falta dos cuentas de Google distintas, y una
+persona que trabaje para dos clientes necesita dos correos. **Lo que se gana:** nunca se puede operar
+sobre el tenant equivocado por error, y no hace falta un selector de empresa al ingresar.
+
+### D-69 · La decisión de acceso vive en un solo lugar · **Aprobado — implementado**
+
+Estaba escrita dos veces: en el evento de login de Auth0 y en `TenantResolver`. Dos copias de una
+regla de acceso siempre terminan divergiendo, y la que se olvide de actualizarse es la que deja
+entrar a quien no debe. Ahora las dos llaman a `IServicioAcceso`.
+
+El acceso se decide **antes** de crear la sesión: si no está habilitado, el pipeline se detiene y
+nunca llega a existir una cookie. Dejarlo entrar y bloquearlo después en cada pantalla sería confiar
+en que ninguna se olvide de preguntar.
+
+**Todo rechazo se registra**, con el mismo mensaje que ve la persona, así soporte y usuario hablan del
+mismo hecho. Un rechazo dice mucho más que un ingreso: es lo único que permite ver que alguien está
+probando.
+
+### D-70 · Panel de plataforma como aplicación aparte, fuera de internet público · **Aprobado — pendiente de construir**
+
+El SuperAdmin no opera desde la misma web que los clientes. Proyecto propio, subdominio propio,
+alcanzable solo por VPN o lista blanca de IP, doble factor obligatorio y sin sesión compartida.
+
+**Lo que más protege un panel de administración no es cómo esté programado: es que no sea
+alcanzable.** Detrás de una VPN, la mayor parte de los ataques deja de existir porque no hay a qué
+golpear. Todo lo demás viene después.
+
+**Se descarta la palabra "backdoor" a propósito.** Una puerta trasera es un camino no documentado que
+saltea los controles — es contra lo que se defiende el sistema, no algo que convenga construir. Lo
+que se construye es una superficie administrativa separada, con más controles y no con menos.
+
+**Y "impenetrable" no existe.** Quien tenga acceso al motor de base puede hacer lo que quiera, y lo
+único que cierra ese caso es publicar periódicamente la punta de las cadenas fuera del sistema. El
+panel separado sube mucho el costo de entrar; no lo vuelve imposible.

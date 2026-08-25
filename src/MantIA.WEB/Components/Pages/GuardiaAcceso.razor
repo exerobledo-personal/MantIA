@@ -1,5 +1,6 @@
 ﻿@using Microsoft.AspNetCore.Components.Authorization
 @using MantIA.WEB.Services
+@using MantIA.BLL.Acceso
 @inject AuthenticationStateProvider AuthProvider
 @inject TenantResolver Resolver
 @inject NavigationManager Nav
@@ -20,7 +21,7 @@
         // Esta autenticado: validamos que tenga acceso real (usuario + dominio).
         var resultado = await Resolver.ResolverAsync(state.User);
 
-        if (resultado.Estado != EstadoAcceso.Autorizado)
+        if (!resultado.Autorizado)
         {
             var msg = Uri.EscapeDataString(resultado.Mensaje ?? "Acceso no autorizado.");
             Nav.NavigateTo($"/acceso-denegado?mensaje={msg}", forceLoad: true);
