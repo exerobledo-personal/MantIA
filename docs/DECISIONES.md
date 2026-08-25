@@ -1191,3 +1191,43 @@ que se construye es una superficie administrativa separada, con más controles y
 **Y "impenetrable" no existe.** Quien tenga acceso al motor de base puede hacer lo que quiera, y lo
 único que cierra ese caso es publicar periódicamente la punta de las cadenas fuera del sistema. El
 panel separado sube mucho el costo de entrar; no lo vuelve imposible.
+
+### D-71 · Cuatro superficies separadas, no una aplicación · **Aprobado — pendiente de construir**
+
+El embudo comercial completo es: sitio institucional → landing → cotización → contacto y briefing →
+demo → venta → alta del cliente. Eso reparte en cuatro superficies con dueños, ritmos y riesgos
+distintos, y conviene que sean cuatro despliegues:
+
+| Superficie | Dónde | Por qué separada |
+|---|---|---|
+| Sitio institucional y landing | `mantia.com.ar` | Cambia todas las semanas y lo toca marketing. Mezclado con el producto, corregir un título obliga a desplegar el sistema entero |
+| Producto | `app.mantia.com.ar` | Detrás de Auth0 e invitación. Cambia cuando cambia el software |
+| Panel de plataforma | tercer subdominio | D-70: fuera de internet público |
+| Demo | ruta o subdominio propio | Datos de maqueta, sin base real. Ya existe |
+
+**El formulario de cotización es la única escritura a la base expuesta a internet abierto de todo el
+sistema.** Todo lo demás está detrás de autenticación y de una invitación nominal. Eso lo convierte
+en la superficie más golpeada por defecto — no por interés en MantIA, sino porque los formularios
+públicos se llenan solos de basura automatizada. Necesita límite por IP, protección anti-bot, y
+escribir en una tabla que **no** pertenezca al modelo de tenants.
+
+**Un prospecto no es una empresa.** Va como entidad de plataforma, sin `EmpresaId` ni filtro de
+aislamiento, con los estados del embudo real —Nuevo, Contactado, En briefing, Demo otorgada, Ganado,
+Perdido— y el motivo cuando se pierde, que es el dato que después explica por qué no se vende. Al
+cerrar la venta se convierte en empresa con `IServicioAltaEmpresa`, y queda el vínculo entre los dos
+para poder medir cuántas cotizaciones terminan en cliente.
+
+**Es dato personal de gente que todavía no es usuaria**, así que va cifrado igual que el resto. El
+correo determinista, para poder detectar que la misma persona cotizó tres veces.
+
+### D-72 · La demo se accede con enlace por prospecto · **Aprobado — pendiente de construir**
+
+Después del briefing, no desde la landing. A cada prospecto se le genera un enlace propio con
+vencimiento.
+
+**Por qué no abierta.** La demo es una etapa de la venta y no parte del folleto. Con enlace propio se
+sabe quién la abrió, cuándo y cuántas veces, que es información concreta para decidir a quién volver
+a llamar. Abierta a todos, ese dato no existe.
+
+No usa Auth0 ni crea usuarios ni toca la base operativa: sigue siendo la maqueta con datos ficticios.
+El token solo abre la puerta de la maqueta, así que filtrarlo no expone nada de ningún cliente.

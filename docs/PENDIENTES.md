@@ -10,6 +10,7 @@ en `DECISIONES.md`.
 | P-14 | Extracción OCR de los certificados (etapa 2, ya diseñada en D-64) | Después del MVP |
 | P-15 | Construir el panel de plataforma como aplicación aparte (D-70) | Antes del primer cliente real |
 | P-16 | Envío del correo de invitación | Antes de que un cliente sume gente solo |
+| P-17 | Sitio institucional, landing y prospectos (D-71, D-72) | Cuando arranque la venta |
 
 Resueltos y movidos a `DECISIONES.md`: P-01 dimensión del vector, P-02 umbral de promoción,
 P-03 escala por planta, P-05 estados de morosidad, P-06 numeración, P-07 usuario de demostración,
@@ -77,6 +78,20 @@ para no sumar dos— y decidir si el correo lleva un enlace con token de un solo
 avisa "ya podés entrar con tu cuenta de Google". **Lo segundo es más seguro y más simple**: no hay
 token que robar ni que expirar, porque la habilitación ya vive en la base y la identidad la prueba
 Google.
+
+### P-17 · Sitio institucional, landing y prospectos
+
+D-71 y D-72 fijaron la forma. Falta construir: el sitio y la landing como despliegue aparte, la
+entidad de prospecto con los estados del embudo, el formulario de cotización con sus protecciones, y
+el enlace de demo con token y vencimiento.
+
+Queda por definir con qué se hace el sitio. **No debería ser Blazor:** es contenido que tiene que
+cargar rápido para alguien que llegó de un anuncio, lo va a tocar gente que no programa, y no
+necesita ni base ni sesión. Un generador de sitios estáticos o un gestor de contenido liviano encaja
+mejor y no arrastra el peso del producto.
+
+También falta elegir la protección anti-bot del formulario, que es la única escritura expuesta a
+internet abierto de todo el sistema.
 
 ### P-14 · Extracción OCR de los certificados
 
