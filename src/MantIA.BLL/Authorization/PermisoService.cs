@@ -94,6 +94,13 @@ public class PermisoService : IPermisoService
 
     public void InvalidarUsuario(Guid usuarioId) => _cache.Remove(ClaveUsuario(usuarioId));
 
+    /// <summary>
+    /// Olvida el estado comercial de una empresa. Hay que llamarlo al cambiar el plan, la vigencia o
+    /// la suspension: sin esto, un cliente que acaba de pagar sigue en solo lectura hasta que
+    /// caduque la cache, y el reclamo que llega es "pague y no me deja cargar nada".
+    /// </summary>
+    public void InvalidarEstadoEmpresa(Guid empresaId) => _cache.Remove($"estado_empresa_{empresaId}");
+
     // ---------------------------------------------------------------- estado de la empresa
 
     /// <summary>
@@ -105,17 +112,40 @@ public class PermisoService : IPermisoService
     /// dependiera de que cada modulo se acuerde de preguntarlo, alcanza con que uno se olvide para
     /// que la suspension no signifique nada.
     /// </para>
+    /// <para>
+    /// Son DOS motivos que producen el mismo estado: la suspension comercial, que alguien decide, y
+    /// el vencimiento de la vigencia, que llega solo. Se resuelven juntos a proposito — para el
+    /// cliente es la misma experiencia y para el codigo es la misma regla, y separarlos invitaria a
+    /// que alguna pantalla contemple uno y se olvide del otro.
+    /// </para>
+    /// <para>
+    /// Sobre la vigencia: es el mismo campo para una cuenta de prueba y para un cliente pago. En la
+    /// prueba, el fin es cuando se termina la prueba; en un cliente activo, cuando vence lo pagado.
+    /// En los dos casos se conserva todo y solo se deja de poder escribir.
+    /// </para>
+    /// <para>
+    /// El resultado se cachea unos minutos. Eso significa que el vencimiento no es instantaneo al
+    /// segundo: alguien que este trabajando justo en ese momento puede seguir escribiendo lo que
+    /// dure la entrada de cache. Es aceptable —una vigencia se corta a una fecha, no a un instante—
+    /// y el precio de lo contrario seria consultar la empresa en cada verificacion de permiso.
+    /// </para>
     /// </summary>
     private async Task<bool> EnSoloLecturaAsync(Guid empresaId) =>
         await _cache.GetOrCreateAsync($"estado_empresa_{empresaId}", async entrada =>
         {
             entrada.AbsoluteExpirationRelativeToNow = Expiracion;
-            var estado = await _db.Empresas
+
+            var cuenta = await _db.Empresas
                 .IgnoreQueryFilters([MantIADbContext.FiltroBaja])
                 .Where(e => e.Id == empresaId)
-                .Select(e => e.Estado)
+                .Select(e => new { e.Estado, e.FinVigencia })
                 .FirstOrDefaultAsync();
-            return estado == EstadoEmpresa.Suspendida;
+
+            if (cuenta is null) return true;
+
+            var vencida = cuenta.FinVigencia is { } fin && fin <= DateTimeOffset.UtcNow;
+
+            return cuenta.Estado == EstadoEmpresa.Suspendida || vencida;
         });
 
     private static bool EsLectura(string accion) =>

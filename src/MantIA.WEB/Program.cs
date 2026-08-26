@@ -76,6 +76,7 @@ builder.Services.AddScoped<MantIA.BLL.Authorization.IGestorPermisos, MantIA.BLL.
 builder.Services.AddScoped<MantIA.BLL.Acceso.IServicioAcceso, MantIA.BLL.Acceso.ServicioAcceso>();
 builder.Services.AddScoped<MantIA.BLL.Acceso.IServicioInvitaciones, MantIA.BLL.Acceso.ServicioInvitaciones>();
 builder.Services.AddScoped<MantIA.BLL.Plataforma.IServicioAltaEmpresa, MantIA.BLL.Plataforma.ServicioAltaEmpresa>();
+builder.Services.AddScoped<MantIA.BLL.Plataforma.IControlCupos, MantIA.BLL.Plataforma.ControlCupos>();
 
 // Bitacora. Las llaves de sellado y cifrado NO van en appsettings.json: en desarrollo se cargan
 // con "dotnet user-secrets set Auditoria:Llaves:v1 <base64>" y en produccion por variable de

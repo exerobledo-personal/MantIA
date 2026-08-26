@@ -1231,3 +1231,102 @@ a llamar. Abierta a todos, ese dato no existe.
 
 No usa Auth0 ni crea usuarios ni toca la base operativa: sigue siendo la maqueta con datos ficticios.
 El token solo abre la puerta de la maqueta, así que filtrarlo no expone nada de ningún cliente.
+
+### D-73 · La prueba es un tenant real y acotado, no una maqueta · **Aprobado — implementado**
+### *(reemplaza a D-72)*
+
+D-72 decía que la demo era la maqueta con datos ficticios, accedida por un enlace con token. **Estaba
+mal.** La demo es una cuenta real con topes: hasta 5 máquinas, 3 usuarios, 1 planta y 20 órdenes
+abiertas, durante 30 días — todo ajustable caso por caso.
+
+**Por qué la versión correcta es mejor, y no es un detalle.** Lo que el prospecto carga durante la
+prueba **sobrevive a la compra**. Con una maqueta, todo lo que cargó se pierde justo cuando decide
+pagar, que es el peor momento posible para pedirle que vuelva a cargar sus máquinas a mano. Acá el
+upgrade no mueve un dato: es el mismo tenant con otros números.
+
+El alta de una prueba es la misma operación que el alta de cualquier cliente, con el plan Prueba:
+correo del Usuario 0 y listo. El upgrade es `CambiarPlanAsync`, que corre una fecha y sube unos
+topes.
+
+### D-74 · Una empresa tiene una vigencia, sea prueba o cliente pago · **Aprobado — implementado**
+
+La fecha de fin de la prueba y la fecha de renovación de un cliente activo **son el mismo campo**.
+`InicioVigencia` y `FinVigencia` en `Empresa`, ajustables caso por caso.
+
+Al llegar la fecha, la empresa pasa a **solo lectura**: entra, consulta, exporta, y no puede cargar
+nada. Es el mismo mecanismo que ya existía para la suspensión comercial (D-33), extendido con un
+segundo motivo. Se resuelven juntos a propósito — para el cliente es la misma experiencia y para el
+código es la misma regla; separarlos invitaría a que alguna pantalla contemple uno y se olvide del
+otro.
+
+Un solo mecanismo en vez de dos, y convertir una prueba en cliente deja de ser una transición
+especial.
+
+### D-75 · Los cupos se aplican de verdad, y bloquean el alta sin borrar nada · **Aprobado — implementado**
+### *(supera a D-54)*
+
+**El problema que había:** `MaxMaquinas`, `MaxUsuarios`, `MaxPlantas` y `MaxMaquinasHabilitadas`
+existían como campos y se mostraban en pantalla —el "12 / 200" del panel— pero **nada los aplicaba**.
+Se podían cargar quinientas máquinas con un plan de doscientas. Una cuenta de prueba "de hasta 5
+máquinas" no significaba nada.
+
+Ahora los aplica `IControlCupos`, y las reglas son tres:
+
+**Manda el número de la empresa, no el del plan.** El del plan es el valor por defecto que se copia
+al dar de alta. Después se ajusta por acuerdo comercial sin inventar un plan nuevo para cada cliente,
+y queda un solo número que mirar cuando algo se bloquea.
+
+**Bloquea el alta, nunca borra.** Una empresa por encima de su techo —le bajaron el plan, se le venció
+la prueba, alguien se equivocó al cargar— conserva todo y solo deja de poder crear más. Bajar un plan
+no puede destruir el trabajo de nadie.
+
+**Cuenta lo vivo.** Lo dado de baja no ocupa lugar: el cliente paga por lo que opera, no por su
+historial. Las órdenes cuentan solo las abiertas y en curso, y las invitaciones pendientes cuentan
+como usuario — si no, una empresa con el cupo lleno podría invitar a veinte personas y el rechazo
+aparecería recién en el primer ingreso de cada una.
+
+**Esto supera a D-54**, que había aprobado renombrar `Plan.MaxMaquinas` a `MaxMaquinasPorPlanta`. Si
+el tope del plan fuera por planta y el de la empresa total, no serían comparables y "manda el de la
+empresa" dejaría de significar algo. Queda como **tope total por empresa**. Si hace falta un límite
+por planta, se agrega aparte como una restricción más, no como el mismo número.
+
+### D-76 · El panel de plataforma va expuesto y endurecido, no detrás de una red · **Aprobado — reemplaza el cerrojo de red de D-70**
+
+D-70 decía "fuera de internet público, por VPN o lista blanca de IP". **El argumento en contra es
+bueno y gana:** el superadministrador no va a ser una persona sino un equipo comercial. Una lista
+blanca no escala a gente que trabaja desde lugares distintos, y una VPN suma fricción y costo por
+cada persona que entra al equipo.
+
+Queda: **aplicación aparte, subdominio propio, accesible desde internet, endurecida.** Doble factor
+obligatorio, conexión de identidad separada de la de clientes, sesión corta, sin cookie compartida, y
+cada acción a la cadena de plataforma con severidad crítica. Es lo que hace todo el mundo con su
+panel interno.
+
+Lo que se mantiene de D-70: que sea una **aplicación separada**. Eso no era por la red — era para que
+una vulnerabilidad en una pantalla de operación no quede a un paso del panel que administra a todos
+los clientes. Esa razón sigue en pie.
+
+El cerrojo de red queda como endurecimiento futuro y opcional, para el día que el panel opere datos
+de clientes y no solo cuentas.
+
+### D-77 · El tope de órdenes cuenta las abiertas y es de cien en la prueba · **Aprobado**
+
+Una orden es lo que menos recursos consume del sistema: es manejo interno —"esta máquina necesita
+repuestos", "hay que cambiar esta lamparita"— y no toca la ingesta ni el modelo. En los planes pagos
+no lleva tope; en la prueba son cien abiertas, que en la práctica es no tener tope y solo existe como
+freno ante un uso automatizado.
+
+**Cuenta las abiertas y en curso, nunca el histórico.** Una empresa tiene que poder ver todas las
+órdenes que creó, sean de hoy o de hace cinco años. Nada las borra ni las archiva.
+
+### D-78 · La siembra completa los campos que nacieron después de la fila · **Aprobado — implementado**
+
+Solo rellena lo que está en nulo y nunca pisa un valor. Resuelve el caso de una columna agregada al
+modelo cuando la fila ya existía: sin esto queda vacía para siempre, y un cupo vacío significa sin
+límite, que es justo lo contrario de lo que se busca.
+
+Dos excepciones deliberadas: el tope de órdenes solo se completa en cuentas de prueba, y la vigencia
+solo en empresas que no sean MantIA — en los dos casos el nulo es un valor legítimo y no hay forma de
+distinguirlo de "todavía no se cargó".
+
+Es andamiaje de desarrollo. Cuando el esquema deje de moverse, este método debería desaparecer.

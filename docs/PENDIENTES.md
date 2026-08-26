@@ -3,105 +3,182 @@
 Lo que **no** está implementado y necesita una decisión antes de escribir código. Lo ya decidido está
 en `DECISIONES.md`.
 
-| # | Qué falta definir | Urgencia |
+| # | Qué falta | Urgencia |
 |---|---|---|
-| P-12 | Dónde viven los archivos en producción: disco o almacenamiento de objetos | Antes del primer cliente real |
-| P-13 | ¿`Documentos` es un recurso propio de permisos o va con `Maquinas`? | Antes de la demo |
-| P-14 | Extracción OCR de los certificados (etapa 2, ya diseñada en D-64) | Después del MVP |
-| P-15 | Construir el panel de plataforma como aplicación aparte (D-70) | Antes del primer cliente real |
+| P-23 | Definir el modelo de ML y el flujo de ingesta | **Ya** |
+| P-24 | Nombre comercial y dominio | **Bloquea todo el frente comercial** |
+| P-15 | Construir el panel de plataforma | Antes del primer cliente real |
+| P-22 | Roles dentro del panel de plataforma | Con el equipo comercial |
+| P-21 | Usuario y contraseña además de SSO | Antes de vender |
+| P-20 | Versionado de documentos | Conversación dedicada |
+| P-12 | Dónde viven los archivos en producción | Antes del primer cliente real |
+| P-19 | Aviso de mora 30/60/90 y purga manual de tenants | Antes del primer cliente real |
 | P-16 | Envío del correo de invitación | Antes de que un cliente sume gente solo |
-| P-17 | Sitio institucional, landing y prospectos (D-71, D-72) | Cuando arranque la venta |
+| P-17 | Sitio institucional, landing y prospectos | Depende de P-24 |
+| P-13 | ¿`Documentos` es un recurso propio de permisos? | Con P-20 |
+| P-18 | Enganchar el control de cupos | Cuando exista la lógica de operación |
+| P-14 | Extracción OCR de los certificados | Etapa 2 |
+| P-03 | Escala de máquinas por planta | Con los primeros clientes |
+| P-05 | Qué dispara el estado suspendido | Cuando exista el plan comercial |
 
-Resueltos y movidos a `DECISIONES.md`: P-01 dimensión del vector, P-02 umbral de promoción,
-P-03 escala por planta, P-05 estados de morosidad, P-06 numeración, P-07 usuario de demostración,
-P-08 bitácora caída, P-09 permisos por ámbito, P-10 huecos en la cadena, **P-11 dígitos
-verificadores (D-61, D-62, D-63)**, **P-04 documentos de máquina (D-64, D-65)**.
+Resueltos: P-01, P-02, P-04, P-06 a P-11.
 
 ---
 
-### P-12 · Dónde viven los archivos en producción
+### P-23 · Modelo de ML y flujo de ingesta
 
-Hoy está `AlmacenDocumentosLocal`: sistema de archivos, direccionado por hash de contenido. Alcanza
-para desarrollo y para un despliegue en un solo servidor.
+La conversación más grande que queda, y la que menos puede seguir postergándose: qué predice el
+modelo exactamente, con qué datos se entrena, qué parte es aprendizaje y qué parte son reglas de
+negocio, cómo se valida la calidad de las sugerencias, y qué hace N8N en la iteración 1.
 
-**Con más de una instancia deja de alcanzar**, porque el archivo que subió una no está en el disco de
-la otra. Las opciones son un volumen compartido —simple, pero es un punto único de falla y hay que
-respaldarlo aparte— o almacenamiento de objetos tipo S3 o Azure Blob, que resuelve replicación y
-respaldo pero suma una dependencia y un costo por GB.
+Es también lo que la corrección de la primera entrega dejó marcado como foco de mejora. Conviene
+resolverlo antes que cualquier pantalla: es lo que el producto vende, y todo lo construido hasta
+ahora es la infraestructura que lo sostiene.
 
-La interfaz `IAlmacenDocumentos` ya está pensada para que el cambio sea una clase nueva y una línea
-de registro. **No hace falta decidirlo hoy**, pero sí antes de que un cliente real cargue documentos:
-migrar archivos después es incómodo.
+### P-24 · Nombre comercial y dominio
 
-**Dos cosas que no dependen de esa decisión y ya están:** la raíz configurable tiene que quedar fuera
-de `wwwroot` —si cae adentro, los archivos son descargables sin pasar por permisos— y el hash del
-contenido se verifica antes de cada descarga.
-
-### P-13 · ¿`Documentos` es un recurso propio de permisos?
-
-Ahora mismo los documentos usan los permisos de `Maquinas`: quien puede consultar la máquina ve sus
-papeles, quien puede modificarla los adjunta. Es defendible —el documento es un atributo del activo—
-y tiene la ventaja de no agregar celdas a la matriz.
-
-**El argumento en contra:** un certificado de proveedor tiene información comercial que no todo el
-que consulta una máquina necesariamente debería ver, y adjuntar un papel no es lo mismo que cambiar
-la criticidad del equipo.
-
-Si va como recurso propio, hay que agregarlo a `CatalogoPermisos` con ámbito Operación, decidir el
-piso irrevocable por rol en `PermisosMinimos` y regenerar la matriz por defecto. **Decisión tuya**:
-si decís que sí, lo hago; si no, queda como está y se documenta el criterio.
-
-Lo mismo aplica a `Integridad`: hoy los hallazgos se registran en la bitácora con ese recurso pero no
-existe como recurso protegible, así que **no hay pantalla para verlos**. Cuando la haya, necesita una
-celda de permiso, y el candidato natural es que solo la vea AdminEmpresa y el SuperAdmin.
+El dominio de MantIA no está disponible. Eso bloquea el sitio, el correo de invitación y los
+subdominios del panel y de la aplicación. Es lo primero del frente comercial, porque todo lo demás
+cuelga del nombre.
 
 ### P-15 · Construir el panel de plataforma
 
-D-70 fijó el dónde: aplicación aparte, subdominio propio, fuera de internet público, doble factor
-obligatorio y sin sesión compartida con la web de clientes. Falta construirlo.
+Aplicación aparte, subdominio propio, expuesta pero endurecida (D-76). Alta de empresas con Usuario 0
+y cambio de plan ya están construidos como servicios: falta la aplicación y las pantallas. También
+van acá la vista de integridad, la bitácora de plataforma, la purga de tenants y la ingesta del
+catálogo.
 
-Lo que tiene que poder hacer, y nada más que eso: dar de alta empresas con su Usuario 0 —el servicio
-ya está, `IServicioAltaEmpresa`—, suspender y reactivar clientes, ver la bitácora de plataforma,
-verificar la integridad de los dígitos, e ingerir el catálogo compartido. **No** opera datos de
-clientes: para eso está el bypass, que ya se audita como crítico.
+Depende de P-22, porque el reparto de permisos cambia qué pantallas ve cada uno.
 
-Queda por definir la infraestructura: si va VPN o lista blanca de IP, y si el subdominio se resuelve
-con el mismo despliegue o con uno separado. Depende de dónde termine hosteado.
+### P-22 · Roles dentro del panel de plataforma
+
+Si el panel lo va a usar un equipo comercial, `SuperAdminMantIA` como rol único deja de alcanzar: no
+todo el que da de alta un cliente debería poder purgar un tenant ni usar el bypass sobre datos de
+clientes.
+
+Mínimo dos perfiles: **comercial** —alta de empresas, cambio de plan, prospectos, ver cuentas— y
+**plataforma** —purga, integridad, bypass, ingesta del catálogo—. Falta decidir si son roles nuevos
+del sistema o niveles dentro del actual.
+
+### P-21 · Usuario y contraseña además de SSO
+
+No todos los clientes van a entrar con Google. Auth0 soporta conexiones de usuario y contraseña
+conviviendo con las sociales, así que técnicamente es configuración.
+
+**El modelo de acceso no cambia**: se invita por correo y la identidad se ata en el primer ingreso.
+Lo único que cambia es de dónde sale el identificador.
+
+**Pero hay una consecuencia que no es negociable.** Con Google, el correo llega verificado por Google.
+Con una conexión de contraseña, la persona escribe el correo que quiere: si no se exige verificación
+antes de consumir la invitación, cualquiera puede reclamar la invitación de otro con solo saber la
+dirección, y todo el modelo de acceso se cae. **Verificación de correo obligatoria** para esa
+conexión, sin excepción.
+
+Faltan además política de contraseñas, recuperación, y si el doble factor es obligatorio o sugerido.
+
+### P-20 · Versionado de documentos
+
+Conversación dedicada, con amendment aparte. Lo que conviene tener presente al tenerla:
+
+**Una parte ya está resuelta sin querer.** El almacén direcciona por el SHA-256 del contenido: subir
+un archivo distinto produce otra ruta, así que **es imposible pisar un archivo existente**. Lo viejo
+sobrevive por construcción y no por disciplina.
+
+**Lo que falta es la cadena de versiones en la ficha.** Hoy un documento apunta a un contenido y
+punto: si se sube una corrección, queda un documento nuevo suelto y nada dice que reemplaza al
+anterior. Falta que cada versión apunte a la que reemplaza, que la lista muestre la vigente con su
+historial atrás, y que quede registrado quién reemplazó qué y por qué.
+
+**Sobre guardar los archivos en Postgres:** se puede, pero infla cada copia de respaldo con binarios
+que no cambian nunca, castiga cualquier consulta que traiga la fila entera y complica mudarse
+después. La extensión de vectores no tiene nada que ver con esto: sirve para búsqueda semántica del
+*texto* extraído, que sí va en la base.
+
+### P-12 · Dónde viven los archivos en producción
+
+Apareció una idea nueva: que los archivos vivan en un servidor del propio cliente, con la aplicación
+en la nube resolviendo cada tenant.
+
+**Se puede, y no lo recomiendo.** La aplicación en la nube tendría que alcanzar una máquina dentro de
+la red del cliente, lo que obliga a abrir un camino de entrada a su red o a montar un túnel por
+cliente; los respaldos pasan a ser responsabilidad de ellos y el reclamo cuando se pierda un archivo
+va a llegar igual; y cada instalación se vuelve un caso distinto de soportar. Además, como igual
+tienen que llegar al catálogo compartido y al servidor de modelo, la conectividad no se evita: solo
+se agrega una pieza más que puede fallar.
+
+**Recomiendo almacenamiento de objetos en la nube, un solo despliegue.** Lo inhouse queda como opción
+empresarial mucho más adelante, para un cliente grande que lo exija por política, y cotizado aparte
+porque cuesta soporte real.
+
+### P-19 · Aviso de mora y purga de tenants
+
+**El aviso es una escalera, no un mensaje.** Correo automático a los 30, 60 y 90 días de mora, más el
+de baja definitiva, con contenido editable desde la aplicación. El texto se define con un abogado
+cuando esté cerrada la forma del contrato.
+
+**Falta decidir contra qué se cuentan esos días.** Hoy la empresa tiene una fecha de fin de vigencia y
+nada más: no hay modelo de facturación, así que no existe "factura impaga". Se puede contar desde el
+vencimiento de la vigencia, que no cuesta nada y alcanza para arrancar, o construir facturas como
+entidad, que es correcto pero es otro módulo. **Recomiendo lo primero** hasta que haya cobranza real.
+
+**La purga es un botón y una decisión personal.** "Eliminar definitivamente el tenant", manual y
+arbitraria, nunca automática (D-55). Lo que sí se automatiza es el aviso interno: "este tenant
+consume recursos y no registra órdenes hace X". Conviene exportarle lo cargado antes de borrar.
 
 ### P-16 · Envío del correo de invitación
 
-Hoy la invitación se crea en la base y no le llega nada a la persona: hay que avisarle por afuera.
-Para probar alcanza, pero un cliente que sume diez personas necesita que el sistema mande el correo.
-
-Falta elegir el proveedor —el candidato natural es el mismo por el que salgan las alertas de stock,
-para no sumar dos— y decidir si el correo lleva un enlace con token de un solo uso o simplemente
-avisa "ya podés entrar con tu cuenta de Google". **Lo segundo es más seguro y más simple**: no hay
-token que robar ni que expirar, porque la habilitación ya vive en la base y la identidad la prueba
-Google.
+Falta el proveedor —conviene que sea el mismo por el que salgan las alertas de stock, para no sumar
+dos servicios— y depende de P-24 para el dominio del remitente. Un correo de invitación que sale de
+una casilla de Gmail personal no ayuda a vender.
 
 ### P-17 · Sitio institucional, landing y prospectos
 
-D-71 y D-72 fijaron la forma. Falta construir: el sitio y la landing como despliegue aparte, la
-entidad de prospecto con los estados del embudo, el formulario de cotización con sus protecciones, y
-el enlace de demo con token y vencimiento.
+El sitio como despliegue aparte, la entidad de prospecto con los estados del embudo, y el formulario
+de cotización con sus protecciones — va a ser la única escritura a la base expuesta a internet
+abierto de todo el sistema. Bloqueado por P-24.
 
-Queda por definir con qué se hace el sitio. **No debería ser Blazor:** es contenido que tiene que
-cargar rápido para alguien que llegó de un anuncio, lo va a tocar gente que no programa, y no
-necesita ni base ni sesión. Un generador de sitios estáticos o un gestor de contenido liviano encaja
-mejor y no arrastra el peso del producto.
+### P-13 · ¿`Documentos` es un recurso propio de permisos?
 
-También falta elegir la protección anti-bot del formulario, que es la única escritura expuesta a
-internet abierto de todo el sistema.
+Se resuelve junto con P-20. Hoy usan los permisos de `Maquinas`. Lo mismo aplica a `Integridad`, que
+se registra en la bitácora pero no existe como recurso protegible, así que hoy **no hay pantalla
+posible** para ver los hallazgos.
+
+### P-18 · Enganchar el control de cupos
+
+`IControlCupos` limita cuántas máquinas, usuarios, plantas y órdenes abiertas puede tener una empresa
+según su plan. Está construido y **no lo llama nadie**, porque no existen todavía los servicios de
+alta a los que engancharlo. Se resuelve cuando esté la lógica de operación.
 
 ### P-14 · Extracción OCR de los certificados
 
-Sigue vigente lo diseñado: subida → extracción en N8N con OCR → validación humana en pantalla de dos
-columnas antes de que el texto entre al motor. La entidad ya tiene dónde apoyarse; falta el flujo y la
-segunda pantalla.
+Etapa 2. Subida, extracción en N8N con OCR, validación humana antes de que el texto entre al motor.
 
-**Por qué la validación no es opcional.** Un certificado escaneado y pasado por OCR trae errores, y
-ese texto va a terminar influyendo en qué repuestos recomienda el sistema. Que un dato sin revisar
-entre al motor es exactamente lo que hace perder credibilidad a las recomendaciones.
+### P-03 · Escala de máquinas por planta
 
-**Cuando se haga:** el texto extraído es texto libre escrito por terceros, así que entra en
-`CamposCifrados` como aleatorio, igual que las descripciones de orden.
+Se ajusta con datos de los primeros clientes. Lo que hay que evitar desde ya: pantallas que solo
+funcionen con el extremo bajo del rango. Los listados nacen con paginación del lado del servidor
+aunque hoy se prueben con quince filas.
+
+### P-05 · Disparadores del estado suspendido
+
+D-33 dejó el modo solo lectura y D-74 sumó el vencimiento de vigencia. Falta la parte comercial, que
+se resuelve junto con P-19.
+
+---
+
+## Cambios que NO se hicieron y por qué
+
+| Qué | Por qué no |
+|---|---|
+| **Capacidad offline** | Decisión tuya: es un proyecto web. Contradice §2.1.4 del documento de visión, que además contradice a §1.9 |
+| **Bloqueo pesimista para el stock** | Se resolvió con libro mayor (D-30). Bloquear filas serializa y no escala |
+| **Enums nativos de PostgreSQL** | Cada cambio exige `ALTER TYPE` manual fuera de transacción |
+| **Matriz de permisos por defecto** | Cada cliente define la suya. Se reemplazó por el piso irrevocable (D-25) |
+| **Cifrar la bitácora entera** | D-26: la integridad importa más. Se cifra campo por campo (D-46) |
+| **Interceptores de EF para atar el cifrado a la fila** | Se hizo el DV de fila en tabla aparte (D-61) |
+| **Retención de bitácora por severidad** | Decisión tuya: siempre queda el registro |
+| **Registro público de empresas** | D-66: detrás de cada cliente hay un contrato |
+| **Alta automática por dominio** | D-67: el dominio acota a quién se puede invitar, no da acceso |
+| **Una identidad en varias empresas** | D-68: dos cuentas para probar, a cambio de no operar nunca sobre el tenant equivocado |
+| **VPN o lista blanca para el panel** | D-76: no escala a un equipo comercial. Queda como endurecimiento futuro |
+| **Tope histórico de órdenes** | D-77: una empresa ve todas las órdenes que creó, sean de hoy o de hace cinco años |

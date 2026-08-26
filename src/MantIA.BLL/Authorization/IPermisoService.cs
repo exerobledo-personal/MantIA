@@ -28,4 +28,10 @@ public interface IPermisoService
     /// un <c>PermisoPorUsuario</c>.
     /// </summary>
     void InvalidarUsuario(Guid usuarioId);
+
+    /// <summary>
+    /// Olvida el estado comercial de una empresa: plan, vigencia y suspension. Se llama al cambiar
+    /// cualquiera de los tres.
+    /// </summary>
+    void InvalidarEstadoEmpresa(Guid empresaId);
 }

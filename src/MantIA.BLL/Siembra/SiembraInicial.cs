@@ -42,6 +42,7 @@ public class SiembraInicial : BackgroundService
     // --- Identificadores fijos ---
     private static readonly Guid PlanInterno = new("11111111-0000-0000-0000-000000000001");
     private static readonly Guid PlanProfesional = new("11111111-0000-0000-0000-000000000002");
+    private static readonly Guid PlanPrueba = new("11111111-0000-0000-0000-000000000003");
 
     private static readonly Guid EmpresaMantIA = new("22222222-0000-0000-0000-000000000001");
     private static readonly Guid EmpresaCliente = new("22222222-0000-0000-0000-000000000002");
@@ -137,6 +138,7 @@ public class SiembraInicial : BackgroundService
         // filas de una a la otra.
         creadas += await SembrarPlataformaAsync(db, tenant, ct);
         creadas += await SembrarClienteAsync(db, tenant, ct);
+        creadas += await CompletarCamposNuevosAsync(db, ct);
 
         tenant.EmpresaId = null;
         tenant.UsuarioId = null;
@@ -148,9 +150,82 @@ public class SiembraInicial : BackgroundService
         }
 
         _log.LogInformation(
-            "Siembra inicial: {Cantidad} filas creadas. Entrar como '{SuperAdmin}' o " +
+            "Siembra inicial: {Cantidad} filas creadas o campos completados. Entrar como '{SuperAdmin}' o " +
             "'{AdminEmpresa}'. Son identidades de relleno: no existen en Auth0.",
             creadas, SubSuperAdmin, SubAdminEmpresa);
+    }
+
+    // ------------------------------------------------------------------ campos agregados despues
+
+    /// <summary>
+    /// Completa los campos que se agregaron al modelo despues de que la fila ya existia.
+    ///
+    /// <para><b>Solo rellena lo que esta en nulo. Nunca pisa un valor.</b> Esa es la linea que separa
+    /// esto de una siembra que sobrescribe: si ajustaste un cupo a mano para probar algo, se respeta.
+    /// El unico caso que resuelve es el de una columna que nacio despues que la fila y que, sin esto,
+    /// queda vacia para siempre —y un cupo vacio significa sin limite, que es justo lo contrario de
+    /// lo que se quiere—.</para>
+    ///
+    /// <para>Existe porque en desarrollo la base sobrevive a los cambios de modelo. Cuando el esquema
+    /// deje de moverse, este metodo deberia desaparecer.</para>
+    /// </summary>
+    private static async Task<int> CompletarCamposNuevosAsync(MantIADbContext db, CancellationToken ct)
+    {
+        var empresas = await db.Empresas.IgnoreQueryFilters().ToListAsync(ct);
+        var planes = await db.Planes.IgnoreQueryFilters().ToDictionaryAsync(p => p.Id, ct);
+
+        var tocadas = 0;
+        var ahora = DateTimeOffset.UtcNow;
+
+        foreach (var empresa in empresas)
+        {
+            if (!planes.TryGetValue(empresa.PlanId, out var plan)) continue;
+
+            if (empresa.MaxMaquinasHabilitadas is null)
+            {
+                empresa.MaxMaquinasHabilitadas = plan.MaxMaquinas;
+                tocadas++;
+            }
+
+            if (empresa.MaxUsuariosHabilitados is null)
+            {
+                empresa.MaxUsuariosHabilitados = plan.MaxUsuarios;
+                tocadas++;
+            }
+
+            if (empresa.MaxPlantasHabilitadas is null)
+            {
+                empresa.MaxPlantasHabilitadas = plan.MaxPlantas;
+                tocadas++;
+            }
+
+            // El tope de ordenes se deja como esta: nulo es sin limite y es un valor legitimo, asi
+            // que no hay forma de distinguir "todavia no se cargo" de "no tiene tope". Se completa
+            // solo si la empresa es de prueba, donde no tener tope si seria un error.
+            if (empresa.MaxOrdenesTrabajo is null && plan.EsPrueba)
+            {
+                empresa.MaxOrdenesTrabajo = plan.MaxOrdenesTrabajo;
+                tocadas++;
+            }
+
+            if (empresa.InicioVigencia is null)
+            {
+                empresa.InicioVigencia = ahora;
+                tocadas++;
+            }
+
+            // La vigencia nula tambien es legitima —MantIA no vence— asi que se completa solo si el
+            // plan define una duracion y la empresa no es la propia plataforma.
+            if (empresa.FinVigencia is null && empresa.Id != EmpresaMantIA && plan.DiasVigencia > 0)
+            {
+                empresa.FinVigencia = ahora.AddDays(plan.DiasVigencia);
+                tocadas++;
+            }
+
+        }
+
+        if (tocadas > 0) await db.SaveChangesAsync(ct);
+        return tocadas;
     }
 
     // ------------------------------------------------------------------ plataforma
@@ -176,7 +251,41 @@ public class SiembraInicial : BackgroundService
                 MaxMaquinas = 0,
                 MaxUsuarios = 50,
                 MaxPlantas = 0,
+                MaxOrdenesTrabajo = 0,
                 PrecioMensual = 0m,
+
+                // MantIA no vence. Es la unica empresa que puede no tener vigencia: si se venciera,
+                // el personal de soporte quedaria en solo lectura y no podria ni reactivar clientes.
+                DiasVigencia = 36_500,
+            });
+            creadas++;
+        }
+
+        if (!existentes.Contains(PlanPrueba))
+        {
+            db.Planes.Add(new Plan
+            {
+                Id = PlanPrueba,
+                Nombre = "Prueba",
+                Descripcion =
+                    "Cuenta de evaluacion. Es un tenant real y lo que se cargue sobrevive al upgrade.",
+
+                // El techo que hace que la prueba sea una prueba. Alcanza para cargar un sector y
+                // ver el sistema funcionando con datos propios, que es lo que convence; no alcanza
+                // para operar una planta gratis.
+                MaxMaquinas = 5,
+                MaxUsuarios = 3,
+                MaxPlantas = 1,
+
+                // Cien ordenes abiertas, que en la practica es no tener tope. Una orden es lo que
+                // menos recursos consume del sistema —"esta maquina necesita repuestos", "hay que
+                // cambiar esta lamparita"— y no toca ni la ingesta ni el modelo. El numero existe
+                // solo como freno ante un uso automatizado.
+                MaxOrdenesTrabajo = 100,
+
+                PrecioMensual = 0m,
+                DiasVigencia = 30,
+                EsPrueba = true,
             });
             creadas++;
         }
@@ -191,7 +300,12 @@ public class SiembraInicial : BackgroundService
                 MaxMaquinas = 200,
                 MaxUsuarios = 40,
                 MaxPlantas = 3,
+
+                // Sin tope de ordenes: acotar el trabajo de un cliente que paga no tiene sentido.
+                MaxOrdenesTrabajo = null,
+
                 PrecioMensual = 480_000m,
+                DiasVigencia = 365,
             });
             creadas++;
         }
@@ -221,7 +335,14 @@ public class SiembraInicial : BackgroundService
                 TenantId = "org_mantia",
                 PlanId = PlanInterno,
                 MaxMaquinasHabilitadas = 0,
+                MaxUsuariosHabilitados = 50,
+                MaxPlantasHabilitadas = 0,
+                MaxOrdenesTrabajo = 0,
                 Estado = EstadoEmpresa.Activa,
+
+                // Sin vencimiento: ver el comentario del plan Interno.
+                InicioVigencia = DateTimeOffset.UtcNow,
+                FinVigencia = null,
             });
             creadas++;
         }
@@ -235,7 +356,12 @@ public class SiembraInicial : BackgroundService
                 TenantId = "org_aceros_litoral",
                 PlanId = PlanProfesional,
                 MaxMaquinasHabilitadas = 200,
+                MaxUsuariosHabilitados = 40,
+                MaxPlantasHabilitadas = 3,
+                MaxOrdenesTrabajo = null,
                 Estado = EstadoEmpresa.Activa,
+                InicioVigencia = DateTimeOffset.UtcNow,
+                FinVigencia = DateTimeOffset.UtcNow.AddYears(1),
             });
             creadas++;
         }
