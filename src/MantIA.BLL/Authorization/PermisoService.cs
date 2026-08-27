@@ -138,14 +138,19 @@ public class PermisoService : IPermisoService
             var cuenta = await _db.Empresas
                 .IgnoreQueryFilters([MantIADbContext.FiltroBaja])
                 .Where(e => e.Id == empresaId)
-                .Select(e => new { e.Estado, e.FinVigencia })
+                .Select(e => new { e.Estado, e.FinVigencia, e.Cobranza })
                 .FirstOrDefaultAsync();
 
             if (cuenta is null) return true;
 
+            // Tres motivos, un solo estado. La suspension la decide alguien; el vencimiento de la
+            // vigencia llega solo; la mora de noventa dias es el corte automatico de la escalera.
+            // Para el cliente los tres se sienten igual, y separarlos en el codigo invitaria a que
+            // alguna pantalla contemple uno y se olvide de los otros.
             var vencida = cuenta.FinVigencia is { } fin && fin <= DateTimeOffset.UtcNow;
+            var cortada = cuenta.Cobranza is EstadoCobranza.Mora90 or EstadoCobranza.Incobrable;
 
-            return cuenta.Estado == EstadoEmpresa.Suspendida || vencida;
+            return cuenta.Estado == EstadoEmpresa.Suspendida || vencida || cortada;
         });
 
     private static bool EsLectura(string accion) =>

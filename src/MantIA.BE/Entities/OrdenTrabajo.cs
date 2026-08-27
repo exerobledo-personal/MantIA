@@ -30,6 +30,28 @@ public class OrdenTrabajo : TenantEntity, IConcurrencia
     public DateTimeOffset? FechaCierre { get; set; }
     public decimal? HorasResolucion { get; set; }
 
+    // ------------------------------------------------------------------ control de la solicitud
+
+    /// <summary>
+    /// Quien la reporto. Puede ser cualquier empleado de cualquier area, no solo mantenimiento, y
+    /// es el eje por el que ve sus propios pedidos alguien que solo tiene permiso de generar.
+    /// </summary>
+    public Guid? SolicitanteUsuarioId { get; set; }
+
+    /// <summary>Quien la reviso y decidio si correspondia. Nulo mientras nadie la miro.</summary>
+    public Guid? ControladaPorUsuarioId { get; set; }
+
+    public DateTimeOffset? FechaControl { get; set; }
+
+    /// <summary>
+    /// Por que se rechazo. Es obligatorio al rechazar: quien reporto algo merece saber por que no se
+    /// hizo, y sin motivo la proxima vez no reporta.
+    /// </summary>
+    public string? MotivoRechazo { get; set; }
+
+    /// <summary>Nacio como pedido y todavia nadie la miro.</summary>
+    public bool EsperandoControl => Estado == EstadoOrden.Solicitada;
+
     public uint Version { get; set; }
 
     public ICollection<OrdenTrabajoRepuesto> Repuestos { get; set; } = [];

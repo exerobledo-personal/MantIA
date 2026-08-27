@@ -49,6 +49,38 @@ public class Empresa : BaseEntity, IBajaLogica
     public int? DiasParaVencer(DateTimeOffset ahora) =>
         FinVigencia is { } fin ? (int)Math.Ceiling((fin - ahora).TotalDays) : null;
 
+    // ------------------------------------------------------------------ cobranza
+
+    public EstadoCobranza Cobranza { get; set; } = EstadoCobranza.AlDia;
+
+    /// <summary>Cuando se registro el ultimo pago. Nulo en una cuenta que nunca pago.</summary>
+    public DateTimeOffset? FechaUltimoPago { get; set; }
+
+    /// <summary>
+    /// Cuando se mando el ultimo aviso de mora. Evita repetir el correo del escalon en cada pasada
+    /// del trabajo de fondo: sin esto, un cliente en mora recibe el mismo aviso todos los dias.
+    /// </summary>
+    public DateTimeOffset? FechaUltimoAvisoMora { get; set; }
+
+    /// <summary>
+    /// Dias de atraso. Hasta que exista facturacion se cuentan desde el vencimiento de la vigencia.
+    /// Cero o negativo significa al dia.
+    /// </summary>
+    public int DiasDeMora(DateTimeOffset ahora) =>
+        FinVigencia is { } fin && fin < ahora ? (int)Math.Floor((ahora - fin).TotalDays) : 0;
+
+    /// <summary>
+    /// En que escalon deberia estar segun el atraso. No la asigna: solo dice cual corresponde, para
+    /// que el trabajo de fondo compare y decida si hay que avisar.
+    /// </summary>
+    public EstadoCobranza CobranzaQueCorresponde(DateTimeOffset ahora) => DiasDeMora(ahora) switch
+    {
+        >= 90 => EstadoCobranza.Mora90,
+        >= 60 => EstadoCobranza.Mora60,
+        >= 30 => EstadoCobranza.Mora30,
+        _ => EstadoCobranza.AlDia
+    };
+
     public EstadoEmpresa Estado { get; set; } = EstadoEmpresa.Activa;
     public DateTimeOffset? FechaBaja { get; set; }
 

@@ -9,6 +9,22 @@ public static class Acciones
     public const string Alta        = "Alta";
     public const string Modificacion= "Modificacion";
     public const string Baja        = "Baja";
+    /// <summary>
+    /// Revisar una solicitud y decidir si corresponde: la convierte en orden o la rechaza.
+    /// <para>
+    /// Es la accion que separa "alguien reporto algo" de "mantenimiento acepto que hay que hacerlo".
+    /// Sin ella, cualquier empleado que carga un pedido esta creando trabajo comprometido para el
+    /// equipo de mantenimiento, y el historial se llena de cosas que nunca fueron.
+    /// </para>
+    /// </summary>
+    public const string Controlar   = "Controlar";
+
+    /// <summary>Poner responsable a una orden. Es aparte de Modificacion porque reparte trabajo.</summary>
+    public const string Asignar     = "Asignar";
+
+    /// <summary>Ejecutar la orden: registrar avance, consumo de repuestos y resolucion.</summary>
+    public const string Realizar    = "Realizar";
+
     /// <summary>Cerrar una orden. Es aparte de Modificacion porque mueve stock.</summary>
     public const string Cerrar      = "Cerrar";
     /// <summary>Aceptar o rechazar una recomendacion.</summary>
@@ -54,7 +70,11 @@ public static class CatalogoPermisos
         new("Repuestos",       "Repuestos criticos",      Ambito.Operacion, [C, A, M, B]),
         new("Stock",           "Movimientos de stock",    Ambito.Operacion, [C, A]),
         new("Alertas",         "Alertas de stock",        Ambito.Operacion, [C, Acciones.Configurar]),
-        new("Ordenes",         "Ordenes de trabajo",      Ambito.Operacion, [C, A, M, B, Acciones.Cerrar]),
+        // La escalera de mantenimiento se arma con estas acciones y no con roles nuevos: generar,
+        // generar y controlar, generar controlar y asignar, o todo eso mas realizar. Cada empresa
+        // marca las celdas que quiere. Por eso la matriz no viene con valores por defecto.
+        new("Ordenes",         "Ordenes de trabajo",      Ambito.Operacion,
+            [C, A, M, B, Acciones.Controlar, Acciones.Asignar, Acciones.Realizar, Acciones.Cerrar]),
         new("Catalogo",        "Catalogo tecnico",        Ambito.Operacion, [C]),
         new("Recomendaciones", "Recomendaciones",         Ambito.Operacion, [C, Acciones.Decidir]),
         new("Reportes",        "Reportes operativos",     Ambito.Operacion, [C, A, M, B, Acciones.Exportar]),

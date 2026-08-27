@@ -70,6 +70,7 @@ public static class CamposCifrados
             // y se muestra; no se filtra por su contenido en SQL.
             ["OrdenTrabajo.DescripcionProblema"]   = NivelCifrado.Aleatorio,
             ["OrdenTrabajo.DescripcionResolucion"] = NivelCifrado.Aleatorio,
+            ["OrdenTrabajo.MotivoRechazo"]         = NivelCifrado.Aleatorio,
             ["MovimientoStock.Motivo"]             = NivelCifrado.Aleatorio,
             ["SolicitudRollback.Motivo"]           = NivelCifrado.Aleatorio,
             ["SolicitudRollback.MotivoRechazo"]    = NivelCifrado.Aleatorio,

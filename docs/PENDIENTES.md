@@ -5,11 +5,14 @@ en `DECISIONES.md`.
 
 | # | Qué falta | Urgencia |
 |---|---|---|
-| P-23 | Definir el modelo de ML y el flujo de ingesta | **Ya** |
-| P-24 | Nombre comercial y dominio | **Bloquea todo el frente comercial** |
+| P-25 | Vincular dos formas de entrar de la misma persona | Con P-21 |
+| P-26 | Modelo de facturación | Después de los primeros cobros |
+| P-28 | Inventario, depósito y proveedores (doc propio) | Con la capa de operación |
+| P-29 | Registrar MantOops en INPI, clase 42 | Antes de vender |
+| P-27 | Marca parametrizable de plataforma y de cliente (D-82) | Con el panel |
 | P-15 | Construir el panel de plataforma | Antes del primer cliente real |
 | P-22 | Roles dentro del panel de plataforma | Con el equipo comercial |
-| P-21 | Usuario y contraseña además de SSO | Antes de vender |
+| P-21 | Política de contraseñas, recuperación y doble factor | Antes de vender |
 | P-20 | Versionado de documentos | Conversación dedicada |
 | P-12 | Dónde viven los archivos en producción | Antes del primer cliente real |
 | P-19 | Aviso de mora 30/60/90 y purga manual de tenants | Antes del primer cliente real |
@@ -25,21 +28,45 @@ Resueltos: P-01, P-02, P-04, P-06 a P-11.
 
 ---
 
-### P-23 · Modelo de ML y flujo de ingesta
+### P-25 · Vincular dos formas de entrar de la misma persona
 
-La conversación más grande que queda, y la que menos puede seguir postergándose: qué predice el
-modelo exactamente, con qué datos se entrena, qué parte es aprendizaje y qué parte son reglas de
-negocio, cómo se valida la calidad de las sugerencias, y qué hace N8N en la iteración 1.
+Si alguien entra con el SSO de su empresa y después crea una contraseña con el mismo correo, el
+proveedor de identidad le asigna **dos identificadores distintos**. Para el sistema son dos personas,
+y el índice único la va a rechazar en el segundo intento.
 
-Es también lo que la corrección de la primera entrega dejó marcado como foco de mejora. Conviene
-resolverlo antes que cualquier pantalla: es lo que el producto vende, y todo lo construido hasta
-ahora es la infraestructura que lo sostiene.
+Dos salidas: obligar a una sola forma de entrar por persona —simple y molesto— o vincular las dos
+identidades a un mismo usuario, que es lo que corresponde pero hay que construirlo. Se decide junto
+con P-21.
 
-### P-24 · Nombre comercial y dominio
+### P-26 · Modelo de facturación
 
-El dominio de MantIA no está disponible. Eso bloquea el sitio, el correo de invitación y los
-subdominios del panel y de la aplicación. Es lo primero del frente comercial, porque todo lo demás
-cuelga del nombre.
+Hoy no existe: la escalera de mora se cuenta desde el vencimiento de la vigencia, que alcanza para
+arrancar. Cuando haya cobranza real hacen falta facturas como entidad, con su estado de pago, y la
+mora pasa a contarse desde ahí. Es otro módulo y puede esperar.
+
+### P-27 · Marca parametrizable
+
+D-82 fijó que ni el nombre, ni el logo, ni los colores van en el código. Falta construir: la
+configuración de marca de la plataforma, y la carga de logo y marca de cada empresa cliente desde
+"opciones avanzadas" al darla de alta. El almacén de documentos ya resuelve el guardado de los
+archivos.
+
+### P-28 · Inventario, depósito y proveedores
+
+Diseño completo en `INVENTARIO-Y-DEPOSITO.md`. Lo que falta decidir de ahí: la moneda del historial
+de precios, si el mínimo de stock se implementa también por depósito, si el plan acota la cantidad de
+artículos, y quién puede ver los precios de compra — que es información comercial y probablemente
+merezca una acción propia.
+
+**El cambio estructural que trae:** el stock deja de ser un número por repuesto y pasa a ser por par
+repuesto-depósito. Eso toca el libro mayor y obliga a sumar el depósito al catálogo de campos
+sellados.
+
+### P-29 · Registrar la marca en INPI
+
+`mantoops.com` y `.com.ar` ya están registrados, pero el dominio no da ningún derecho sobre el
+nombre. La marca en clase 42 sí. El caso de MantIA Industrial® muestra exactamente el costo de no
+hacerlo a tiempo.
 
 ### P-15 · Construir el panel de plataforma
 

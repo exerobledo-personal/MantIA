@@ -4,7 +4,47 @@ namespace MantIA.BE.Common;
 // "activo" tiene que romper la compilacion, no llegar a produccion. La DAL los persiste
 // como string para que la base siga siendo legible a ojo.
 
-public enum EstadoEmpresa { Activa, Suspendida, Baja }
+/// <summary>
+/// Situacion operativa de la empresa. Responde "puede trabajar", no "por que".
+/// El motivo vive en <see cref="EstadoCobranza"/>, y separarlos es lo que permite distinguir en la
+/// base y en pantalla un cliente que se fue al dia de uno al que se le corto por falta de pago.
+/// </summary>
+public enum EstadoEmpresa
+{
+    Activa,
+
+    /// <summary>Entra y consulta, no puede cargar nada. El motivo lo dice la cobranza.</summary>
+    Suspendida,
+
+    /// <summary>Se dio de baja. Con cobranza al dia es una baja voluntaria y limpia.</summary>
+    Baja
+}
+
+/// <summary>
+/// Escalera de mora. Es un campo propio y no un calculo al vuelo por dos razones: se ve en la
+/// pantalla del cliente y en la del panel sin recalcular nada, y deja constancia de en que escalon
+/// estaba la cuenta cuando se le mando cada aviso.
+/// <para>
+/// Hasta que exista modelo de facturacion, los escalones se cuentan desde el vencimiento de la
+/// vigencia. Cuando haya cobranza real, cambia la fuente del calculo y nada mas.
+/// </para>
+/// </summary>
+public enum EstadoCobranza
+{
+    AlDia,
+
+    /// <summary>Primer aviso. La empresa sigue trabajando normal.</summary>
+    Mora30,
+
+    /// <summary>Segundo aviso. Sigue trabajando: cortar a los sesenta dias no da tiempo a nadie.</summary>
+    Mora60,
+
+    /// <summary>Tercer aviso y corte: la empresa pasa a solo lectura y conserva todo.</summary>
+    Mora90,
+
+    /// <summary>Se dio por perdida. Estado terminal de la escalera; el tenant sigue existiendo.</summary>
+    Incobrable
+}
 
 public enum EstadoGenerico { Activo, Inactivo }
 
@@ -14,7 +54,37 @@ public enum Criticidad { Baja, Media, Alta, Critica }
 
 public enum EstadoEnriquecimiento { Pendiente, EnProceso, Completado, Fallido }
 
-public enum EstadoOrden { Abierta, EnCurso, Cerrada, Cancelada }
+/// <summary>
+/// Ciclo de vida de una orden de trabajo.
+/// <para>
+/// <b>Solicitada existe por una razon concreta.</b> Cualquier empleado de cualquier area puede
+/// reportar algo —una cinta trabada, una lampara quemada—, y eso todavia NO es una orden de trabajo:
+/// es un pedido que mantenimiento tiene que mirar. Sin este estado, el tiempo medio de resolucion,
+/// las ordenes por maquina y el historial que alimenta al modelo predictivo se llenan de pedidos que
+/// nunca fueron validos, y ese historial es justamente el dato de entrenamiento.
+/// </para>
+/// <para>
+/// Quien tiene permiso de Controlar crea directamente en Abierta: no tiene sentido que se apruebe a
+/// si mismo un pedido.
+/// </para>
+/// </summary>
+public enum EstadoOrden
+{
+    /// <summary>Reportada por alguien sin permiso de control. Espera revision de mantenimiento.</summary>
+    Solicitada,
+
+    /// <summary>Aceptada: hay trabajo que hacer. Es donde nace una orden creada por mantenimiento.</summary>
+    Abierta,
+
+    EnCurso,
+    Cerrada,
+
+    /// <summary>Se revisó la solicitud y no corresponde. Lleva motivo y no vuelve atras.</summary>
+    Rechazada,
+
+    /// <summary>Era una orden valida y se dio de baja. Distinto de Rechazada.</summary>
+    Cancelada
+}
 
 public enum TipoMantenimiento { Correctivo, Preventivo, Predictivo }
 

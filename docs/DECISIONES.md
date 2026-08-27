@@ -1330,3 +1330,155 @@ solo en empresas que no sean MantIA — en los dos casos el nulo es un valor leg
 distinguirlo de "todavía no se cargó".
 
 Es andamiaje de desarrollo. Cuando el esquema deje de moverse, este método debería desaparecer.
+
+### D-79 · El correo lo define la invitación; la forma de entrar la elige la persona · **Aprobado**
+
+MantIA o el administrador de la empresa fijan **a qué dirección** se invita. Esa dirección es de un
+dominio empresarial habilitado, cualquiera, no solo Google. La persona después elige cómo autenticarse
+contra ese correo: el SSO de su proveedor, o una contraseña propia.
+
+**El modelo de acceso no cambia**: se invita por correo, la identidad se ata en el primer ingreso.
+Lo único que cambia es de dónde sale el identificador.
+
+**Con conexión de contraseña hay que verificar el correo antes de consumir la invitación.** Con SSO,
+el proveedor ya probó que la persona controla esa casilla. Con contraseña no prueba nada: alguien que
+conozca la dirección invitada podría registrarse con ella antes que su dueño y quedarse con el
+acceso. La verificación es lo que cierra esa ventana.
+
+### D-80 · Estado de cobranza como campo propio, separado del estado operativo · **Aprobado — implementado**
+
+Dos ejes, no uno. `EstadoEmpresa` responde **"puede trabajar"**; `EstadoCobranza` responde
+**"por qué"**. Separarlos es lo que permite distinguir en la base y en pantalla un cliente que se fue
+al día de uno al que se le cortó por falta de pago — que era exactamente el pedido.
+
+`EstadoCobranza`: `AlDia`, `Mora30`, `Mora60`, `Mora90`, `Incobrable`. A los treinta y sesenta días
+la empresa **sigue trabajando normal**: cortar antes no le da tiempo a nadie a resolver un pago. A los
+noventa pasa a solo lectura y conserva todo.
+
+**Es un campo guardado y no un cálculo al vuelo**, por dos razones: se ve en las dos pantallas sin
+recalcular nada, y deja constancia de en qué escalón estaba la cuenta cuando se le mandó cada aviso.
+
+Hasta que exista modelo de facturación, los escalones se cuentan desde el vencimiento de la vigencia.
+Cuando haya cobranza real cambia la fuente del cálculo y nada más.
+
+### D-81 · Los archivos van a almacenamiento en la nube · **Aprobado**
+
+Se descarta que vivan en un servidor del cliente. El argumento que lo cierra: como igual tienen que
+llegar al catálogo compartido y al servidor de modelo, la conectividad no se evita — solo se agrega
+una pieza más que puede fallar, con respaldos que pasan a ser responsabilidad del cliente y un
+reclamo que llega igual cuando se pierda un archivo.
+
+### D-82 · La marca es configuración, no código · **Aprobado — pendiente de construir**
+
+Ni el nombre, ni el logo, ni los colores de la plataforma se escriben en el código. Salen de
+configuración, y cada empresa cliente puede además tener los suyos, cargados desde el panel al darla
+de alta.
+
+**Por qué ahora y no después.** Cambiar de nombre comercial —que va a pasar, porque el dominio de
+MantIA no está disponible— tiene que ser editar configuración y no buscar y reemplazar en el código.
+Y poder mostrarle a un cliente su propio logo es barato de hacer si se piensa desde el principio y
+carísimo de retrofitear.
+
+El almacén de documentos ya resuelve la parte difícil: los logos son archivos direccionados por
+contenido, igual que los certificados.
+
+### D-83 · Tres roles de plataforma, combinables en una misma persona · **Aprobado — pendiente de construir**
+
+- **SuperAdmin**: puede todo. Siempre existe al menos uno y es quien da de alta a los demás.
+- **Plataforma**: purga de tenants, integridad, bypass, ingesta del catálogo.
+- **Comercial**: alta de clientes, cambio de plan, prospectos, ver cuentas. Nada más.
+
+**Combinables**: una misma persona puede tener plataforma y comercial a la vez. Eso rompe el campo
+`Rol` único que existe hoy, así que el personal de MantIA necesita un conjunto de roles y no uno
+solo. El modelo de roles de las empresas cliente no cambia.
+
+### D-84 · El tope de órdenes es de operabilidad, no comercial · **Aprobado — implementado**
+### *(ajusta D-77)*
+
+Mil órdenes **abiertas**, no cien. Para llegar a mil sin cerrar ninguna hacen falta meses de
+abandono, así que el número no limita a nadie que trabaje: solo frena un uso automatizado o una carga
+descontrolada. El histórico sigue sin tope, y ninguna orden se borra ni se archiva nunca.
+
+### D-85 · MantOops · **Aprobado — dominios registrados**
+
+`mantoops.com` y `mantoops.com.ar`, los dos registrados. Reemplaza a MantIA, que no estaba
+disponible.
+
+**El motivo del cambio resultó ser mejor que el que lo disparó.** Se buscó otro nombre porque el
+dominio estaba tomado, y al mirar quién lo tenía apareció **MantIA Industrial®, de SA Sistemas**: un
+CMMS argentino, con la marca registrada. Seguir con ese nombre habría terminado en una carta
+documento con clientes ya adentro.
+
+**No hay indicio de plagio en ninguna dirección.** *MantIA* es la contracción evidente de
+mantenimiento más IA en castellano; que dos proyectos lleguen al mismo juego de palabras obvio es lo
+esperable. Y su propuesta de valor —mantenimiento, activos, órdenes, inventario e indicadores— **no
+menciona predictivo ni IA**: usan el nombre como gancho y venden un CMMS tradicional. El diferencial
+de este proyecto sigue intacto.
+
+**Pendiente y recomendado: registrar MantOops en INPI, clase 42.** El dominio no da ningún derecho
+sobre el nombre; la marca sí.
+
+Subdominios: `mantoops.com` para el sitio, `app.mantoops.com` para el producto,
+`admin.mantoops.com` para el panel de plataforma, `no-reply@mantoops.com` como remitente.
+
+### D-86 · La escalera de órdenes se arma con acciones, no con roles · **Aprobado — implementado**
+
+Cualquier empleado de cualquier área puede reportar algo. Después alguien de mantenimiento revisa si
+corresponde. Y el que revisa puede además asignar, y el que asigna puede además ejecutar.
+
+**No hace falta un rol nuevo por escalón.** Se agregan tres acciones al recurso `Ordenes` y la
+escalera se arma marcando celdas de la matriz que ya existe:
+
+| Perfil | Acciones |
+|---|---|
+| Solo genera | `Consultar` + `Alta` |
+| Genera y controla | + `Controlar` + `Modificacion` |
+| Genera, controla y asigna | + `Asignar` |
+| Genera, controla, asigna y realiza | + `Realizar` + `Cerrar` |
+
+Cada empresa define sus escalones. Es exactamente el caso que justifica que la matriz no venga con
+valores por defecto (D-25).
+
+### D-87 · Estado `Solicitada`: un pedido no es todavía una orden · **Aprobado — implementado**
+
+`EstadoOrden` pasa a ser `Solicitada, Abierta, EnCurso, Cerrada, Rechazada, Cancelada`.
+
+Quien **no** tiene permiso de `Controlar` crea en `Solicitada`. Quien lo tiene crea directamente en
+`Abierta`: no tiene sentido que se apruebe a sí mismo un pedido. El control la lleva a `Abierta` o a
+`Rechazada` **con motivo obligatorio** — quien reportó algo merece saber por qué no se hizo, y sin
+esa respuesta la próxima vez no reporta.
+
+**`Rechazada` y `Cancelada` son distintas y esa distinción es el punto.** Rechazada es un pedido que
+nunca fue una orden; cancelada es una orden válida que se dio de baja.
+
+**Por qué importa más allá del flujo:** sin este estado, el tiempo medio de resolución, las órdenes
+por máquina y el historial que alimenta al modelo predictivo se llenan de pedidos que nunca fueron
+válidos. Ese historial es el dato de entrenamiento del nivel 2, así que ensuciarlo sale caro dos
+veces.
+
+### D-88 · El que solo genera ve únicamente lo suyo · **Aprobado**
+
+Un empleado de logística que reporta una cinta trabada ve la opción de generar, sus propias órdenes y
+el estado de cada una. Nada más.
+
+**Ver todas las órdenes de la planta es una filtración**, aunque parezca inofensivo: el detalle de las
+intervenciones dice qué se rompe, cada cuánto y cuánto cuesta arreglarlo. Se puede conceder por
+excepción con un filtro, pero el piso es lo mínimo.
+
+`OrdenTrabajo` gana `SolicitanteUsuarioId`, que es el eje de ese filtro y además responde "quién
+reportó esto" cuando hay que preguntarle algo.
+
+### D-89 · El motor da recomendaciones genéricas hasta poder darlas propias · **Aprobado — corrige el documento del motor**
+
+La estadística del catálogo compartido **deja de ser predicción y pasa a ser contexto**. No dispara
+alertas por sí sola.
+
+**El argumento que lo decide:** dos máquinas iguales en dos plantas distintas no son la misma
+máquina. Cambian los turnos, la carga, el ambiente y la calidad del mantenimiento previo. Que un
+rodamiento haya fallado a las 4.200 horas en otra fábrica es una correlación, no una causa, y alertar
+por eso es el tipo de sugerencia que un mantenedor con oficio descarta a la primera — y con dos que
+le fallen deja de mirar la pantalla para siempre.
+
+Las recomendaciones accionables salen solo de **la ficha del fabricante** —genérica y correcta desde
+el día uno— y del **historial propio de esa planta**, cuando exista. La estadística del catálogo se
+muestra al lado, como referencia, y sirve para priorizar qué mirar primero.

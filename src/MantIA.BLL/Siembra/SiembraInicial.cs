@@ -277,11 +277,12 @@ public class SiembraInicial : BackgroundService
                 MaxUsuarios = 3,
                 MaxPlantas = 1,
 
-                // Cien ordenes abiertas, que en la practica es no tener tope. Una orden es lo que
-                // menos recursos consume del sistema —"esta maquina necesita repuestos", "hay que
-                // cambiar esta lamparita"— y no toca ni la ingesta ni el modelo. El numero existe
-                // solo como freno ante un uso automatizado.
-                MaxOrdenesTrabajo = 100,
+                // Mil ordenes ABIERTAS. No es un limite comercial sino de operabilidad: para llegar
+                // a mil sin cerrar ninguna hacen falta meses de abandono, asi que el numero solo
+                // frena un uso automatizado o una carga descontrolada. Una orden es ademas lo que
+                // menos recursos consume —"esta maquina necesita repuestos", "hay que cambiar esta
+                // lamparita"— y no toca ni la ingesta ni el modelo.
+                MaxOrdenesTrabajo = 1_000,
 
                 PrecioMensual = 0m,
                 DiasVigencia = 30,

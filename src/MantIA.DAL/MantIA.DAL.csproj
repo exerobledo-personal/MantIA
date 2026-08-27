@@ -17,7 +17,7 @@
     <!-- Bitacora. Va en la capa de datos junto al resto de la persistencia; la capa de negocio
          solo conoce la interfaz IRepositorioBitacora. Si el restore se queja de la version,
          correr: dotnet add src/MantIA.DAL package MongoDB.Driver -->
-    <PackageReference Include="MongoDB.Driver" Version="3.4.0" />
+    <PackageReference Include="MongoDB.Driver" Version="3.11.0" />
 
     <!-- La DAL registra sus propios servicios (RegistroBitacora), asi que necesita el enlace de
          configuracion. Configure<T>(IConfiguration) vive en Options.ConfigurationExtensions y
